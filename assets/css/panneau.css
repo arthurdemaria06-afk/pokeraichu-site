@@ -1,0 +1,23 @@
+/* Panneau A3 des salons : absence de droit de retractation (arrete du 2 decembre 2014) */
+@font-face{font-family:"Libre Caslon Text";src:url("../fonts/libre-caslon-text-700.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+@page{size:A3 landscape;margin:0}
+
+.panneau-tools .actions{margin-top:0}
+.panneau-tools .muted{margin:14px 0 28px}
+.panneau-sheet{padding:0 20px 56px;overflow-x:auto}
+.panneau{display:flex;flex-direction:column;justify-content:space-between;width:420mm;height:297mm;margin:0 auto;padding:24mm 26mm 20mm;background:#fff;color:#1E1B18;box-shadow:0 0 0 1px var(--line),0 10px 34px rgba(30,27,24,.1);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.panneau__txt{margin:0;font:700 90pt/1.06 "Libre Caslon Text",Georgia,"Times New Roman",serif;letter-spacing:-.012em;text-wrap:balance}
+.panneau__brand{display:flex;align-items:center;gap:6mm;margin:0;font:700 19pt/1 "Libre Caslon Text",Georgia,serif;letter-spacing:.09em}
+.panneau__brand img{width:16mm;height:16mm;transform:rotate(-3deg)}
+.panneau__brand .i-bolt{width:.5em;height:.82em;color:#E5802B;margin:0 0 0 -.04em}
+@media screen and (max-width:1680px){.panneau{zoom:.62}}
+@media screen and (max-width:1100px){.panneau{zoom:.4}}
+@media screen and (max-width:700px){.panneau{zoom:.21}}
+
+@media print{
+  html,body{margin:0;padding:0;background:#fff}
+  .skip,.band,.site-header,.site-footer,.panneau-tools,.toast{display:none!important}
+  main{margin:0;padding:0}
+  .panneau-sheet{padding:0;overflow:visible}
+  .panneau{zoom:1;margin:0;box-shadow:none;break-after:avoid}
+}

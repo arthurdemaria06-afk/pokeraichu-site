@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /envoi/
+Disallow: /gestion.html
+Disallow: /salon.html
+
+Sitemap: https://pokeraichu.netlify.app/sitemap.xml

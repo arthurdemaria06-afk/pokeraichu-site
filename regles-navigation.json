@@ -1,0 +1,1 @@
+{"prefetch": [{"where": {"and": [{"href_matches": "/*"}, {"not": {"href_matches": ["/r/*", "/en/r/*", "/s/*", "/envoi/*", "/gestion.html", "/salon.html", "/*.json", "/*.pdf"]}}, {"not": {"selector_matches": "[rel~=nofollow], [download], [target=_blank]"}}]}, "eagerness": "moderate"}, {"where": {"selector_matches": ".pager a[rel=next], .pager a[rel=prev]"}, "eagerness": "eager"}]}

@@ -1,0 +1,74 @@
+{
+ "id": "/",
+ "name": "Poké-Raichu",
+ "short_name": "Poké-Raichu",
+ "lang": "fr",
+ "dir": "ltr",
+ "description": "Cartes Pokémon rares du Japon et de France : réservation sur le site, paiement sur eBay.",
+ "start_url": "/?app=1",
+ "scope": "/",
+ "display": "standalone",
+ "display_override": [
+  "standalone",
+  "minimal-ui"
+ ],
+ "orientation": "portrait",
+ "background_color": "#F3EEE3",
+ "theme_color": "#B85414",
+ "categories": [
+  "shopping"
+ ],
+ "icons": [
+  {
+   "src": "/assets/img/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/assets/img/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  },
+  {
+   "src": "/assets/img/icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Catalogue",
+   "url": "/catalogue.html",
+   "description": "Tout le stock"
+  },
+  {
+   "name": "Ma sélection",
+   "url": "/selection.html"
+  },
+  {
+   "name": "Raichu",
+   "url": "/collections/raichu.html"
+  },
+  {
+   "name": "Nouveautés",
+   "url": "/catalogue.html?tri=recent"
+  }
+ ],
+ "screenshots": [
+  {
+   "src": "/assets/img/capture-mobile.png",
+   "sizes": "780x1688",
+   "type": "image/png",
+   "form_factor": "narrow",
+   "label": "Le catalogue sur mobile"
+  },
+  {
+   "src": "/assets/img/capture-bureau.png",
+   "sizes": "1280x800",
+   "type": "image/png",
+   "form_factor": "wide",
+   "label": "Le catalogue sur ordinateur"
+  }
+ ]
+}

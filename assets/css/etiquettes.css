@@ -1,0 +1,40 @@
+/* Etiquettes de stand : planches A4 de 21 etiquettes 63,5 x 38,1 mm (Avery L7160 et equivalents) */
+@page{size:A4;margin:0}
+
+.label-tools{display:grid;gap:14px;margin-bottom:28px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.label-tools .filter-row{grid-template-columns:minmax(0,26rem)}
+.label-tools .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 26px}
+.label-tools .count{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.label-tools .btn:disabled{opacity:.5;cursor:default}
+.label-tools .muted{max-width:44em;margin:0;font-size:.88rem}
+[data-label-base]{white-space:nowrap}
+.check{display:inline-flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.check input{width:20px;height:20px;margin:0;accent-color:var(--shu-fonce)}
+
+.sheets{display:grid;gap:22px;justify-content:start;padding-bottom:48px;overflow-x:auto}
+.sheet{display:grid;grid-template-columns:repeat(3,63.5mm);grid-auto-rows:38.1mm;column-gap:2.54mm;align-content:start;width:210mm;height:297mm;padding:15.15mm 7.21mm;overflow:hidden;background:#fff;box-shadow:0 0 0 1px var(--line),0 8px 30px rgba(30,27,24,.08)}
+@media screen and (max-width:859px){.sheet{zoom:.4}}
+@media screen and (min-width:600px) and (max-width:859px){.sheet{zoom:.68}}
+
+.label{display:grid;grid-template-columns:23mm minmax(0,1fr);column-gap:2.4mm;align-items:center;height:38.1mm;padding:2.5mm 2.8mm 2.5mm 2.3mm;overflow:hidden;background:#fff;color:#1E1B18;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media screen{.label{outline:1px dashed #D9D2C5;outline-offset:-1px}}
+.label__qr{width:23mm;height:23mm}
+.label__txt{display:flex;flex-direction:column;min-width:0;font:400 6.4pt/1.22 var(--text)}
+.label p{margin:0}
+.label__brand{display:flex;align-items:center;gap:.5mm;margin-bottom:.9mm;font:700 5.2pt/1 "Libre Caslon Text",Georgia,serif;letter-spacing:.1em}
+.label__brand svg{width:1.5mm;height:2.5mm;fill:#E5802B}
+.label__name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font:700 8.2pt/1.14 var(--text)}
+.label__num,.label__state{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#4A4640;font-variant-numeric:tabular-nums}
+.label__num{margin-top:.5mm}
+.label__price{margin-top:1.1mm;font:400 12.5pt/1 var(--display);font-variant-numeric:lining-nums}
+.label__price.ask{font:700 6.2pt/1.2 var(--text);letter-spacing:.08em;text-transform:uppercase;color:#9A4410}
+.label__ref{margin-top:1mm;font-size:5.4pt;color:#5F5A53}
+
+@media print{
+  html,body{margin:0;padding:0;background:#fff}
+  .skip,.band,.site-header,.site-footer,.crumbs,.page-head,.label-tools,.toast{display:none!important}
+  main,.wrap{margin:0;padding:0;max-width:none}
+  .sheets{display:block;padding:0;overflow:visible}
+  .sheet{zoom:1;box-shadow:none;break-after:page;break-inside:avoid}
+  .sheet:last-child{break-after:auto}
+}

@@ -1,0 +1,5 @@
+# Poké-Raichu : Netlify publie le site à chaque changement du dépôt.
+# _outils/construire.py ajoute les cartes enregistrées depuis /gestion.html (dossier _ajouts), puis retire les fichiers de travail.
+[build]
+  command = "python3 _outils/construire.py"
+  publish = "."

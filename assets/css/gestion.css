@@ -1,0 +1,59 @@
+/* Poké-Raichu · page de gestion : prix en direct */
+.callout[data-gestion-setup]{margin-bottom:24px}
+.callout[data-gestion-setup] .actions{margin-top:14px}
+.gestion-list .sel-row__ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-top:8px}
+.prix-edit{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px}
+.prix-box{display:inline-flex;align-items:stretch;border:1px solid var(--edge);border-radius:2px;background:var(--gofun);overflow:hidden}
+.prix-box input{width:5.6em;min-height:40px;padding:0 2px 0 12px;border:0;border-radius:0;background:none;color:var(--sumi);font:600 1rem/1 var(--text);text-align:right}
+.prix-box input:focus{outline:2px solid var(--sumi);outline-offset:-2px}
+.prix-box input[aria-invalid="true"]{color:var(--shu-fonce)}
+.prix-box__eur{display:flex;align-items:center;padding:0 10px 0 4px;color:var(--nezumi);font:600 1rem/1 var(--text)}
+.prix-box button{min-height:40px;padding:0 14px;border:0;border-left:1px solid var(--edge);background:var(--sumi);color:var(--gofun);font:600 .8rem/1 var(--text);cursor:pointer}
+.prix-box button:disabled{background:var(--gofun);color:var(--nezumi);cursor:default}
+.prix-edit.is-confirm .prix-box{border-color:var(--shu-fonce)}
+.prix-edit.is-confirm .prix-box button{background:var(--shu-fonce);color:var(--gofun)}
+.prix-edit .linkbtn{padding:6px 0;font-size:.85rem}
+.sel-row.is-live-price .sel-row__meta{color:var(--shu-fonce)}
+.prix-note{flex-basis:100%;margin:0;color:var(--nezumi);font-size:.85rem;line-height:1.4}
+.prix-note:empty{display:none}
+.prix-note.is-warn{color:var(--shu-fonce);font-weight:600}
+
+/* ajout d'une carte */
+.ajout{margin:0 0 28px;border:1px solid var(--edge);border-radius:2px;background:var(--gofun)}
+.ajout__sum{display:flex;align-items:center;gap:12px;min-height:56px;padding:0 16px;font:600 1.05rem/1.2 var(--text);cursor:pointer;list-style:none}
+.ajout__sum::-webkit-details-marker{display:none}
+.ajout__plus{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:var(--shu);color:var(--gofun);font:600 1.2rem/1 var(--text);transition:transform .2s}
+.ajout[open] .ajout__plus{transform:rotate(45deg)}
+.ajout__body{padding:0 16px 20px}
+.ajout-form{display:grid;gap:16px}
+.ajout-form fieldset{margin:0;padding:0;border:0;min-width:0}
+.ajout-form legend{padding:0;margin-bottom:6px;font-weight:600}
+.ajout-form .field{margin:0}
+.ajout-form .chips{margin-bottom:10px}
+.ajout-slots{display:grid;gap:14px}
+.ajout-pick{position:relative;display:inline-flex;align-items:center;justify-content:center;width:100%;cursor:pointer}
+.crop{margin-bottom:10px}
+.crop__frame{position:relative;width:min(100%,300px);aspect-ratio:5/7;margin:0 auto;overflow:hidden;border-radius:6px;background:var(--slab);touch-action:none;cursor:grab;box-shadow:0 0 0 2px var(--sumi)}
+.crop__frame img{position:absolute;left:50%;top:50%;max-width:none;user-select:none;-webkit-user-select:none;pointer-events:none;transform-origin:center}
+.crop__tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 18px;margin-top:10px}
+.crop__tools input[type=range]{flex:1 1 180px;max-width:300px;accent-color:var(--shu)}
+.ajout-ext-new{display:grid;gap:12px;margin-top:12px;padding:12px;border-left:3px solid var(--shu);background:var(--washi)}
+.ajout-grade{display:grid;gap:12px;margin-top:4px}
+.ajout-row{display:grid;grid-template-columns:1fr 1.4fr;gap:14px}
+.ajout-row .prix-box{display:flex}
+.ajout-row .prix-box input{flex:1;width:auto;min-height:44px}
+.ajout-more summary{cursor:pointer;color:var(--shu-fonce);font-size:.95rem}
+.ajout-more .field{margin-top:10px}
+.ajout-err{margin:0;color:var(--shu-fonce);font-weight:600}
+.ajout-err:empty,.ajout-msg:empty{display:none}
+.ajout-recap{padding:14px;border:2px solid var(--sumi);background:var(--washi)}
+.ajout-recap__t{margin:0 0 8px;font-weight:600}
+.ajout-recap .specs{margin:0}
+.ajout-msg{margin:0;padding:12px 14px;background:var(--washi);border-left:3px solid var(--edge)}
+.ajout-msg.is-ok{border-left-color:var(--shu);font-weight:600}
+.ajout-msg.is-warn{border-left-color:var(--shu-fonce);color:var(--shu-fonce)}
+.ajout-list__h{margin:26px 0 8px;font:600 1rem/1.3 var(--text)}
+.ajout-list__ul{margin:0;padding:0;list-style:none}
+.ajout-list__ul li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 14px;padding:10px 0;border-top:1px solid var(--line);font-size:.92rem}
+.ajout-list__ul .linkbtn.is-warn{color:var(--shu-fonce);font-weight:600}
+.crop__hint{margin:8px 0 0;text-align:center}
