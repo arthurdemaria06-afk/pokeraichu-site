@@ -244,7 +244,7 @@ def prepend_grid(rel, html_tiles, grid_pat=r'<ul class="grid" role="list"[^>]*>'
 
 def en_twin(rel_fr):
     s = rd(rel_fr)
-    m = re.search(r'hreflang="en" href="https://pokeraichu\.netlify\.app/([^"]+)"', s)
+    m = re.search(r'hreflang="en" href="https://pokeraichu\.com/([^"]+)"', s)
     return m.group(1) if m else None
 
 

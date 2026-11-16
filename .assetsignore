@@ -1,0 +1,18 @@
+# Fichiers du dépôt qui ne doivent pas être publiés sur le site
+.git
+.github
+.wrangler
+node_modules
+worker
+_ajouts
+_outils
+wrangler.jsonc
+wrangler.toml
+netlify.toml
+requirements.txt
+runtime.txt
+package.json
+package-lock.json
+.assetsignore
+.gitignore
+README.md

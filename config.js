@@ -15,7 +15,7 @@
   chaine_whatsapp  : lien de ta chaîne WhatsApp « Arrivages » (https://whatsapp.com/channel/...). Vide = boutons masqués.
   mesure_audience  : identifiant du site sur Umami Cloud (36 caractères, offre gratuite). Vide = aucune mesure.
   depot            : dépôt GitHub du site (« compte/nom »), où la page de gestion enregistre les cartes ajoutées.
-                     Netlify reconstruit le site à chaque ajout. Vide = bouton « Ajouter une carte » désactivé.
+                     Cloudflare reconstruit le site à chaque ajout. Vide = bouton « Ajouter une carte » désactivé.
   statuts_url      : lien « Raw » du Gist GitHub qui contient statuts.json (cartes réservées ou vendues en direct,
                      modifiables depuis /gestion.html sans republier). Vide = seulement la liste « reservees » ci-dessous.
   reservees        : références des cartes réservées en ce moment, ex. ["108", "113"]. Elles s'affichent

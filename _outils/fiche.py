@@ -6,7 +6,7 @@ les fiches (en-tete, pied de page, livraison) sont repris d'une fiche existante 
 """
 import html, json, os, re, unicodedata
 
-SITE = 'https://pokeraichu.netlify.app'
+SITE = 'https://pokeraichu.com'
 BOLT = '<svg class="i-bolt" viewBox="0 0 12 20" aria-hidden="true" focusable="false"><path d="M7.6 0 .6 11.4h5L3.9 20l7.5-12.2H6.4L7.6 0z"/></svg>'
 NNBSP = ' '
 

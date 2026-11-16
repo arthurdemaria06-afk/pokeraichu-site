@@ -1,5 +1,12 @@
-# Poké-Raichu : Netlify publie le site à chaque changement du dépôt.
-# _outils/construire.py ajoute les cartes enregistrées depuis /gestion.html (dossier _ajouts), puis retire les fichiers de travail.
+# Poké-Raichu : le site a déménagé sur https://pokeraichu.com (Cloudflare).
+# L'ancienne adresse pokeraichu.netlify.app renvoie chaque page vers la même page de la nouvelle adresse
+# (liens courts /r/ et /s/ des QR codes compris), dès que Netlify publie cette version.
 [build]
-  command = "python3 _outils/construire.py"
+  command = "echo Redirection vers pokeraichu.com"
   publish = "."
+
+[[redirects]]
+  from = "/*"
+  to = "https://pokeraichu.com/:splat"
+  status = 301
+  force = true

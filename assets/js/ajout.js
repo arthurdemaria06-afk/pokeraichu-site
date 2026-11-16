@@ -1,6 +1,6 @@
 /* Poké-Raichu · /gestion.html : ajouter une carte au stock depuis le téléphone.
    La carte (photo recadrée + infos) est enregistrée dans le dépôt GitHub du site (_ajouts/), en un seul envoi ;
-   Netlify reconstruit alors le site et crée ses vraies pages FR et EN (_outils/construire.py), en 2 à 3 minutes.
+   Cloudflare reconstruit alors le site et crée ses vraies pages FR et EN (_outils/construire.py), en 2 à 3 minutes.
    Clé : la même que pour les prix (stockée sur ce téléphone), avec l'accès « Contents: Read and write » au dépôt. */
 (function () {
   'use strict';
@@ -405,7 +405,7 @@
           return;
         }
         if (Date.now() - t0 < 8 * 60 * 1000) setTimeout(tick, 15000);
-        else setMsg('La mise à jour prend plus longtemps que prévu. Vérifiez sur Netlify (onglet Deploys) si besoin.', 'is-warn');
+        else setMsg('La mise à jour prend plus longtemps que prévu. Vérifiez sur Cloudflare (Workers et Pages, onglet Deployments) si besoin.', 'is-warn');
       }).catch(function () { if (Date.now() - t0 < 8 * 60 * 1000) setTimeout(tick, 15000); });
     })();
   }

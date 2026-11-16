@@ -1,0 +1,23 @@
+/* Poké-Raichu · hébergement Cloudflare (Workers, fichiers statiques).
+   À chaque changement du dépôt GitHub, Cloudflare lance « npx wrangler deploy » :
+   - build.command fabrique les cartes ajoutées depuis /gestion.html (_outils/construire.py) ;
+   - le site entier est publié tel quel (les fichiers listés dans .assetsignore restent privés) ;
+   - worker/formulaires.js reçoit seulement les envois de formulaires et les transmet par e-mail.
+   L'adresse de réception est le secret CONTACT_TO (réglé dans Cloudflare, jamais dans ce fichier). */
+{
+  "name": "pokeraichu-site",
+  "main": "worker/formulaires.js",
+  "compatibility_date": "2026-10-01",
+  "build": {
+    "command": "(python3 -m pip install -q -r requirements.txt || python3 -m pip install -q --break-system-packages -r requirements.txt || true) && python3 _outils/construire.py"
+  },
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/", "/contact.html", "/recherche.html", "/en/contact.html", "/en/find-a-card.html"]
+  },
+  "send_email": [{ "name": "MAIL" }],
+  "observability": { "enabled": true }
+}
