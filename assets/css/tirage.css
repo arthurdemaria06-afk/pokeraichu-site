@@ -1,0 +1,87 @@
+/* Poké-Raichu · page de tirage au sort */
+#tirage{padding-bottom:56px}
+.tg-step{padding:26px 0 30px;border-top:1px solid var(--line)}
+.tg-step h2{display:flex;align-items:center;gap:12px;margin:0 0 14px;font-size:clamp(1.5rem,5vw,2rem)}
+.tg-num{display:inline-flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:50%;background:var(--shu);color:var(--gofun);font:600 1rem/1 var(--text)}
+.tg-file{position:relative;margin-top:6px}
+.tg-sources{margin:16px 0 0;padding:0;list-style:none}
+.tg-sources li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:12px 0;border-top:1px solid var(--line);font-size:.94rem}
+.tg-sources li:last-child{border-bottom:1px solid var(--line)}
+.tg-sources .tg-src__name{flex:1 1 180px;min-width:0;overflow-wrap:anywhere;font-weight:600}
+.tg-sources .tg-src__n{color:var(--nezumi)}
+.tg-net{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border:1px solid var(--edge);border-radius:999px;background:var(--gofun);color:var(--sumi);font:600 .8rem/1 var(--text);cursor:pointer}
+.tg-net[data-net="instagram"]{border-color:var(--shu);color:var(--shu-fonce)}
+.tg-net[data-net="tiktok"]{border-color:var(--kon);color:var(--kon)}
+.tg-paste{margin-top:18px}
+.tg-paste summary{cursor:pointer;color:var(--shu-fonce);font-size:.95rem}
+.tg-paste p{margin:10px 0 8px}
+.tg-textarea{min-height:140px;padding:12px 14px;line-height:1.45;resize:vertical;margin-bottom:10px}
+.tg-err{margin:14px 0 0;color:var(--shu-fonce);font-weight:600}
+.tg-err:empty{display:none}
+.tg-grid{display:grid;gap:16px;margin-top:18px}
+@media (min-width:640px){.tg-grid{grid-template-columns:1fr 1fr}}
+.tg-check{display:flex;align-items:center;gap:10px;margin-top:16px;font-size:.95rem;cursor:pointer}
+.tg-check input{width:20px;height:20px;accent-color:var(--shu)}
+.tg-check[hidden],.field[hidden]{display:none}
+.tg-total{margin:0 0 14px;font:400 1.25rem/1.35 var(--display)}
+.tg-total strong{color:var(--shu-fonce);font-weight:400}
+.tg-search{max-width:360px;margin-bottom:12px}
+.tg-table-wrap{overflow-x:auto;border:1px solid var(--line);background:var(--gofun)}
+.tg-table{width:100%;border-collapse:collapse;font-size:.92rem}
+.tg-table th{padding:10px 12px;border-bottom:1px solid var(--line);font:600 .68rem/1.3 var(--text);letter-spacing:.1em;text-transform:uppercase;color:var(--nezumi);text-align:left;white-space:nowrap}
+.tg-table td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tg-table tr:last-child td{border-bottom:0}
+.tg-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tg-table td:first-child{font-weight:600;word-break:break-word}
+.tg-net-s{display:block;margin-top:2px;font:400 .78rem/1.2 var(--text);color:var(--nezumi)}
+@media (max-width:420px){.tg-bar{display:none}}
+.tg-table tr.is-win td{background:var(--tint)}
+.tg-table tr.is-win td:first-child::after{content:" ★";color:var(--shu)}
+.tg-bar{display:inline-block;width:46px;height:6px;margin-left:8px;border-radius:3px;background:var(--line);vertical-align:middle;overflow:hidden}
+.tg-bar i{display:block;height:100%;background:var(--shu)}
+.tg-more{margin:4px 0 0}
+
+/* scène du tirage */
+.tg-stage{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;padding:40px 16px 44px;overflow:hidden;border:1px solid var(--line);background:var(--raimon) repeat-x left top/14px 14px,var(--raimon) repeat-x left bottom/14px 14px,var(--washi);text-align:center}
+.tg-stage::before{content:"";position:absolute;inset:22px 10px;border:1px solid rgba(154,68,16,.3);pointer-events:none}
+.tg-stage__top{display:none}
+.tg-scene{perspective:1000px;width:min(56vw,230px);aspect-ratio:5/7;margin-top:6px}
+.tg-card{position:relative;width:100%;height:100%;transform-style:preserve-3d;will-change:transform}
+.tg-face{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:7%/5%;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;box-shadow:0 18px 40px -18px rgba(30,27,24,.55),0 0 0 1px rgba(59,36,20,.25)}
+.tg-face--front{background:var(--gofun) radial-gradient(circle at 50% 42%,var(--tint),var(--gofun) 70%)}
+.tg-face--front img{width:100%;height:100%;object-fit:contain;padding:12%}
+.tg-face--front.is-photo img{object-fit:cover;padding:0}
+.tg-face--back{transform:rotateY(180deg);background:var(--orange) linear-gradient(135deg,rgba(255,255,255,.18),rgba(0,0,0,.08));border:4px solid #3B2414}
+.tg-face--back::before{content:"";position:absolute;inset:8%;border:2px solid rgba(59,36,20,.55);border-radius:6%/4%;background:var(--raimon) repeat;background-size:14px 14px;opacity:.55}
+.tg-back__bolt{position:relative;display:flex;color:var(--yamabuki)}
+.tg-back__bolt .i-bolt{width:34%;min-width:48px;height:auto;margin:auto;filter:drop-shadow(0 0 0 #3B2414) drop-shadow(1px 1px 0 #3B2414) drop-shadow(-1px -1px 0 #3B2414)}
+.tg-ticker{min-height:1.4em;margin:6px 0 0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:400 clamp(1.5rem,6.4vw,2.3rem)/1.2 var(--display);color:var(--sumi)}
+.tg-ticker.is-spinning{color:var(--nezumi)}
+.tg-win{min-height:0}
+.tg-win:empty{display:none}
+.tg-win__label{margin:0;font:600 .74rem/1.3 var(--text);letter-spacing:.16em;text-transform:uppercase;color:var(--shu-fonce)}
+.tg-win__name{margin:4px 0 0;font:400 clamp(2rem,9vw,3.4rem)/1.1 var(--display);color:var(--shu-fonce);overflow-wrap:anywhere}
+.tg-win__meta{margin:8px 0 0;color:var(--nezumi);font-size:.95rem}
+.tg-stage.is-done .tg-ticker{display:none}
+.tg-confetti{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.tg-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
+.tg-actions .btn{flex:1 1 220px}
+.tg-actions--small{gap:4px 22px;margin-top:6px}
+.tg-photo{position:relative}
+.tg-log{margin:18px 0 0;padding-left:1.3em;color:var(--nezumi);font-size:.9rem}
+.tg-log li{padding:3px 0}
+.tg-log strong{color:var(--sumi)}
+
+/* mode film : la scène occupe tout l'écran (pour filmer ou faire une capture vidéo) */
+body.tg-film{overflow:hidden}
+.tg-stage.is-film{position:fixed;inset:0;z-index:100;justify-content:center;gap:22px;padding:calc(24px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom));border:0}
+.tg-stage.is-film::before{inset:calc(24px + env(safe-area-inset-top)) 12px calc(24px + env(safe-area-inset-bottom))}
+.tg-stage.is-film .tg-stage__top{position:absolute;top:calc(40px + env(safe-area-inset-top));left:24px;right:24px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tg-stage__brand{display:inline-flex;align-items:center;gap:2px;font:400 1.05rem/1 var(--display);letter-spacing:.06em}
+.tg-stage__brand .i-bolt{width:.6em;color:var(--shu)}
+.tg-stage__t{font:600 .7rem/1.3 var(--text);letter-spacing:.16em;text-transform:uppercase;color:var(--shu-fonce)}
+.tg-close{width:40px;height:40px;border:1px solid var(--edge);border-radius:50%;background:var(--gofun);color:var(--sumi);font:400 1.5rem/1 var(--text);cursor:pointer}
+.tg-stage.is-film .tg-scene{width:min(62vw,40vh,320px)}
+.tg-stage.is-film .tg-film-go{display:inline-flex}
+.tg-film-go{display:none;min-width:220px}
+@media (prefers-reduced-motion:reduce){.tg-card{transition:none}}

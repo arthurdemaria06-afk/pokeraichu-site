@@ -3,5 +3,6 @@ Allow: /
 Disallow: /envoi/
 Disallow: /gestion.html
 Disallow: /salon.html
+Disallow: /tirage.html
 
 Sitemap: https://pokeraichu.netlify.app/sitemap.xml
