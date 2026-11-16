@@ -57,3 +57,31 @@
 .ajout-list__ul li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 14px;padding:10px 0;border-top:1px solid var(--line);font-size:.92rem}
 .ajout-list__ul .linkbtn.is-warn{color:var(--shu-fonce);font-weight:600}
 .crop__hint{margin:8px 0 0;text-align:center}
+
+/* annonces prêtes à copier (eBay, Vinted, Leboncoin) */
+.annonce-btn{min-height:40px;padding:0 16px;font-size:.88rem}
+.annonce-ou.is-warn{color:var(--shu-fonce);font-weight:600}
+.annonce{grid-column:1/-1;display:grid;gap:14px;margin-top:12px;padding:14px;border:1px solid var(--edge);border-left:3px solid var(--shu);background:var(--gofun);min-width:0}
+.annonce__tabs{display:flex}
+.annonce__tabs button{flex:1}
+.annonce__body{display:grid;gap:14px;min-width:0}
+.annonce__champ{min-width:0}
+.annonce__head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-bottom:6px}
+.annonce__label{margin:0;font:600 .68rem/1.3 var(--text);letter-spacing:.1em;text-transform:uppercase;color:var(--nezumi)}
+.annonce__n{font-size:.8rem;color:var(--nezumi);font-variant-numeric:tabular-nums}
+.annonce__copy{margin-left:auto;min-height:36px;padding:0 16px;border:1px solid var(--sumi);border-radius:2px;background:var(--sumi);color:var(--gofun);font:600 .8rem/1 var(--text);cursor:pointer}
+.annonce__copy.is-ok{background:var(--shu-fonce);border-color:var(--shu-fonce)}
+.annonce__val{margin:0;padding:10px 12px;background:var(--washi);color:var(--sumi);font:400 .95rem/1.45 var(--text);white-space:pre-wrap;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+p.annonce__val{font-weight:600}
+.annonce__adj{padding:8px 0 0;font-size:.85rem}
+.annonce__ecart{display:grid;gap:8px;margin-top:10px;font-size:.9rem}
+.annonce__ecart .input{max-width:140px}
+.annonce__ecart .btn{justify-self:start;min-height:40px}
+.annonce__ecart p{margin:0}
+.annonce__done{font-size:.92rem}
+.annonce__photos{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+.annonce__photos p{margin:0}
+.annonce__strip{display:flex;gap:8px;overflow-x:auto}
+.annonce__strip:empty{display:none}
+.annonce__strip img{display:block;width:60px;height:84px;object-fit:cover;border-radius:3px;box-shadow:0 0 0 1px var(--edge)}
+.annonce__save{justify-self:start}

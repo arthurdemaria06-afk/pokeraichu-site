@@ -69,6 +69,7 @@
     var save = G.querySelector('[data-gestion-save]'), forget = G.querySelector('[data-gestion-forget]');
     var q = d.getElementById('g-q'), list = G.querySelector('[data-gestion-list]'), count = G.querySelector('[data-gestion-count]');
     var cards = [], byRef = {}, state = { reservees: [], vendues: [], prix: {} }, timer = null, loaded = false;
+    var AN = window.PR_ANNONCE || null, anOpen = null;
     function K(ref) { return String(ref).trim().toUpperCase(); }
     function eur0(n) { return Math.round(n) === n ? n + '\u202f€' : eur(n); }
     var note = { ref: null, text: '', warn: false };
@@ -224,6 +225,12 @@
         li.appendChild(el('span', 'sel-row__name', label(c)));
         li.appendChild(el('span', 'sel-row__meta', 'Réf. ' + c.ref + ' · ' + c.quantite + ' en stock' +
           (lp !== null ? ' · prix changé en direct (publié : ' + eur0(c.prix_eur) + ')' : '')));
+        var where = AN ? AN.ou(c.ref) : [];
+        if (where.length) {
+          var gone = cur === 'vendue';
+          li.appendChild(el('span', 'sel-row__meta annonce-ou' + (gone ? ' is-warn' : ''),
+            (gone ? 'Vendue : annonce à retirer sur ' : 'Annonce postée sur ') + where.join(', ')));
+        }
         var seg = el('div', 'seg');
         seg.setAttribute('role', 'group');
         seg.setAttribute('aria-label', 'Statut de la réf. ' + c.ref);
@@ -239,6 +246,14 @@
         ctrl.appendChild(seg);
         ctrl.appendChild(priceBox(c));
         li.appendChild(ctrl);
+        if (AN) {
+          var ab = el('button', 'btn btn--ghost annonce-btn', anOpen === c.ref ? 'Fermer l’annonce' : 'Annonce');
+          ab.type = 'button';
+          ab.setAttribute('aria-expanded', String(anOpen === c.ref));
+          ab.addEventListener('click', function () { anOpen = anOpen === c.ref ? null : c.ref; render(); });
+          ctrl.appendChild(ab);
+          if (anOpen === c.ref) li.appendChild(AN.panel(c, c.prix_eur === null || c.prix_eur === undefined ? null : (lp !== null ? lp : c.prix_eur), render));
+        }
         list.appendChild(li);
       });
       count.textContent = state.reservees.length + ' réservée(s) · ' + state.vendues.length + ' vendue(s) · ' + nPx +
@@ -265,7 +280,7 @@
     /* retour sur l'onglet : relire le Gist (changements faits depuis la caisse du salon ou un autre appareil) */
     d.addEventListener('visibilitychange', function () {
       var a = d.activeElement;
-      if (!d.hidden && loaded && !timer && !(a && a.closest && a.closest('.prix-edit'))) load();
+      if (!d.hidden && loaded && !timer && !(a && a.closest && a.closest('.prix-edit, .annonce'))) load();
     });
     syncSetup();
     load();
