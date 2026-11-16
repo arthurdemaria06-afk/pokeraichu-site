@@ -29,6 +29,19 @@
   function del(k, ses) { try { (ses ? sessionStorage : localStorage).removeItem(k); } catch (e) {} }
   function getJSON(k, ses, dflt) { try { return JSON.parse(get(k, ses) || 'null') || dflt; } catch (e) { return dflt; } }
   /* Historique (cartes vues, derniere visite, recherches) : desactivable depuis la page Confidentialite */
+  /* Lien « Gestion » en pied de page, seulement sur l'appareil du vendeur (celui où sa clé GitHub est enregistrée) */
+  if (get('pr.gestion.jeton') && !/\/gestion\.html$/.test(location.pathname)) {
+    var addGestion = function () {
+      var ul = d.querySelector('.site-footer nav .footer-links');
+      if (!ul || ul.querySelector('[data-gestion-link]')) return;
+      var li = el('li'), a = el('a', null, tr('Gestion (visible seulement sur ce téléphone)', 'Shop admin (only visible on this phone)'));
+      a.href = '/gestion.html';
+      a.setAttribute('data-gestion-link', '');
+      li.appendChild(a);
+      ul.insertBefore(li, ul.firstChild);
+    };
+    if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', addGestion); else addGestion();
+  }
   function memOK() { return get('pr.memoire') !== 'non'; }
   function norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function el(tag, cls, text) {

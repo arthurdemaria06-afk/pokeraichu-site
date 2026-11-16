@@ -3,10 +3,10 @@
    Styles, scripts, polices et photos versionnés : cache d'abord (ils ne changent jamais à adresse égale).
    Hors ligne : pages déjà vues, liens courts /r/ et /s/ résolus avec le stock gardé, sinon page « Hors ligne ». */
 'use strict';
-var VERSION = '050581ca73';
+var VERSION = 'd11e230d98';
 var CACHE = 'pr-' + VERSION;
 var SALON = 'pr-salon';
-var PRECACHE = ["/", "/index.html", "/catalogue.html", "/selection.html", "/hors-ligne.html", "/en/index.html", "/en/offline.html", "/en/selection.html", "/config.js", "/data/stock.json", "/assets/css/site.css?v=080ec330", "/assets/js/site.js?v=6a09b4fc", "/assets/js/hasard.js?v=4a27143b", "/assets/fonts/libre-caslon-display-400.woff2", "/assets/fonts/libre-caslon-text-400.woff2", "/assets/fonts/libre-caslon-text-700.woff2", "/assets/img/logo.svg?v=5dfcbaeb", "/assets/img/marque.svg?v=f3e27339", "/favicon.svg?v=f3e27339"];
+var PRECACHE = ["/", "/index.html", "/catalogue.html", "/selection.html", "/hors-ligne.html", "/en/index.html", "/en/offline.html", "/en/selection.html", "/config.js", "/data/stock.json", "/assets/css/site.css?v=080ec330", "/assets/js/site.js?v=d9c45a4f", "/assets/js/hasard.js?v=4a27143b", "/assets/fonts/libre-caslon-display-400.woff2", "/assets/fonts/libre-caslon-text-400.woff2", "/assets/fonts/libre-caslon-text-700.woff2", "/assets/img/logo.svg?v=5dfcbaeb", "/assets/img/marque.svg?v=f3e27339", "/favicon.svg?v=f3e27339"];
 var MAX_PAGES = 160;
 
 self.addEventListener('install', function (e) {
