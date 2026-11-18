@@ -4036,7 +4036,7 @@
     "a_signaler": false
    },
    "quantite": 1,
-   "prix_eur": 30.0,
+   "prix_eur": 35.0,
    "prix_sur_demande": false,
    "nouveau": false,
    "phare_rang": null,
@@ -4779,7 +4779,7 @@
     "type": "brute",
     "note": null,
     "cert": null,
-    "libelle": "Near Mint",
+    "libelle": "Excellent",
     "a_signaler": false
    },
    "quantite": 1,
@@ -4793,7 +4793,7 @@
     "variante": null,
     "edition": "1st Edition",
     "rarete": "Common",
-    "etat": "Near Mint",
+    "etat": "Excellent",
     "pokemons": [
      "Mareep"
     ],
@@ -4996,7 +4996,7 @@
     "type": "brute",
     "note": null,
     "cert": null,
-    "libelle": "Near Mint",
+    "libelle": "Excellent",
     "a_signaler": false
    },
    "quantite": 1,
@@ -5010,7 +5010,7 @@
     "variante": "Neo Genesis, old back",
     "edition": null,
     "rarete": "Holo",
-    "etat": "Near Mint",
+    "etat": "Excellent",
     "pokemons": [
      "Slowking"
     ],
@@ -5159,7 +5159,7 @@
     "type": "brute",
     "note": null,
     "cert": null,
-    "libelle": "Near Mint",
+    "libelle": "Excellent",
     "a_signaler": false
    },
    "quantite": 1,
@@ -5173,7 +5173,7 @@
     "variante": "Neo Revelation, old back",
     "edition": null,
     "rarete": null,
-    "etat": "Near Mint",
+    "etat": "Excellent",
     "pokemons": [
      "Raichu"
     ],
@@ -9564,7 +9564,7 @@
    "prix_sur_demande": false,
    "nouveau": false,
    "phare_rang": 8,
-   "photo": null,
+   "photo": "assets/photos/mew-ex-152-128-fr-pca-9-5-1-800.webp",
    "en": {
     "nom": "Mew ex",
     "variante": null,
@@ -9577,8 +9577,8 @@
     "titre": "Mew ex 152/128",
     "slug": "mew-ex-152-128-fr-pca-9-5"
    },
-   "photo_t": null,
-   "photo_xs": null,
+   "photo_t": "assets/photos/mew-ex-152-128-fr-pca-9-5-1-240.webp?v=e2e1658e",
+   "photo_xs": "assets/photos/mew-ex-152-128-fr-pca-9-5-1-560.webp?v=0962ce29",
    "ajout": 1
   },
   {
@@ -9619,7 +9619,7 @@
    "prix_sur_demande": false,
    "nouveau": false,
    "phare_rang": null,
-   "photo": null,
+   "photo": "assets/photos/mewtwo-ex-151-128-fr-pca-10-1-800.webp",
    "en": {
     "nom": "Mewtwo ex",
     "variante": null,
@@ -9632,8 +9632,8 @@
     "titre": "Mewtwo ex 151/128",
     "slug": "mewtwo-ex-151-128-fr-pca-10"
    },
-   "photo_t": null,
-   "photo_xs": null,
+   "photo_t": "assets/photos/mewtwo-ex-151-128-fr-pca-10-1-240.webp?v=23773a67",
+   "photo_xs": "assets/photos/mewtwo-ex-151-128-fr-pca-10-1-560.webp?v=33d71624",
    "ajout": 1
   },
   {
