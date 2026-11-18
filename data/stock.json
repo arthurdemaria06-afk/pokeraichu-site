@@ -4032,7 +4032,7 @@
     "type": "brute",
     "note": null,
     "cert": null,
-    "libelle": "Near Mint",
+    "libelle": "Excellent",
     "a_signaler": false
    },
    "quantite": 1,
@@ -4046,7 +4046,7 @@
     "variante": null,
     "edition": null,
     "rarete": "SAR",
-    "etat": "Near Mint",
+    "etat": "Excellent",
     "pokemons": [
      "Sylveon"
     ],
