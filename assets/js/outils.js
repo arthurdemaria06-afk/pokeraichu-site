@@ -1,5 +1,6 @@
 /* Poké-Raichu · outils du vendeur (pages non référencées) :
    - /gestion.html : statuts (réservée, vendue) et prix en direct écrits dans un Gist GitHub, lus par le site sans republier ;
+     bouton « Modifier » (assets/js/modif.js) : nom, état et Pokémon d'une fiche déjà en ligne ;
    - /salon.html : caisse du stand utilisable sans réseau, export des ventes pour l'Excel. */
 (function () {
   'use strict';
@@ -70,6 +71,7 @@
     var q = d.getElementById('g-q'), list = G.querySelector('[data-gestion-list]'), count = G.querySelector('[data-gestion-count]');
     var cards = [], byRef = {}, state = { reservees: [], vendues: [], prix: {} }, timer = null, loaded = false;
     var AN = window.PR_ANNONCE || null, anOpen = null;
+    var MO = window.PR_MODIF || null, moOpen = null;
     function K(ref) { return String(ref).trim().toUpperCase(); }
     function eur0(n) { return Math.round(n) === n ? n + '\u202f€' : eur(n); }
     var note = { ref: null, text: '', warn: false };
@@ -231,6 +233,8 @@
           li.appendChild(el('span', 'sel-row__meta annonce-ou' + (gone ? ' is-warn' : ''),
             (gone ? 'Vendue : annonce à retirer sur ' : 'Annonce postée sur ') + where.join(', ')));
         }
+        var wait = MO ? MO.etiquette(c) : '';
+        if (wait) li.appendChild(el('span', 'sel-row__meta modif-attente', wait));
         var seg = el('div', 'seg');
         seg.setAttribute('role', 'group');
         seg.setAttribute('aria-label', 'Statut de la réf. ' + c.ref);
@@ -254,6 +258,14 @@
           ctrl.appendChild(ab);
           if (anOpen === c.ref) li.appendChild(AN.panel(c, c.prix_eur === null || c.prix_eur === undefined ? null : (lp !== null ? lp : c.prix_eur), render));
         }
+        if (MO) {
+          var mb = el('button', 'btn btn--ghost modif-btn', moOpen === c.ref ? 'Fermer la modification' : 'Modifier');
+          mb.type = 'button';
+          mb.setAttribute('aria-expanded', String(moOpen === c.ref));
+          mb.addEventListener('click', function () { moOpen = moOpen === c.ref ? null : c.ref; render(); });
+          ctrl.appendChild(mb);
+          if (moOpen === c.ref) li.appendChild(MO.panel(c, render));
+        }
         list.appendChild(li);
       });
       count.textContent = state.reservees.length + ' réservée(s) · ' + state.vendues.length + ' vendue(s) · ' + nPx +
@@ -264,6 +276,7 @@
         cards = r[0].cartes.slice().sort(function (a, b) { return (parseInt(a.ref, 10) || 1e6) - (parseInt(b.ref, 10) || 1e6) || a.ref.localeCompare(b.ref); });
         byRef = {};
         cards.forEach(function (c) { byRef[K(c.ref)] = c; });
+        if (MO) MO.apprendre(cards);
         state.reservees = refs(r[1].reservees);
         state.vendues = refs(r[1].vendues);
         state.prix = cleanPrix(r[1].prix);

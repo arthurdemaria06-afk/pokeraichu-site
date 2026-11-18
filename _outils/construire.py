@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Poké-Raichu · construction du site par Netlify.
+"""Poké-Raichu · construction du site par Cloudflare (a chaque commit).
 
-Ajoute au site les cartes enregistrees depuis la page de gestion (_ajouts/cartes.json et _ajouts/photos/),
-avec leurs vraies pages FR et EN, puis retire les fichiers de travail du site publie.
-Sans carte ajoutee, le site est publie tel quel. Relancable : il part toujours des fichiers du depot.
+1. Ajoute au site les cartes enregistrees depuis la page de gestion (_ajouts/cartes.json et _ajouts/photos/),
+   avec leurs vraies pages FR et EN.
+2. Reporte les modifications de fiches enregistrees depuis la page de gestion (_ajouts/modifs.json : nom, etat,
+   Pokemon), sur les cartes du depot comme sur les cartes ajoutees (voir modifier.py).
+3. Retire les fichiers de travail du site publie.
+Sans ajout ni modification, le site est publie tel quel. Relancable : il part toujours des fichiers du depot.
 """
 import datetime, hashlib, io, json, os, re, shutil, sys
 
@@ -301,17 +304,26 @@ def add_pocket(c, rel, lang):
 
 
 def main():
+    ajouter()
+    try:  # une modification mal remplie ne bloque jamais le site
+        import modifier
+        for line in modifier.appliquer_modifs(ROOT):
+            print(line)
+    except Exception as e:
+        print('modifications ignorées : %r' % e)
+    cleanup()
+
+
+def ajouter():
     raws = load_raw()
     if not raws:
-        print('Aucune carte ajoutée : site publié tel quel.')
-        cleanup()
+        print('Aucune carte ajoutée.')
         return
     st = json.load(open(P('data', 'stock.json'), encoding='utf-8'))
     stock = st['cartes']
     known = {c['ref'] for c in stock} | {v.get('ref') for v in st.get('vendus', []) if isinstance(v, dict)}
     raws = [r for r in raws if r['ref'] not in known]
     if not raws:
-        cleanup()
         return
     used_fr = {f[:-5] for f in os.listdir(P('cartes'))}
     used_en = {f[:-5] for f in os.listdir(P('en', 'cards'))}
@@ -469,7 +481,6 @@ def main():
     s = re.sub(r"var VERSION = '[0-9a-f]+';", "var VERSION = '%s';" % hashlib.md5((s + vf + ve).encode()).hexdigest()[:10], s, count=1)
     wr('sw.js', s)
     print('%d carte(s) ajoutée(s) : %s' % (len(new), ', '.join('%s %s' % (c['ref'], c['slug']) for c in new)))
-    cleanup()
 
 
 def cleanup():

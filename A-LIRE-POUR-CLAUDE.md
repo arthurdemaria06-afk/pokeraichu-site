@@ -1,6 +1,6 @@
 # Poké-Raichu · passation du site (à lire avant toute modification)
 
-Mis à jour le 16 novembre 2026. Ce fichier résume l'état du site, comment il est hébergé et publié,
+Mis à jour le 18 novembre 2026. Ce fichier résume l'état du site, comment il est hébergé et publié,
 et les règles à respecter. Il n'est pas publié sur le site (exclu dans `.assetsignore`).
 
 ## 1. Le propriétaire et sa façon de travailler
@@ -57,6 +57,12 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
   - **Bouton « Annonce »** (`assets/js/annonce.js`) : titre, prix, description et photos prêts à copier pour
     **eBay (80 car.), Vinted (60), Leboncoin (50)**. Écart de prix par plateforme et cases « postée sur… »
     gardés dans le `localStorage`. Rien n'est envoyé aux plateformes (Vinted interdit l'automatisation).
+  - **Bouton « Modifier »** (`assets/js/modif.js`) : change le **nom** (FR et EN), l'**état** d'une carte non gradée
+    (ou le n° de certificat d'un slab) et les **Pokémon** d'une fiche déjà en ligne. Un seul fichier est commité :
+    `_ajouts/modifs.json` (`{"modifs": {"<réf>": {nom_fr, nom_en, etat | cert, pokemons, pokemons_en, le}}}`), puis
+    Cloudflare reconstruit le site. La référence et l'adresse (slug) de la fiche ne changent jamais.
+    Lots et scellés ne sont pas modifiables depuis le téléphone. L'attente de publication est gardée dans le
+    `localStorage` (`pr.modif.attente`).
   - Un lien « Gestion (visible seulement sur ce téléphone) » apparaît en pied de page du site quand la clé est
     enregistrée (`site.js`).
 - `/salon.html` : caisse du stand utilisable hors ligne. `/etiquettes.html`, `/panneau-salon.html` : étiquettes et QR codes.
@@ -88,6 +94,19 @@ modifiées directement, et les nouvelles cartes sont produites par :
   - numérotation des promos ;
   - apostrophe → « - » dans les slugs ;
   - bloc « cartes liées » vide = "\n".
+- `_outils/modifier.py` : **modifie une fiche déjà en ligne sans la régénérer**. Il calcule ce que `fiche.py` produit
+  pour l'ancienne et la nouvelle version de la carte, puis reporte seulement les différences dans les vraies pages
+  (fusion à trois voies : tout ce qui a été ajouté à la main dans une page est conservé). Il met à jour la fiche FR et EN,
+  toutes les vignettes, les pages Pokémon et collections Pikachu/Raichu, le filtre du catalogue, `data/stock.json`,
+  les index de recherche, puis les `?v=` et la version du service worker.
+  - Appelé par `construire.py` pour `_ajouts/modifs.json` (cartes du dépôt et cartes ajoutées).
+  - **Pour changer la base du dépôt** (état, nom, Pokémon, prix publié), ne plus éditer les pages à la main :
+    `python3 _outils/modifier.py . 094 '{"etat": "Excellent"}'` (clés : `nom_fr`, `nom_en`, `etat`, `cert`, `pokemons`,
+    `pokemons_en`, `prix_eur`), puis commit. Une modification enregistrée depuis le téléphone pour la même fiche
+    garde la priorité au moment de la construction.
+  - Limites : lots et scellés non gérés ; une carte sans photo ne prend pas de pochette dans le classeur Raichu ;
+    ajouter une première photo à une fiche du dépôt se fait par script (paramètre `entre` de `appliquer`, voir le commit `e9f37c2`).
+  - Contrôle fait le 18/11 : aller-retour sur les 204 fiches modifiables (changement puis retour) = site identique, 0 conflit.
 - `data/stock.json` : clés `meta, taxonomies, cartes, vendus, parties, coups_de_foudre` (217 cartes au 16/11).
 - `config.js` : **seul fichier de réglages à la main** (WhatsApp, livraison, remises, coups de foudre, TVA, médiateur…).
   Tout est documenté en tête du fichier.
@@ -114,6 +133,8 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - **Test de l'ajout de carte depuis le téléphone** sur pokeraichu.com : premier essai réel prévu par Arthur.
   Vérifier que la carte apparaît en 2 à 3 minutes et que le build Cloudflare est vert. Si le build échoue,
   demander la ligne `✘ [ERROR]` du journal.
+- **Premier essai réel du bouton « Modifier »** depuis le téléphone : vérifier que la fiche change en 2 à 3 minutes
+  et que le build Cloudflare est vert (le journal liste chaque fiche modifiée ou ignorée).
 - **Tester le formulaire de contact** (réception sur la boîte d'Arthur via Email Routing).
 - Quand Netlify aura de nouveau des crédits : vérifier que `pokeraichu.netlify.app` redirige bien vers pokeraichu.com,
   puis proposer à Arthur de verrouiller la publication automatique sur Netlify (« Lock to stop auto publishing »).
@@ -122,6 +143,8 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (18/11) Bouton « Modifier » de la page de gestion (nom, état, Pokémon) + `_outils/modifier.py` dans la construction
+- `e9f37c2` États « Excellent » des cartes d'avant 2012, photos des slabs PCA 231 et 232, Nymphali à 35 €
 - `133799d` Ajout de cartes depuis la page de gestion (GitHub + build)
 - `67e4073` Page de tirage au sort
 - `7758e1a` Bouton « Annonce » (eBay, Vinted, Leboncoin)
