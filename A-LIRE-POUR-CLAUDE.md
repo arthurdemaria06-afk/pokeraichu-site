@@ -190,6 +190,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (19/11) Ajout 347 Minotaupe 079/071 AR (SV5M), 348 Minotaupe 059/049 CHR (sm11b Dream League), 349 Démolosse 206/184 CHR (s8b), prix sur demande, brouillons Shopify PKR-347 à 349.
 - (19/11) Comptes clients (connexion Google) et éclairs : voir § Comptes clients et éclairs. Reste à faire par Arthur : ID client Google dans `config.js` (`google_client_id`) et base D1 liée (`d1_databases` dans `wrangler.jsonc`).
 - (19/11) Ajout 345 Raikou-ex 108/076 KR et 346 Mentali-ex 211/187 KR (SAR, prix sur demande ; Shopify : brouillons PKR-345 et PKR-346 à 0 €, à publier avec un prix). `construire.py` : la livraison d'une nouvelle fiche est reprise d'une fiche chiffrée si le modèle est en prix sur demande.
 - (19/11) Gestion : petite photo à gauche du nom ; premier prix possible pour les cartes en prix sur demande
