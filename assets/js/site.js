@@ -374,45 +374,75 @@
   function soldNode(node, ref) { return isSold(ref) || linked(node).some(isSold); }
   function resNode(node, ref) { return !soldNode(node, ref) && (isRes(ref) || linked(node).some(isRes)); }
   var lot = d.querySelector('[data-lot-ref]');
-  function sticker(art, text) {
+  function sticker(art) {
     var sk = art.querySelector('[data-sticker]');
-    if (!sk) { sk = el('span', 'sticker'); sk.setAttribute('data-sticker', ''); art.appendChild(sk); }
-    sk.textContent = text;
-    sk.hidden = false;
+    if (!sk) { sk = el('span', 'sticker'); sk.setAttribute('data-sticker', ''); sk.hidden = true; art.appendChild(sk); }
+    return sk;
+  }
+  /* Statut affiché puis levé (carte remise en vente depuis la gestion) : chaque élément retrouve son état d'origine.
+     Sans cela, une carte inscrite « vendue » dans config.js le restait à l'écran même quand le Gist dit le contraire. */
+  function mark(node, on, text) {
+    if (!node) return;
+    if (on) {
+      if (!node.hasAttribute('data-st0')) { node.setAttribute('data-st0', node.textContent); node.setAttribute('data-st0h', node.hidden ? '1' : ''); }
+      node.textContent = text;
+      node.hidden = false;
+    } else if (node.hasAttribute('data-st0')) {
+      node.textContent = node.getAttribute('data-st0');
+      node.hidden = node.getAttribute('data-st0h') === '1';
+      node.removeAttribute('data-st0');
+      node.removeAttribute('data-st0h');
+    }
+  }
+  function hideSold(b, sold) {
+    if (!b) return;
+    if (sold) {
+      if (!b.hasAttribute('data-sold-hid')) b.setAttribute('data-sold-hid', b.hidden ? '1' : '');
+      b.hidden = true;
+    } else if (b.hasAttribute('data-sold-hid')) {
+      b.hidden = b.getAttribute('data-sold-hid') === '1';
+      b.removeAttribute('data-sold-hid');
+    }
   }
   function applyStatuses() {
     if (!RES.length && !SOLD.length && !d.querySelector('.tile.is-reserved, .tile.is-sold, .pocket.is-reserved, .pocket.is-sold')) return applyLot();
     all('.tile[data-ref], .pocket[data-ref]').forEach(function (t) {
-      var ref = t.getAttribute('data-ref'), sold = soldNode(t, ref), res = resNode(t, ref);
+      var ref = t.getAttribute('data-ref'), sold = soldNode(t, ref), res = resNode(t, ref), on = res || sold;
+      var txt = sold ? tr('Vendue', 'Sold') : tr('Réservée', 'Reserved');
       if (res !== t.classList.contains('is-reserved')) t.classList.toggle('is-reserved', res);
       if (sold !== t.classList.contains('is-sold')) t.classList.toggle('is-sold', sold);
       var art = t.querySelector('.art');
-      if (art && (res || sold)) sticker(art, sold ? tr('Vendue', 'Sold') : tr('Réservée', 'Reserved'));
-      var st = t.querySelector('[data-status-text]');
-      if (st && (res || sold)) st.textContent = sold ? tr('Vendue', 'Sold') : tr('Réservée', 'Reserved');
-      var pk = t.querySelector('[data-pick]');
-      if (pk && sold) pk.hidden = true;
+      if (art) mark(on ? sticker(art) : art.querySelector('[data-sticker]'), on, txt);
+      mark(t.querySelector('[data-status-text]'), on, txt);
+      hideSold(t.querySelector('[data-pick]'), sold);
     });
     applyLot();
   }
   function applyLot() {
     if (!lot || lot.hasAttribute('data-gone')) return;
-    var ref = lot.getAttribute('data-lot-ref'), sold = soldNode(lot, ref), res = resNode(lot, ref);
-    if (!res && !sold) return;
-    lot.classList.add(sold ? 'is-sold' : 'is-reserved');
-    var ls = lot.querySelector('[data-sticker]');
-    if (ls) { ls.textContent = sold ? tr('Vendue', 'Sold') : tr('Réservée', 'Reserved'); ls.hidden = false; }
-    var lst = lot.querySelector('[data-status-text]');
-    if (lst) lst.textContent = sold ? tr('Vendue', 'Sold') : tr('Réservée', 'Reserved');
+    var ref = lot.getAttribute('data-lot-ref'), sold = soldNode(lot, ref), res = resNode(lot, ref), on = res || sold;
+    var txt = sold ? tr('Vendue', 'Sold') : tr('Réservée', 'Reserved');
+    lot.classList.toggle('is-sold', sold);
+    lot.classList.toggle('is-reserved', res);
+    mark(lot.querySelector('[data-sticker]'), on, txt);
+    mark(lot.querySelector('[data-status-text]'), on, txt);
     all('[data-msg-reserved]').forEach(function (a) {
-      if (a.getAttribute('data-status-done')) return;
-      a.setAttribute('data-status-done', '1');
-      a.setAttribute('data-msg', a.getAttribute('data-msg-reserved'));
-      a.textContent = a.getAttribute('data-label-reserved');
+      if (on === a.hasAttribute('data-status-done')) return;
+      if (on) {
+        a.setAttribute('data-status-done', '1');
+        a.setAttribute('data-msg-avant', a.getAttribute('data-msg') || '');
+        a.setAttribute('data-label-avant', a.textContent);
+        a.setAttribute('data-msg', a.getAttribute('data-msg-reserved'));
+        a.textContent = a.getAttribute('data-label-reserved');
+      } else {
+        a.removeAttribute('data-status-done');
+        a.setAttribute('data-msg', a.getAttribute('data-msg-avant') || '');
+        a.textContent = a.getAttribute('data-label-avant') || a.textContent;
+      }
       setContact(a, a.getAttribute('data-msg'), a.getAttribute('data-ref'));
     });
-    all('[data-alert-reserved]').forEach(function (b) { b.hidden = false; });
-    if (sold) all('[data-pick-main]').forEach(function (b) { b.hidden = true; });
+    all('[data-alert-reserved]').forEach(function (b) { b.hidden = !on; });
+    all('[data-pick-main]').forEach(function (b) { hideSold(b, sold); });
   }
   applyStatuses();
   var LIVE = String(C.statuts_url || '').trim();
