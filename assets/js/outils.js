@@ -120,6 +120,9 @@
     var jet = d.getElementById('g-jeton'), info = G.querySelector('[data-gestion-info]');
     var save = G.querySelector('[data-gestion-save]'), forget = G.querySelector('[data-gestion-forget]');
     var q = d.getElementById('g-q'), list = G.querySelector('[data-gestion-list]'), count = G.querySelector('[data-gestion-count]');
+    /* filtre « Prix sur demande » : seulement les cartes sans prix, pour leur en donner un vite */
+    var askBtn = G.querySelector('[data-gestion-ask]'), askN = G.querySelector('[data-gestion-ask-n]'), askOnly = false;
+    function isAsk(c) { return c.prix_eur === null || c.prix_eur === undefined; }
     var cards = [], byRef = {}, state = { reservees: [], vendues: [], prix: {} }, timer = null, loaded = false;
     var AN = window.PR_ANNONCE || null, anOpen = null;
     var MO = window.PR_MODIF || null, moOpen = null;
@@ -315,6 +318,7 @@
       list.textContent = '';
       var shown = 0, nPx = Object.keys(state.prix).length;
       cards.forEach(function (c) {
+        if (askOnly && !isAsk(c)) return;
         if (t && norm(c.ref + ' ' + label(c) + ' ' + (c.nom_en || '')).indexOf(t) === -1) return;
         var cur = statusOf(c.ref), lp = livePrice(c.ref);
         shown++;
@@ -388,6 +392,13 @@
         }
         list.appendChild(li);
       });
+      var nAsk = cards.filter(isAsk).length;
+      if (askN) askN.textContent = ' · ' + nAsk;
+      if (askBtn) askBtn.hidden = !nAsk && !askOnly;
+      if (askOnly) {
+        count.textContent = shown + ' carte(s) en prix sur demande' + (t ? ' pour cette recherche' : '') + ' · tapez le prix puis « Publier »';
+        return;
+      }
       count.textContent = state.reservees.length + ' réservée(s) · ' + state.vendues.length + ' vendue(s) · ' + nPx +
         ' prix changé(s) en direct' + (t ? '' : ' · tapez une référence ou un nom pour trouver une carte');
     }
@@ -410,6 +421,11 @@
       }).catch(function (e) { setInfo('Lecture impossible (' + e.message + ').'); });
     }
     q.addEventListener('input', render);
+    if (askBtn) askBtn.addEventListener('click', function () {
+      askOnly = !askOnly;
+      askBtn.setAttribute('aria-pressed', String(askOnly));
+      render();
+    });
     /* retour sur l'onglet : relire le Gist (changements faits depuis la caisse du salon ou un autre appareil) */
     d.addEventListener('visibilitychange', function () {
       var a = d.activeElement;

@@ -71,6 +71,7 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
     (LH_Sold, LH_Complete). Recherche reprise de `data/ebay.json` (préparée dans l'Excel, carte par carte), sinon
     construite par `outils.js` sur le même modèle : nom anglais, (n°,n°/total), langue, grade, exclusions.
   - La liste affiche **toutes les cartes d'un coup** (plus de limite à 60, demandé le 19/11) : on fait défiler.
+  - Bouton filtre **« Prix sur demande · n »** sous la recherche : n'affiche que les cartes sans prix (se combine avec la recherche).
   - **Petite photo** de la carte à gauche du nom (lien vers la fiche) ; pastille avec la réf. quand il n'y a pas de photo.
   - **Carte en prix sur demande** : champ « Prix » + « Publier ». Le premier prix part dans `_ajouts/modifs.json`
     (`prix_eur`, fusionné avec une éventuelle modification de nom ou d'état), `modifier.py` reconstruit fiche, vignettes,
