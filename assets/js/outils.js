@@ -204,13 +204,58 @@
       render();
       publish('Réf. ' + c.ref + ' : ' + eur0(v), c.ref);
     }
+    /* carte en prix sur demande : premier prix publie dans la fiche (2 a 3 minutes), plus en direct ensuite */
+    function askBox(c, wrap) {
+      if (!MO || !MO.prix || !MO.modifiable(c)) {
+        wrap.appendChild(el('span', 'muted small', 'Prix sur demande'));
+        return wrap;
+      }
+      var w = MO.prixEnAttente(c);
+      var box = el('span', 'prix-box');
+      var inp = el('input');
+      inp.type = 'text';
+      inp.inputMode = 'decimal';
+      inp.autocomplete = 'off';
+      inp.spellcheck = false;
+      inp.setAttribute('enterkeyhint', 'done');
+      inp.setAttribute('aria-label', 'Prix en euros, réf. ' + c.ref);
+      inp.placeholder = 'Prix';
+      if (w) inp.value = num(w.v);
+      var ok = el('button', '', 'Publier');
+      ok.type = 'button';
+      ok.disabled = true;
+      box.appendChild(inp);
+      box.appendChild(el('span', 'prix-box__eur', '€'));
+      box.appendChild(ok);
+      wrap.appendChild(box);
+      var nt = el('p', 'prix-note' + (note.ref === K(c.ref) && note.warn ? ' is-warn' : ''), note.ref === K(c.ref) ? note.text :
+        (w ? 'Prix de ' + eur0(w.v) + ' envoyé à ' + frTime(w.t) + ' : en ligne dans 2 à 3 minutes.' : 'Prix sur demande pour l’instant.'));
+      nt.setAttribute('data-note', K(c.ref));
+      nt.setAttribute('aria-live', 'polite');
+      wrap.appendChild(nt);
+      inp.addEventListener('input', function () {
+        var v = parsePrice(inp.value);
+        inp.setAttribute('aria-invalid', String(v === null && inp.value.trim() !== ''));
+        ok.disabled = v === null;
+      });
+      function go() {
+        var v = parsePrice(inp.value);
+        if (v === null) return;
+        ok.disabled = true;
+        setNote(c.ref, 'Envoi…');
+        MO.prix(c, v, render).then(function () {
+          setNote(c.ref, '✓ Prix de ' + eur0(v) + ' enregistré à ' + frTime(Date.now()) + ' : la fiche passe à ce prix dans 2 à 3 minutes.');
+          setInfo('Réf. ' + c.ref + ' : prix de ' + eur0(v) + ' envoyé.');
+        }).catch(function (e) { ok.disabled = false; setNote(c.ref, e.message, true); });
+      }
+      ok.addEventListener('click', go);
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+      return wrap;
+    }
     function priceBox(c) {
       var lp = livePrice(c.ref), cur = lp !== null ? lp : c.prix_eur;
       var wrap = el('div', 'prix-edit');
-      if (c.prix_eur === null || c.prix_eur === undefined) {
-        wrap.appendChild(el('span', 'muted small', 'Prix sur demande : à changer lors d’une republication.'));
-        return wrap;
-      }
+      if (c.prix_eur === null || c.prix_eur === undefined) return askBox(c, wrap);
       var box = el('span', 'prix-box');
       var inp = el('input');
       inp.type = 'text';
@@ -274,7 +319,23 @@
         var cur = statusOf(c.ref), lp = livePrice(c.ref);
         if (!t && cur === 'dispo' && lp === null && shown >= 60) return;
         shown++;
-        var li = el('li', 'sel-row' + (lp !== null ? ' is-live-price' : ''));
+        var li = el('li', 'sel-row sel-row--pic' + (lp !== null ? ' is-live-price' : ''));
+        var pic = el('a', 'sel-pic' + (c.photo_t ? '' : ' sel-pic--none'));
+        pic.href = 'cartes/' + c.slug + '.html';
+        pic.target = '_blank';
+        pic.rel = 'noopener';
+        pic.setAttribute('aria-label', 'Voir la fiche ' + label(c) + ' (nouvel onglet)');
+        if (c.photo_t) {
+          var im = el('img');
+          im.src = c.photo_t;
+          im.alt = '';
+          im.width = 48;
+          im.height = 67;
+          im.loading = 'lazy';
+          im.decoding = 'async';
+          pic.appendChild(im);
+        } else pic.appendChild(el('span', 'sel-pic__top', c.ref));
+        li.appendChild(pic);
         li.appendChild(el('span', 'sel-row__name', label(c)));
         li.appendChild(el('span', 'sel-row__meta', 'Réf. ' + c.ref + ' · ' + c.quantite + ' en stock' +
           (lp !== null ? ' · prix changé en direct (publié : ' + eur0(c.prix_eur) + ')' : '')));

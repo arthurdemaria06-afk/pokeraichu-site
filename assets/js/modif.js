@@ -206,6 +206,8 @@
       lire().then(function (r) {
         var m = { nom_fr: v.nom_fr, nom_en: v.nom_en, pokemons: v.pokemons, pokemons_en: v.pokemons_en, le: new Date().toISOString().slice(0, 10) };
         if (slab) m.cert = v.cert || null; else m.etat = v.etat;
+        var avant = r.data.modifs[c.ref];
+        if (avant && avant.prix_eur) m.prix_eur = avant.prix_eur;
         r.data.modifs[c.ref] = m;
         return ecrire(r, 'Modification de la fiche ' + c.ref + ' : ' + v.nom_fr);
       }).then(function () {
@@ -250,5 +252,41 @@
     })();
   }
 
-  window.PR_MODIF = { panel: panel, apprendre: apprendre, etiquette: etiquette, modifiable: modifiable };
+  /* premier prix d'une carte en « prix sur demande » : enregistre dans _ajouts/modifs.json, la fiche est reconstruite
+     avec ce prix (vignettes, fiche, recherche, donnees Google). Ensuite le prix se change en direct comme les autres. */
+  var envoisPrix = getJSON('pr.modif.prix', {});
+  function prixEnAttente(c) {
+    var w = envoisPrix[c.ref];
+    if (!w) return null;
+    if (c.prix_eur === w.v || Date.now() - w.t > 30 * 60 * 1000) { delete envoisPrix[c.ref]; put('pr.modif.prix', JSON.stringify(envoisPrix)); return null; }
+    return w;
+  }
+  function prix(c, v, onChange) {
+    if (!token()) return Promise.reject(new Error('Enregistrez d’abord votre clé GitHub en haut de la page.'));
+    return lire().then(function (r) {
+      var m = r.data.modifs[c.ref] || {};
+      m.prix_eur = v;
+      m.le = new Date().toISOString().slice(0, 10);
+      r.data.modifs[c.ref] = m;
+      return ecrire(r, 'Prix de la fiche ' + c.ref + ' : ' + String(v).replace('.', ',') + ' €');
+    }).then(function () {
+      envoisPrix[c.ref] = { t: Date.now(), v: v };
+      put('pr.modif.prix', JSON.stringify(envoisPrix));
+      var t0 = Date.now();
+      (function tick() {
+        fetch('data/stock.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
+          var n = (s.cartes || []).filter(function (x) { return x.ref === c.ref; })[0];
+          if (n && n.prix_eur === v) {
+            Object.keys(n).forEach(function (k) { c[k] = n[k]; });
+            prixEnAttente(c);
+            if (onChange) onChange();
+            return;
+          }
+          if (Date.now() - t0 < 8 * 60 * 1000) setTimeout(tick, 15000);
+        }).catch(function () { if (Date.now() - t0 < 8 * 60 * 1000) setTimeout(tick, 15000); });
+      })();
+    }, function (e) { throw new Error(failMsg(e)); });
+  }
+
+  window.PR_MODIF = { panel: panel, apprendre: apprendre, etiquette: etiquette, modifiable: modifiable, prix: prix, prixEnAttente: prixEnAttente };
 })();

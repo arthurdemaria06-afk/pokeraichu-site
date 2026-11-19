@@ -44,7 +44,7 @@ def num(p):
     if p is None:  # prix sur demande
         return ''
     p = float(p)
-    return str(int(p)) if p == int(p) else ('%.2f' % p).rstrip('0').rstrip('.')
+    return str(int(p)) if p == int(p) else ('%.2f' % p)  # 12.5 -> 12,50 €, comme sur le site
 
 
 def thousands(n, sep):
@@ -379,9 +379,17 @@ def render_product(root, c, lang, shell, ship_block, ship_ld, valid_until, relat
     return s
 
 
-def extract_ship(page):
+def extract_ship(page, root=None, lang='fr'):
     blk = re.search(r'<div class="ship">.*?</ul>\n', page, re.S).group(0)
     ld = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', page, re.S).group(1))
+    if 'offers' not in ld and root:   # fiche en prix sur demande : livraison reprise d'une fiche chiffree
+        d = os.path.join(root, 'cartes' if lang == 'fr' else os.path.join('en', 'cards'))
+        for f in sorted(os.listdir(d)):
+            t = open(os.path.join(d, f), encoding='utf-8').read()
+            m = re.search(r'<script type="application/ld\+json">(.*?)</script>', t, re.S)
+            if m and '"offers"' in m.group(1):
+                ld = json.loads(m.group(1))
+                break
     return blk, ld['offers']
 
 

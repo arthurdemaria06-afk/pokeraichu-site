@@ -70,6 +70,11 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
   - **Bouton « Ventes eBay ↗ »** sur chaque carte (sauf lots) : ouvre dans un nouvel onglet les ventes réussies eBay.fr
     (LH_Sold, LH_Complete). Recherche reprise de `data/ebay.json` (préparée dans l'Excel, carte par carte), sinon
     construite par `outils.js` sur le même modèle : nom anglais, (n°,n°/total), langue, grade, exclusions.
+  - **Petite photo** de la carte à gauche du nom (lien vers la fiche) ; pastille avec la réf. quand il n'y a pas de photo.
+  - **Carte en prix sur demande** : champ « Prix » + « Publier ». Le premier prix part dans `_ajouts/modifs.json`
+    (`prix_eur`, fusionné avec une éventuelle modification de nom ou d'état), `modifier.py` reconstruit fiche, vignettes,
+    recherche et données Google (livraison reprise d'une fiche chiffrée). En ligne en 2 à 3 minutes ; ensuite le prix se
+    change en direct comme les autres. Attente gardée dans `pr.modif.prix`.
   - Un lien « Gestion (visible seulement sur ce téléphone) » apparaît en pied de page du site quand la clé est
     enregistrée (`site.js`).
 - `/salon.html` : caisse du stand utilisable hors ligne. `/etiquettes.html`, `/panneau-salon.html` : étiquettes et QR codes.
@@ -161,6 +166,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (19/11) Gestion : petite photo à gauche du nom ; premier prix possible pour les cartes en prix sur demande
 - (19/11) Bouton « Ventes eBay » dans la page de gestion ; « Nouveau pour vous » devient un petit sticker « New » au logo
   (l'ancien bandeau couvrait toute la carte : `.art::before` a un `inset`, il faut remettre `bottom` et `left` à `auto`)
 

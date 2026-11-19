@@ -101,3 +101,10 @@ p.annonce__val{font-weight:600}
 .modif__add .btn{flex:none;min-height:44px;padding:0 16px}
 .modif .actions{justify-content:flex-start;margin-top:0}
 .modif>p{margin:0}
+
+/* petite photo a gauche du nom */
+.gestion-list .sel-row--pic{grid-template-columns:48px minmax(0,1fr);column-gap:12px}
+.gestion-list .sel-row--pic>*{grid-column:2/-1}
+.gestion-list .sel-row--pic>.sel-pic{grid-column:1;grid-row:1/span 3;align-self:start}
+.gestion-list .sel-row--pic>.annonce,.gestion-list .sel-row--pic>.modif{grid-column:1/-1}
+.gestion-list .sel-pic__top{padding:2px 3px;font-size:.55rem}

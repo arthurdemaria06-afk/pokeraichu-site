@@ -133,7 +133,7 @@ def page_of(c, lang):
 
 
 def _render_page(site, c, lang, page):
-    sb, sl = fiche.extract_ship(page)
+    sb, sl = fiche.extract_ship(page, site.root, lang)
     m = re.search(r'</article>\n(.*?)</div>\n<div class="buybar"', page, re.S)
     return fiche.render_product(site.root, _safe(c, lang), lang, page, sb, sl, sl.get('priceValidUntil'), m.group(1) if m else '')
 
@@ -203,11 +203,12 @@ def nouvelle(old, m):
                 c['quantite'] = q
         except (TypeError, ValueError):
             pass
-    if m.get('prix_eur') is not None and old.get('prix_eur') is not None:
+    if m.get('prix_eur') is not None:   # aussi pour une carte en prix sur demande : elle prend un prix
         try:
             v = round(float(m['prix_eur']), 2)
             if 0 < v < 100000:
                 c['prix_eur'] = v
+                c['prix_sur_demande'] = False
         except (TypeError, ValueError):
             pass
     return c
