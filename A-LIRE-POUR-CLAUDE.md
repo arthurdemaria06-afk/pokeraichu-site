@@ -252,3 +252,21 @@ boosters : quantite, prix_u, paye_u ou paye_total, frais_u, vendus, prix_reel_mo
 données en clair : `chiffrer.py` dépose `pilotage/import-<id>.bin` (AES-GCM) et donne `#import=<id>.<clé>` ; Arthur
 touche https://pokeraichu.com/pilotage.html#import=… et confirme. Supprimer le .bin du dépôt une fois l'import fait.
 Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à recopier ici : le dépôt est public).
+
+**Onglet Analyse (vague 1, 19/11/2026)** : `assets/js/pilotage-analyse.js` (PRAnalyse), chargé avant pilotage.js.
+- Découpages : bloc (d'après le code du set : M… = Méga Évolution, SV… = Écarlate et Violet, s… = Épée et Bouclier…),
+  extension, rareté (déduite de `rarete`/`cat`/`nom`), PSA ou brute, type de produit (cartes brutes/gradées + scellé),
+  langue, gamme de prix, groupe, canal. Hors « Type de produit », seules les cartes comptent (le scellé n'a pas de rareté).
+- Par segment : écoulement = coût vendu ÷ coût total ; rentabilité réalisée = bénéfice net ÷ coût des ventes ;
+  attendue = stock au prix marché × taux de réalisation (celui du segment s'il a ≥ 3 ventes, sinon du portefeuille),
+  frais et envoi déduits ; retenue = (n ventes × réalisée + 5 × attendue) ÷ (n + 5).
+- Avis : Renforcer / Sélectif / Rotation / Alléger selon la position face aux moyennes (rentabilité pondérée par le
+  capital, écoulement global) ; « À tester » si < 3 ventes et < 5 articles, ou < 20 € investis ; « Coût à compléter »
+  si plus de 50 % du coût est estimé ; « Données à compléter » si l'attribut manque.
+- Budget du prochain voyage : poids = rentabilité retenue × max(écoulement, 5 %), plafond 40 % par segment, 10 % pour
+  tester les 2 meilleurs « À tester » (≥ 2 articles). Budget gardé dans localStorage `pr.pilotage.budget`.
+- Simulateur gradation : espérance sur 10 / 9 / reste au prix brut, frais de vente et d'envoi des réglages déduits,
+  probabilité de 10 d'équilibre. Délai de vente : date d'achat de la carte, sinon date de son ticket ; « Dater mes ventes »
+  remplit `vente_date` et `date_achat` manquantes.
+- Onglets : Bord · Stock · Ventes · Analyse · Plus (Achats passe dans Plus ; sur ordinateur, liens « Gestion » sous les
+  onglets). Prochaines vagues prévues : charges et voyages (coûts directs, indirects, cachés), puis SASU (TVA, IS, SIG).

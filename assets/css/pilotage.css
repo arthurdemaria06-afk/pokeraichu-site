@@ -76,7 +76,7 @@ body.pl{min-height:100vh;padding-bottom:calc(84px + env(safe-area-inset-bottom))
 .pl-table{width:100%;border-collapse:collapse;font-size:.84rem;font-variant-numeric:tabular-nums}
 .pl-table caption{padding:10px 12px 0;text-align:left;font-weight:600}
 .pl-table th,.pl-table td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
-.pl-table th:first-child,.pl-table td:first-child{text-align:left;white-space:normal;min-width:9em}
+.pl-table th:first-child,.pl-table td:first-child{text-align:left;white-space:normal;min-width:9em;position:sticky;left:0;z-index:1;background:var(--gofun);box-shadow:inset -1px 0 0 var(--line)}
 .pl-table thead th{font:600 .68rem/1.3 var(--text);letter-spacing:.06em;text-transform:uppercase;color:var(--nezumi);vertical-align:bottom}
 .pl-table tfoot td,.pl-table tr.pl-tot td{font-weight:700;border-top:2px solid var(--sumi);border-bottom:0}
 .pl-table tbody tr:last-child td{border-bottom:0}
@@ -167,7 +167,10 @@ a.pl-row:hover{background:var(--washi)}
 .pl-tabs a[aria-current="page"]{color:var(--shu-fonce)}
 .pl-tabs a[aria-current="page"]::before{content:"";position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--shu)}
 .pl-tabs__n{position:absolute;top:7px;left:calc(50% + 6px);min-width:18px;padding:2px 5px;border-radius:999px;background:var(--shu-fonce);color:var(--gofun);font:700 .62rem/1.1 var(--text);text-align:center}
+.pl-tabs__t,.pl-tabs a.pl-tabs__sec{display:none}
 @media (min-width:1000px){
+  .pl-tabs__t{display:block;margin:18px 12px 4px;padding-top:14px;border-top:1px solid var(--line);font:600 .66rem/1.3 var(--text);letter-spacing:.12em;text-transform:uppercase;color:var(--nezumi)}
+  .pl-tabs a.pl-tabs__sec{display:flex;min-height:38px;font-weight:500;font-size:.88rem}
   body.pl{padding-bottom:0}
   .pl-tabs{top:65px;right:auto;bottom:0;width:190px;grid-template-columns:1fr;align-content:start;gap:2px;padding:14px 10px;border-top:0;border-right:1px solid var(--line);background:var(--washi)}
   .pl-tabs a{flex-direction:row;justify-content:flex-start;gap:12px;min-height:46px;padding:0 12px;font-size:.92rem}
@@ -213,3 +216,35 @@ a.pl-row:hover{background:var(--washi)}
 .pl-ecran h1{margin:0 0 10px;font:400 1.9rem/1.15 var(--display)}
 .pl-ecran p{line-height:1.55}
 .pl-file{display:block;margin:12px 0 0}
+
+/* analyse : matrice rentabilité × écoulement, tableaux, dates */
+.pl-matrice-box{padding:10px 8px 6px;overflow:hidden}
+.pl-matrice{display:block;max-width:100%;height:auto;margin:0 auto;font-family:var(--text)}
+.pl-m-grille{stroke:var(--line);stroke-width:1}
+.pl-m-zero{stroke:var(--edge)}
+.pl-m-moy{stroke:var(--nezumi);stroke-width:1;stroke-dasharray:4 4}
+.pl-m-tick{fill:var(--nezumi);font-size:10.5px;font-variant-numeric:tabular-nums}
+.pl-m-axe{fill:var(--nezumi);font-size:10.5px;font-weight:600}
+.pl-m-quad{fill:var(--nezumi);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;opacity:.75}
+.pl-m-pt{fill:var(--shu);fill-opacity:.55;stroke:var(--gofun);stroke-width:2}
+.pl-m-lab{fill:var(--sumi);font-size:11px;font-weight:600;paint-order:stroke;stroke:var(--gofun);stroke-width:3px;stroke-linejoin:round}
+.pl-t-note{display:block;color:var(--nezumi);font-size:.74rem;font-weight:400}
+.pl-dates{margin:12px 0 0;padding:0;list-style:none}
+.pl-dates li{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;align-items:start;padding:12px 0}
+.pl-dates li + li{border-top:1px solid var(--line)}
+.pl-dates__m{min-width:0}
+.pl-dates__n{margin:0;font-weight:600;font-size:.92rem;line-height:1.3}
+.pl-dates__c{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.pl-dates__c label{display:flex;flex-direction:column;gap:3px;flex:1 1 140px;font-size:.74rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--nezumi)}
+.pl-dates__c .input{min-height:44px}
+
+.pl-chips--dims{margin-top:20px}
+.pl-budget{margin-top:12px}
+.pl-budget > .pl-kpis{margin-bottom:12px}
+.pl-budget > .pl-note{margin:0 0 12px}
+.pl-sim > .pl-label{margin-bottom:12px}
+.pl-sim > .pl-note{margin-top:12px}
+.pl-dates__c label{flex:1 1 120px;min-width:0}
+.pl-dates__c .input{width:100%;min-width:0}
+.pl-sheet__b > .field{margin-top:10px}
+.pl-sim > .pl-apercu{margin-top:16px}

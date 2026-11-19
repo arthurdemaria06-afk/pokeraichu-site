@@ -526,7 +526,8 @@
 
   /* ---------------------------------------------------------------- navigation */
   var VUES = {};
-  var ONGLET = { bord: 'bord', stock: 'stock', carte: 'stock', ventes: 'ventes', achats: 'achats', ticket: 'achats' };
+  var ONGLET = { bord: 'bord', stock: 'stock', carte: 'stock', ventes: 'ventes', analyse: 'analyse' };
+  var SECONDAIRE = { achats: 'achats', ticket: 'achats', lots: 'lots', scelle: 'scelle', controles: 'controles', reglages: 'reglages' };
   function retour(defaut, texte) {
     return h('a', { class: 'pl-back', href: defaut, text: '‹ ' + texte, onclick: function (e) { if (S.precedent) { e.preventDefault(); history.back(); } } });
   }
@@ -550,8 +551,10 @@
     var tabs = q('[data-pl-tabs]');
     tabs.hidden = false;
     var actif = ONGLET[S.vue] || 'plus';
+    var second = SECONDAIRE[S.vue];
     Array.prototype.forEach.call(tabs.querySelectorAll('a'), function (x) {
-      if (x.getAttribute('data-vue') === actif) x.setAttribute('aria-current', 'page'); else x.removeAttribute('aria-current');
+      var v = x.getAttribute('data-vue'), sec = x.hasAttribute('data-sec');
+      if ((!sec && v === actif && !(second && d.documentElement.clientWidth >= 1000)) || (sec && v === second)) x.setAttribute('aria-current', 'page'); else x.removeAttribute('aria-current');
     });
     var n = nbAlertes(), b = q('[data-pl-alertes]');
     if (b) { b.hidden = !n; b.textContent = n ? String(n) : ''; }
@@ -1020,6 +1023,7 @@
   /* ---------------------------------------------------------------- achats et tickets */
   VUES.achats = function (m) {
     var R = S.R, P = R.params, tot = { yen: 0, det: 0, eur: 0 }, modes = { ticket: 0, yen: 0, eur: 0, lot: 0 }, produits = 0;
+    m.appendChild(h('a', { class: 'pl-back', href: '#plus', text: '‹ Plus' }));
     R.tickets.forEach(function (x) { tot.yen += z(x.t.total_yen); tot.det += x.detaxe; tot.eur += z(x.paye_eur); });
     R.cartes.forEach(function (r) { var md = (r.c.achat || {}).mode; if (!r.hors && r.compte && md && r.paye != null) modes[md] += r.paye; });
     R.produits.forEach(function (x) { produits += z(x.paye); });
@@ -1317,12 +1321,263 @@
     };
   }
 
+  /* ---------------------------------------------------------------- analyse financière (moteur : assets/js/pilotage-analyse.js) */
+  var AVIS = {
+    'Renforcer': ['ok', 'Rentable et se vend vite : à acheter en priorité.'],
+    'Sélectif': ['estime', 'Rentable mais lent : seulement les meilleures pièces.'],
+    'Rotation': ['', 'Se vend vite mais rapporte moins : bon pour la trésorerie.'],
+    'Alléger': ['ecart', 'Rapporte moins et part lentement : à réduire.'],
+    'À tester': ['garde', 'Trop peu de données : petit budget pour tester.'],
+    'Coût à compléter': ['estime', 'Plus de la moitié du coût est estimé : renseigne les vrais prix d’achat.'],
+    'Données à compléter': ['', 'Information non renseignée sur les cartes.'],
+    'Sans données': ['', 'Ni vente ni prix marché pour juger.']
+  };
+  function avis(reco) { var a = AVIS[reco] || ['', '']; return h('span', { class: 'pl-badge' + (a[0] ? ' pl-badge--' + a[0] : ''), title: a[1], text: reco }); }
+  function nomCourt(s, n) { s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+  function sv(tag, a, kids) {
+    var e = d.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (a) Object.keys(a).forEach(function (k) { if (a[k] != null) e.setAttribute(k, a[k]); });
+    if (kids != null) ajouter(e, kids);
+    return e;
+  }
+  /* matrice rentabilité × écoulement : un point par segment, aire ∝ capital encore en stock */
+  function matrice(A, largeur) {
+    var pts = A.lignes.filter(function (s) { return s.rentab != null && s.ecoul != null && s.cout >= 20 && !/compléter|Sans données/.test(s.reco); })
+      .sort(function (a, b) { return b.cout - a.cout; }).slice(0, 12);
+    if (pts.length < 2) return null;
+    var W = Math.round(Math.max(300, Math.min(largeur, 760))), H = Math.round(W * (W < 500 ? 0.9 : 0.62));
+    var g = { l: 44, r: 12, t: 26, b: 42 };
+    var xMax = Math.max(0.2, Math.max.apply(null, pts.map(function (s) { return s.ecoul; })) * 1.12);
+    var yMin = Math.min(0, Math.min.apply(null, pts.map(function (s) { return s.rentab; })) * 1.15);
+    var yMax = Math.max(0.3, Math.max.apply(null, pts.map(function (s) { return s.rentab; })) * 1.12);
+    function X(v) { return g.l + (W - g.l - g.r) * v / xMax; }
+    function Y(v) { return g.t + (H - g.t - g.b) * (1 - (v - yMin) / (yMax - yMin)); }
+    function pas(e) { var b = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10]; for (var i = 0; i < b.length; i++) if (e / b[i] <= 5) return b[i]; return 20; }
+    var capMax = Math.max.apply(null, pts.map(function (s) { return s.cout_stock; })) || 1;
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, class: 'pl-matrice', role: 'img',
+      'aria-label': 'Rentabilité retenue (vertical) selon l’écoulement (horizontal) de chaque segment. Valeurs dans le tableau qui suit.' });
+    var px = pas(xMax), py = pas(yMax - yMin), v;
+    for (v = 0; v <= xMax + 1e-9; v += px) {
+      svg.appendChild(sv('line', { x1: X(v), x2: X(v), y1: g.t, y2: H - g.b, class: 'pl-m-grille' }));
+      svg.appendChild(sv('text', { x: X(v), y: H - g.b + 15, 'text-anchor': 'middle', class: 'pl-m-tick' }, pct(v)));
+    }
+    for (v = Math.ceil(yMin / py - 1e-9) * py; v <= yMax + 1e-9; v += py) {
+      svg.appendChild(sv('line', { x1: g.l, x2: W - g.r, y1: Y(v), y2: Y(v), class: 'pl-m-grille' + (Math.abs(v) < 1e-9 ? ' pl-m-zero' : '') }));
+      svg.appendChild(sv('text', { x: g.l - 6, y: Y(v) + 4, 'text-anchor': 'end', class: 'pl-m-tick' }, pct(Math.abs(v) < 1e-9 ? 0 : v)));
+    }
+    if (A.ecoul_moy != null && A.ecoul_moy <= xMax) svg.appendChild(sv('line', { x1: X(A.ecoul_moy), x2: X(A.ecoul_moy), y1: g.t, y2: H - g.b, class: 'pl-m-moy' }));
+    if (A.rentab_moy != null && A.rentab_moy >= yMin && A.rentab_moy <= yMax) svg.appendChild(sv('line', { x1: g.l, x2: W - g.r, y1: Y(A.rentab_moy), y2: Y(A.rentab_moy), class: 'pl-m-moy' }));
+    [['Sélectif', g.l + 6, g.t + 13, 'start'], ['Renforcer', W - g.r - 6, g.t + 13, 'end'], ['Alléger', g.l + 6, H - g.b - 7, 'start'], ['Rotation', W - g.r - 6, H - g.b - 7, 'end']]
+      .forEach(function (q4) { svg.appendChild(sv('text', { x: q4[1], y: q4[2], 'text-anchor': q4[3], class: 'pl-m-quad' }, q4[0])); });
+    svg.appendChild(sv('text', { x: 4, y: 12, class: 'pl-m-axe' }, '↑ Rentabilité'));
+    svg.appendChild(sv('text', { x: W - g.r, y: H - 6, 'text-anchor': 'end', class: 'pl-m-axe' }, 'Écoulement (part du capital déjà vendue) →'));
+    var places = [];
+    pts.slice().sort(function (a, b) { return b.cout_stock - a.cout_stock; }).forEach(function (s) {
+      var cx = X(s.ecoul), cy = Y(s.rentab), r = 4 + 16 * Math.sqrt(Math.max(0, s.cout_stock) / capMax);
+      var c = sv('circle', { cx: cx, cy: cy, r: r, class: 'pl-m-pt' });
+      c.appendChild(sv('title', null, s.cle + ' : rentabilité ' + pct(s.rentab) + ', écoulement ' + pct(s.ecoul) + ', ' + eur(s.cout_stock) + ' en stock'));
+      svg.appendChild(c);
+      places.push({ cx: cx, cy: cy, r: r, s: s });
+    });
+    /* étiquettes : à droite du point (à gauche s'il est près du bord), décalées si elles se chevauchent */
+    var poses = [];
+    places.forEach(function (p) {
+      var lab = nomCourt(p.s.cle, W < 500 ? 16 : 24), lg = lab.length * 6.1;
+      var gauche = p.cx + p.r + 4 + lg > W - g.r, tx = gauche ? p.cx - p.r - 4 : p.cx + p.r + 4, ty = p.cy + 4;
+      function boite() { return gauche ? [tx - lg, ty - 10, tx, ty + 2] : [tx, ty - 10, tx + lg, ty + 2]; }
+      function chevauche(b) { return poses.some(function (o) { return b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]; }); }
+      for (var k = 0, dy = [0, 12, -12, 24, -24, 36]; k < dy.length; k++) { ty = p.cy + 4 + dy[k]; if (!chevauche(boite())) break; }
+      ty = Math.max(g.t + 10, Math.min(H - g.b - 2, ty));
+      poses.push(boite());
+      svg.appendChild(sv('text', { x: tx, y: ty, 'text-anchor': gauche ? 'end' : 'start', class: 'pl-m-lab' }, lab));
+    });
+    return svg;
+  }
+  VUES.analyse = function (m) {
+    var R = S.R, An = w.PRAnalyse;
+    m.appendChild(entete('Analyse', 'Ce qui se vend, ce qui rapporte, où placer tes capitaux'));
+    if (!An) { m.appendChild(h('p', { class: 'pl-box', text: 'Le module d’analyse ne s’est pas chargé : recharge la page.' })); return; }
+    var fa = S.fa || (S.fa = { dim: 'rarete', budget: +(lire('pr.pilotage.budget') || 0) || 2000, dimBudget: 'rarete', tout: false });
+    var A = An.segments(R, fa.dim), Pf = fa.dim === 'type' ? A : An.segments(R, 'type'), T = Pf.total;
+    /* qualité des données (portefeuille complet : cartes et scellé) */
+    var aDater = R.cartes.filter(function (r) { return r.c.vendu && !r.hors && (!r.c.vente_date || !dateAchatCarte(r)); }).length;
+    var mesures = T.n_delais;
+    var nbCartes = R.cartes.filter(function (r) { return r.compte && !r.hors; }).length;
+    var base = 'Base : ' + nbr(T.nv) + ' vente' + pl(T.nv) + ' pour ' + nbr(nbCartes) + ' cartes et ' + nbr(T.n - nbCartes) + ' articles scellés ; ' + pct(T.part_estimee) + ' du coût total est estimé (cartes sans prix d’achat). ';
+    base += mesures ? 'Délai de vente mesuré sur ' + mesures + ' vente' + pl(mesures) + '.' : 'Aucune vente n’a encore ses deux dates (achat et vente) : le délai de vente apparaîtra dès que tu les renseignes.';
+    m.appendChild(h('div', { class: 'pl-apercu' }, [base, aDater ? h('span', null, [' ', lienBtn('Dater mes ventes (' + aDater + ')', feuilleDatesVentes)]) : null]));
+    m.appendChild(h('div', { class: 'pl-kpis pl-sec' }, [
+      tuile('Rentabilité réalisée', pct(T.rentab_real), 'bénéfice net ÷ coût des ventes', T.rentab_real < 0 ? 'pl-neg' : ''),
+      tuile('Rentabilité attendue', pct(T.rentab_att), 'stock revendu au prix habituel'),
+      tuile('Écoulement', pct(T.ecoul), 'part du capital déjà vendue'),
+      tuile(mesures ? 'Délai médian' : 'Prix obtenu', mesures ? NF0.format(T.delai_median) + ' jours' : pct(Pf.realisation), mesures ? 'entre achat et vente' : 'prix de vente ÷ prix marché')
+    ]));
+    var chips = h('div', { class: 'pl-chips pl-chips--dims', role: 'group', 'aria-label': 'Découper par' });
+    An.DIMENSIONS.forEach(function (dm) {
+      chips.appendChild(h('button', { type: 'button', class: 'chip', 'data-focus': 'dim-' + dm.id, 'aria-pressed': String(fa.dim === dm.id), text: dm.nom,
+        onclick: function () { if (fa.dim !== dm.id) { fa.dim = dm.id; fa.tout = false; rendre(true); } } }));
+    });
+    m.appendChild(chips);
+    var actif = chips.querySelector('[aria-pressed="true"]');
+    if (actif) chips.scrollLeft = Math.max(0, actif.offsetLeft - chips.offsetLeft - 16);
+    var mat = matrice(A, Math.min(m.clientWidth || 360, 792) - 34);
+    m.appendChild(section('Rentabilité × écoulement', [mat ? h('div', { class: 'pl-box pl-matrice-box' }, mat) : h('p', { class: 'pl-box', text: 'Pas assez de segments mesurables pour ce découpage : choisis-en un autre.' })],
+      'Un point par segment ; plus il est gros, plus il garde de capital en stock. Les pointillés sont tes moyennes : en haut à droite, ce qui rapporte et part vite.'));
+    var lignes = A.lignes, limite = fa.tout || lignes.length <= 14 ? lignes.length : 12;
+    var tot = Object.assign({}, A.total, { cle: fa.dim === 'type' ? 'Ensemble' : 'Toutes les cartes', reco: null });
+    m.appendChild(section('Détail par ' + A.dim.nom.toLowerCase(), [tableau([
+      { t: A.dim.nom, f: function (s) { return h('span', null, [s.cle, s.part_estimee > 0.5 ? h('small', { class: 'pl-t-note', text: 'coût estimé à ' + pct(s.part_estimee) }) : null]); } },
+      { t: 'Avis', f: function (s) { return s.reco ? avis(s.reco) : ''; } },
+      { t: 'Rentab. retenue', f: function (s) { return pct(s.rentab); } },
+      { t: 'Écoulement', f: function (s) { return pct(s.ecoul); } },
+      { t: 'Vendus', f: function (s) { return nbr(s.nv) + ' / ' + nbr(s.n); } },
+      { t: 'Investi', f: function (s) { return eur(s.cout); } },
+      { t: 'En stock', f: function (s) { return eur(s.cout_stock); } },
+      { t: 'Réalisée', f: function (s) { return pct(s.rentab_real); }, cls: function (s) { return s.rentab_real < 0 ? 'pl-neg' : ''; } },
+      { t: 'Attendue', f: function (s) { return pct(s.rentab_att); } },
+      { t: 'Délai médian', f: function (s) { return s.n_delais ? NF0.format(s.delai_median) + ' j' : '—'; } }
+    ], lignes.slice(0, limite), tot, 'Analyse par ' + A.dim.nom)].concat(lignes.length > limite
+      ? [h('button', { type: 'button', class: 'btn btn--ghost pl-plus', text: 'Afficher les ' + (lignes.length - limite) + ' suivantes', onclick: function () { fa.tout = true; rendre(true); } })] : []),
+      (fa.dim === 'type' ? '' : 'Cartes seulement : le scellé n’a ni rareté ni extension (il est dans « Type de produit »). ') + 'Rentabilité = bénéfice net ÷ coût d’achat. Réalisée : sur ce qui est vendu. Attendue : sur le stock, revendu au prix que tu obtiens d’habitude par rapport au prix marché. Retenue : les deux mêlées, d’autant plus vers la réalisée qu’il y a de ventes.'));
+    var cap = lignes.filter(function (s) { return s.cout_stock > 0.5; }).sort(function (a, b) { return b.cout_stock - a.cout_stock; }).slice(0, 10);
+    if (cap.length) m.appendChild(section('Où dort ton capital', [barres(cap.map(function (s) {
+      return { l: s.cle, s: nbr(s.n - s.nv) + ' en stock · ' + pct(s.part_capital) + ' du stock', v: s.cout_stock, txt: eur(s.cout_stock) };
+    }), 'Capital immobilisé par segment')], 'Coût d’achat du stock encore à vendre.'));
+    m.appendChild(blocBudget());
+    /* PSA ou brute */
+    var G = fa.dim === 'gradation' ? A : An.segments(R, 'gradation');
+    var psa = G.lignes.filter(function (s) { return s.cle === 'PSA 10'; })[0], brute = G.lignes.filter(function (s) { return s.cle === 'Brute'; })[0];
+    var comp = psa && brute ? tableau([
+      { t: '', f: function (l) { return l[0]; } },
+      { t: 'PSA 10', f: function (l) { return l[1](psa); } },
+      { t: 'Brutes', f: function (l) { return l[1](brute); } }
+    ], [
+      ['Coût moyen par carte', function (s) { return eur(s.cout_moyen); }],
+      ['Vendues', function (s) { return nbr(s.nv) + ' / ' + nbr(s.n); }],
+      ['Écoulement', function (s) { return pct(s.ecoul); }],
+      ['Rentabilité réalisée', function (s) { return pct(s.rentab_real); }],
+      ['Rentabilité attendue', function (s) { return pct(s.rentab_att); }],
+      ['Rentabilité retenue', function (s) { return pct(s.rentab); }],
+      ['Capital en stock', function (s) { return eur(s.cout_stock); }]
+    ], null, 'PSA 10 et cartes brutes') : null;
+    m.appendChild(section('PSA ou brute', [comp, simulateurGradation()], comp ? 'Tes PSA 10 face à tes cartes brutes, puis le calcul pour une carte précise.' : null));
+  };
+  function dateAchatCarte(r) {
+    var a = r.c.achat || {}, id = (a.mode === 'ticket' && a.ticket) || r.c.ticket, t = id ? S.R.ticketsParId[id] : null;
+    return r.c.date_achat || (t && t.t && t.t.date) || null;
+  }
+  /* prochain voyage : répartition d'un budget (mise à jour sur place, sans redessiner la page) */
+  function blocBudget() {
+    var An = w.PRAnalyse, fa = S.fa;
+    var champ = h('input', { class: 'input', id: 'pl-budget', type: 'text', inputmode: 'decimal', autocomplete: 'off' });
+    champ.value = texteNombre(fa.budget);
+    var sel = h('select', { class: 'select', id: 'pl-budget-dim' }, An.DIMENSIONS.filter(function (x) { return x.id !== 'canal' && x.id !== 'groupe'; })
+      .map(function (x) { return h('option', { value: x.id, text: x.nom }); }));
+    sel.value = fa.dimBudget;
+    var zone = h('div', { class: 'pl-budget', 'aria-live': 'polite' }), minuteur = null;
+    function dessiner() {
+      zone.textContent = '';
+      var Ab = An.segments(S.R, fa.dimBudget), rep = An.repartition(Ab, fa.budget);
+      if (!rep.lignes.length) { zone.appendChild(h('p', { class: 'pl-note', text: 'Aucun segment assez solide pour ce découpage : essaie « Rareté » ou « Bloc ».' })); return; }
+      zone.appendChild(h('div', { class: 'pl-kpis' }, [
+        tuile('Bénéfice attendu', '≈ ' + eurS(rep.benef), 'une fois tout revendu'),
+        tuile('Rentabilité', rep.place ? pct(rep.benef / rep.place) : '—', 'sur ' + eur(rep.place) + ' placés')
+      ]));
+      if (rep.non_place > 0.5) zone.appendChild(h('p', { class: 'pl-note', text: eur(rep.non_place) + ' non placés : les autres segments ne méritent pas davantage, et aucun ne prend plus de 40 % du budget.' }));
+      zone.appendChild(tableau([
+        { t: Ab.dim.nom, f: function (l) { return l.s.cle; } },
+        { t: 'Budget', f: function (l) { return eur(l.montant); } },
+        { t: 'Part', f: function (l) { return pct(l.montant / fa.budget); } },
+        { t: 'Bénéfice att.', f: function (l) { return eurS(l.benef); } },
+        { t: '≈ Articles', f: function (l) { return l.cartes ? NF0.format(l.cartes) : '—'; } },
+        { t: 'Rôle', f: function (l) { return avis(l.role); } }
+      ], rep.lignes, null, 'Répartition du budget'));
+    }
+    champ.addEventListener('input', function () {
+      clearTimeout(minuteur);
+      minuteur = setTimeout(function () { var v = lireNombre(champ.value).v; if (v != null && v > 0) { fa.budget = v; ecrire('pr.pilotage.budget', String(v)); dessiner(); } }, 350);
+    });
+    sel.addEventListener('change', function () { fa.dimBudget = sel.value; dessiner(); });
+    dessiner();
+    return section('Prochain voyage : où placer ton budget', [
+      h('div', { class: 'pl-box' }, h('div', { class: 'pl-form' }, [
+        h('div', { class: 'field pl-demi' }, [h('label', { for: 'pl-budget', text: 'Budget d’achat (€)' }), champ]),
+        h('div', { class: 'field pl-demi' }, [h('label', { for: 'pl-budget-dim', text: 'Répartir par' }), sel])
+      ])), zone
+    ], 'Chaque segment reçoit une part proportionnelle à rentabilité × écoulement (la logique marge × rotation d’un ROI), plafonnée à 40 % du budget ; 10 % vont tester les 2 meilleurs segments encore trop peu connus. Bénéfice attendu : si ces achats se revendent aux marges observées sur ce segment. Aide à la décision, à relire avec ton œil sur le marché.');
+  }
+  function simulateurGradation() {
+    var An = w.PRAnalyse, P = S.R.params;
+    var sim = S.sim || (S.sim = { g_achat: null, g_prix_brute: null, g_prix_psa10: null, g_prix_psa9: null, g_p10: 40, g_p9: 40, g_frais: null, g_delai_mois: 3 });
+    var defs = [
+      { k: 'g_achat', label: 'Achat brute (€)', type: 'num', demi: true },
+      { k: 'g_prix_brute', label: 'Revente brute (€)', type: 'num', demi: true },
+      { k: 'g_prix_psa10', label: 'Revente PSA 10 (€)', type: 'num', demi: true },
+      { k: 'g_prix_psa9', label: 'Revente PSA 9 (€)', type: 'num', demi: true },
+      { k: 'g_p10', label: 'Chance de 10 (%)', type: 'num', demi: true },
+      { k: 'g_p9', label: 'Chance de 9 (%)', type: 'num', demi: true },
+      { k: 'g_frais', label: 'Gradation (€)', type: 'num', demi: true },
+      { k: 'g_delai_mois', label: 'Délai (mois)', type: 'num', demi: true }
+    ];
+    var form = formulaire(defs, sim), sortie = h('div', { class: 'pl-apercu pl-sec', 'aria-live': 'polite' });
+    function calc() {
+      defs.forEach(function (df) { sim[df.k] = lireNombre(form.champs[df.k].value).v; });
+      if (vide(sim.g_prix_brute) || vide(sim.g_prix_psa10) || vide(sim.g_frais)) { sortie.textContent = 'Renseigne au moins la revente brute, la revente en PSA 10 et le coût de la gradation.'; return; }
+      var x = An.simulerGradation({ achat: sim.g_achat, frais: sim.g_frais, prix_brute: sim.g_prix_brute, prix_psa10: sim.g_prix_psa10, prix_psa9: sim.g_prix_psa9,
+        p10: sim.g_p10, p9: sim.g_p9, delai_mois: sim.g_delai_mois, fv: P.fv, envoi: P.envoi });
+      sortie.textContent = '';
+      ajouter(sortie, [
+        h('strong', { text: x.conseil === 'grader' ? 'Grader rapporte plus : ' + eurS(x.surplus) + ' par carte en moyenne.' : 'Mieux vaut revendre brute : grader te coûterait ' + eur(-x.surplus) + ' par carte en moyenne.' }),
+        h('br'), 'Revente moyenne attendue après gradation : ' + eur(x.esperance) + '. Bénéfice moyen : ' + eurS(x.gain_grader) + ' en gradant, ' + eurS(x.gain_brute) + ' en brute.',
+        x.p10_equilibre != null ? h('span', null, [h('br'), 'Grader devient rentable à partir de ' + pct(x.p10_equilibre) + ' de chances d’avoir 10.']) : null,
+        x.surplus > 0 && sim.g_delai_mois > 0 ? h('span', null, [h('br'), 'Contrepartie : ' + eur(z(sim.g_achat) + z(sim.g_frais)) + ' bloqués ' + NF0.format(sim.g_delai_mois) + ' mois de plus, soit ' + eurS(x.surplus / sim.g_delai_mois) + ' gagnés par mois d’attente.']) : null
+      ]);
+    }
+    Object.keys(form.champs).forEach(function (k) { form.champs[k].addEventListener('input', calc); });
+    calc();
+    return h('div', { class: 'pl-box pl-sec pl-sim' }, [h('p', { class: 'pl-label', text: 'Simulateur : faire grader une carte brute ?' }), form.el, sortie,
+      h('p', { class: 'pl-note', text: 'Gradation = tarif PSA, envois aller-retour, assurance, TVA et frais au retour, par carte. Le reste des chances (ni 10 ni 9) se revend au prix brut. Frais de vente et d’envoi de tes réglages déduits.' })]);
+  }
+  function feuilleDatesVentes() {
+    var rs = S.R.cartes.filter(function (r) { return r.c.vendu && !r.hors && (!r.c.vente_date || !dateAchatCarte(r)); });
+    var champs = {};
+    var liste = h('ul', { class: 'pl-dates' }, rs.map(function (r) {
+      var c = r.c, ach = dateAchatCarte(r), iv = null, ia = null;
+      if (!c.vente_date) iv = h('input', { class: 'input', type: 'date', 'aria-label': 'Date de vente : ' + (c.nom || c.ref) });
+      if (!ach) ia = h('input', { class: 'input', type: 'date', 'aria-label': 'Date d’achat : ' + (c.nom || c.ref) });
+      champs[c.ref] = { v: iv, a: ia };
+      return h('li', null, [vignette(c), h('div', { class: 'pl-dates__m' }, [
+        h('p', { class: 'pl-dates__n', text: c.nom || c.ref }), h('p', { class: 'pl-row__meta', text: 'N° ' + c.ref + ' · ' + eur(r.encaisse) + (ach ? ' · achetée le ' + dateFR(ach) : '') + (c.vente_date ? ' · vendue le ' + dateFR(c.vente_date) : '') }),
+        h('div', { class: 'pl-dates__c' }, [ia ? h('label', null, [h('span', { text: 'Achat' }), ia]) : null, iv ? h('label', null, [h('span', { text: 'Vente' }), iv]) : null])
+      ])]);
+    }));
+    var tout = h('input', { class: 'input', type: 'date', id: 'pl-dates-tout' });
+    tout.addEventListener('change', function () { Object.keys(champs).forEach(function (k) { var iv = champs[k].v; if (iv && !iv.value) iv.value = tout.value; }); });
+    var fs = feuille('Dater mes ventes', [h('p', { class: 'pl-note', text: 'Ces dates mesurent la vitesse de vente. Laisse vide ce que tu ne sais pas.' }),
+      h('div', { class: 'field' }, [h('label', { for: 'pl-dates-tout', text: 'Mettre cette date de vente aux cases vides' }), tout]), liste],
+      [bouton('Annuler', fermer, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: 'Enregistrer' })]);
+    fs.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var maj = {}, n = 0;
+      Object.keys(champs).forEach(function (k) {
+        var x = champs[k], o = {};
+        if (x.v && x.v.value) o.vente_date = x.v.value;
+        if (x.a && x.a.value) o.date_achat = x.a.value;
+        if (o.vente_date || o.date_achat) { maj[k] = o; n++; }
+      });
+      fermer();
+      if (!n) return;
+      modifier('Dates ajoutées sur ' + n + ' vente' + pl(n), function (doc) { doc.cartes.forEach(function (c) { var o = maj[c.ref]; if (o) Object.keys(o).forEach(function (f) { c[f] = o[f]; }); }); });
+    });
+  }
+
   /* ---------------------------------------------------------------- menu « Plus » */
   VUES.plus = function (m) {
     var R = S.R, n = nbAlertes(), al = alertes().length;
     m.appendChild(entete('Plus', majTexte()));
     function item(href, titre, sous) { return h('li', null, h('a', { href: href }, h('span', null, [titre, sous ? h('small', { text: sous }) : null]))); }
     m.appendChild(h('ul', { class: 'pl-menu' }, [
+      item('#achats', 'Achats et tickets', R.tickets.length + ' tickets · ' + eur(R.k.investi) + ' investis au total'),
       item('#controles', 'Contrôles', al ? al + ' point' + pl(al) + ' à vérifier' + (n ? ' · ' + n + ' à faire avec le site' : '') : 'Tout est en ordre'),
       item('#lots', 'Lots PSA 10', R.lots.length + ' lots · ' + R.lots.reduce(function (s, L) { return s + L.cartes.length; }, 0) + ' cartes'),
       item('#scelle', 'Scellé et quantités', R.produits.map(function (x) { return x.p.id === 'cardsets' ? 'card sets' : x.p.id; }).join(', ')),
