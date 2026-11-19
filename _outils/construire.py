@@ -65,12 +65,18 @@ def load_raw():
 
 def check(r):
     ref = str(r['ref'])
-    assert re.fullmatch(r'\d{3,5}', ref), 'reference'
+    assert re.fullmatch(r'\d{3,5}|L\d{2}', ref), 'reference'  # L.. : lot
     nom = clean_text(r['nom_fr'])
-    numero = clean_text(r['numero'], 20)
-    assert nom and numero, 'nom ou numero vide'
-    prix = float(r['prix_eur'])
-    assert 0 < prix < 100000, 'prix'
+    numero = clean_text(r.get('numero'), 20)
+    # carte ancienne sans numero de collection : la variante (« Neo Genesis, dos ancien ») complete le titre
+    variante = clean_text(r.get('variante'), 60) or None
+    assert nom and (numero or variante), 'nom ou numero vide'
+    ask = bool(r.get('prix_sur_demande')) and r.get('prix_eur') in (None, '', 0)
+    if ask:
+        prix = None
+    else:
+        prix = float(r['prix_eur'])
+        assert 0 < prix < 100000, 'prix'
     q = int(r.get('quantite') or 1)
     assert 1 <= q <= 99, 'quantite'
     lang = r.get('langue', 'JP')
@@ -96,17 +102,21 @@ def check(r):
     if len(pks_en) != len(pks):
         pks_en = list(pks)
     rar = clean_text(r.get('rarete'), 30) or None
-    return {'ref': ref, 'nom_fr': nom, 'nom_en': clean_text(r.get('nom_en')) or nom, 'numero': numero, 'prix_eur': prix, 'quantite': q,
+    cat = r.get('categorie') if r.get('categorie') in ('vintage', 'ar', 'sar', 'sr', 'fur', 'promos', 'autres', 'reeditions-30') else None
+    return {'ref': ref, 'nom_fr': nom, 'nom_en': clean_text(r.get('nom_en')) or nom, 'numero': numero or None, 'prix_eur': prix, 'quantite': q,
             'langue': lang, 'extension': {'code': code, 'nom': enom}, 'etat': etat, 'photos': n, 'pokemons': pks, 'pokemons_en': pks_en,
-            'rarete': rar, 'ajoute_le': str(r.get('ajoute_le') or TODAY.isoformat())[:10]}
+            'rarete': rar, 'ajoute_le': str(r.get('ajoute_le') or TODAY.isoformat())[:10], 'prix_sur_demande': ask,
+            'variante': variante, 'variante_en': clean_text(r.get('variante_en'), 60) or variante,
+            'edition': clean_text(r.get('edition'), 30) or None, 'edition_en': clean_text(r.get('edition_en'), 30) or None,
+            'rarete_en': clean_text(r.get('rarete_en'), 30) or None, 'categorie': cat, 'nouveau': r.get('nouveau', True) is not False}
 
 
 # ------------------------------------------------------------------ fiche complete au format de stock.json
 def complete(r, used_fr, used_en, batch, sel):
     slab = r['etat']['type'] != 'brute'
 
-    def mk(nom, used):
-        b = slugify(nom + ' ' + r['numero'])
+    def mk(nom, used, suite):
+        b = slugify(nom + ' ' + suite)
         if r['langue'] != 'JP':
             b += '-' + r['langue'].lower()
         if slab:
@@ -115,10 +125,12 @@ def complete(r, used_fr, used_en, batch, sel):
         used.add(s)
         return s
 
-    slug = mk(r['nom_fr'], used_fr)
-    slug_en = mk(r['nom_en'], used_en)
+    slug = mk(r['nom_fr'], used_fr, r['numero'] or r['variante'])
+    slug_en = mk(r['nom_en'], used_en, r['numero'] or r['variante_en'])
     rar = r['rarete']
-    cat = 'gradees' if slab else RAR_CAT.get(rar, 'autres')
+    cat = 'gradees' if slab else r.get('categorie') or RAR_CAT.get(rar, 'autres')
+    titre = r['nom_fr'] + ' ' + r['numero'] if r['numero'] else '%s (%s)' % (r['nom_fr'], r['variante'])
+    titre_en = r['nom_en'] + ' ' + r['numero'] if r['numero'] else '%s (%s)' % (r['nom_en'], r['variante_en'])
     colls = []
     if re.search(r'30th|30e anniversaire', r['extension']['nom'], re.I):
         colls.append('30th-celebration')
@@ -130,13 +142,15 @@ def complete(r, used_fr, used_en, batch, sel):
         if p in r['pokemons']:
             colls.append(s)
     lib = r['etat']['libelle']
-    c = {'ref': r['ref'], 'slug': slug, 'type': 'slab' if slab else 'carte', 'titre': r['nom_fr'] + ' ' + r['numero'], 'nom_fr': r['nom_fr'],
-         'nom_en': r['nom_en'], 'numero': r['numero'], 'sous_numero': None, 'variante': None, 'edition': None, 'pokemons': r['pokemons'],
+    c = {'ref': r['ref'], 'slug': slug, 'type': 'slab' if slab else 'carte', 'titre': titre, 'nom_fr': r['nom_fr'],
+         'nom_en': r['nom_en'], 'numero': r['numero'], 'sous_numero': None, 'variante': None if r['numero'] else r['variante'],
+         'edition': r.get('edition'), 'pokemons': r['pokemons'],
          'extension': r['extension'], 'rarete': rar, 'categorie': cat, 'collections': colls, 'langue': r['langue'], 'etat': r['etat'],
-         'quantite': r['quantite'], 'prix_eur': r['prix_eur'], 'prix_sur_demande': False, 'nouveau': True, 'phare_rang': None,
+         'quantite': r['quantite'], 'prix_eur': r['prix_eur'], 'prix_sur_demande': bool(r.get('prix_sur_demande')), 'nouveau': r.get('nouveau', True), 'phare_rang': None,
          'photo': 'assets/photos/%s-1-800.webp' % slug,
-         'en': {'nom': r['nom_en'], 'variante': None, 'edition': None, 'rarete': RAR_EN.get(rar, rar) if rar else None,
-                'etat': lib if slab else ETAT_EN.get(lib, lib), 'pokemons': r['pokemons_en'], 'titre': r['nom_en'] + ' ' + r['numero'], 'slug': slug_en},
+         'en': {'nom': r['nom_en'], 'variante': None if r['numero'] else r['variante_en'], 'edition': r.get('edition_en'),
+                'rarete': r.get('rarete_en') or (RAR_EN.get(rar, rar) if rar else None),
+                'etat': lib if slab else ETAT_EN.get(lib, lib), 'pokemons': r['pokemons_en'], 'titre': titre_en, 'slug': slug_en},
          'ajout': batch}
     c['_sel'] = sel
     c['_n'] = r['photos']
@@ -226,6 +240,16 @@ def related(c, lang, pool, attrs, lqips):
 
 def rec_of(c):
     return int(c['ref']) if c['ref'].isdigit() else 0
+
+
+def R(c, lang):
+    """Carte ancienne sans numero : rendue comme les fiches d'origine (la fin du titre tient lieu de numero)."""
+    if c.get('numero'):
+        return c
+    nom, titre = (c['nom_fr'], c['titre']) if lang == 'fr' else (c['en']['nom'], c['en']['titre'])
+    d = dict(c)
+    d['numero'] = titre[len(nom) + 1:] if titre.startswith(nom + ' ') else ''
+    return d
 
 
 def tile(c, lang, up, first=False):
@@ -329,7 +353,7 @@ def ajouter():
     used_en = {f[:-5] for f in os.listdir(P('en', 'cards'))}
     base_batch = max([c.get('ajout') or 1 for c in stock] + [1])
     days = sorted({r['ajoute_le'] for r in raws})
-    raws.sort(key=lambda r: (r['ajoute_le'], int(r['ref'])))
+    raws.sort(key=lambda r: (r['ajoute_le'], int(re.sub(r'\D', '', r['ref']) or 0)))
     min_sel = min([0] + [int(a[0]) for a in tile_attrs_from_catalogue()[0].values() if re.fullmatch(r'-?\d+', a[0] or '')])
     new = []
     for k, r in enumerate(raws):
@@ -343,18 +367,19 @@ def ajouter():
     shells = {'fr': rd('cartes/%s.html' % stock[0]['slug']), 'en': rd('en/cards/%s.html' % stock[0]['en']['slug'])}
     pool = [c for c in stock if c['type'] in ('carte', 'slab') and c.get('numero') and c.get('photo') and not (
         c.get('edition') or c.get('variante') or c.get('sous_numero') or c.get('groupe') or c.get('lot') or c.get('stock_ouvert')
-        or c['etat'].get('a_signaler') or c.get('prix_sur_demande') or c.get('variante_en'))] + new
+        or c['etat'].get('a_signaler') or c.get('prix_sur_demande') or c.get('variante_en'))] + [
+        c for c in new if c.get('numero') and not (c.get('edition') or c.get('prix_sur_demande'))]
     # 1. fiches
     for c in new:
-        rc = ref_card(stock, fiche.is_slab(c), float(c['prix_eur']) >= 100)
+        rc = ref_card(stock, fiche.is_slab(c), float(c['prix_eur'] or 0) >= 100)
         for lang in ('fr', 'en'):
             src = rd(('cartes/%s.html' if lang == 'fr' else 'en/cards/%s.html') % (rc['slug'] if lang == 'fr' else rc['en']['slug']))
             sb, sl = fiche.extract_ship(src)
-            page = fiche.render_product(ROOT, c, lang, shells[lang], sb, sl, valid_until, related(c, lang, pool, attrs, lqips))
+            page = fiche.render_product(ROOT, R(c, lang), lang, shells[lang], sb, sl, valid_until, related(c, lang, pool, attrs, lqips))
             wr(('cartes/%s.html' if lang == 'fr' else 'en/cards/%s.html') % (c['slug'] if lang == 'fr' else c['en']['slug']), page)
     # 2. listes
-    fr_tiles = lambda up, first=False: ''.join(tile(c, 'fr', up, first and i == 0) for i, c in enumerate(newest_first))
-    en_tiles = lambda up, first=False: ''.join(tile(c, 'en', up, first and i == 0) for i, c in enumerate(newest_first))
+    fr_tiles = lambda up, first=False: ''.join(tile(R(c, 'fr'), 'fr', up, first and i == 0) for i, c in enumerate(newest_first))
+    en_tiles = lambda up, first=False: ''.join(tile(R(c, 'en'), 'en', up, first and i == 0) for i, c in enumerate(newest_first))
     prepend_grid('catalogue.html', fr_tiles('', True), r'<ul class="grid" role="list" data-grid>')
     prepend_grid('en/catalogue.html', en_tiles('../', True), r'<ul class="grid" role="list" data-grid>')
     for c in newest_first:
@@ -363,26 +388,26 @@ def ajouter():
         targets.append('extensions/%s.html' % fiche.ext_slug(c))
         for rel in targets:
             if os.path.exists(P(rel)):
-                prepend_grid(rel, tile(c, 'fr', '../'))
+                prepend_grid(rel, tile(R(c, 'fr'), 'fr', '../'))
                 twin = en_twin(rel)
                 if twin and os.path.exists(P(twin)):
-                    prepend_grid(twin, tile(c, 'en', '../../'))
+                    prepend_grid(twin, tile(R(c, 'en'), 'en', '../../'))
     # classeur Raichu : une pochette libre par nouvelle carte Raichu
     for c in new:
         if 'Raichu' in c['pokemons']:
-            add_pocket(c, 'collections/raichu.html', 'fr')
-            add_pocket(c, 'en/collections/raichu.html', 'en')
+            add_pocket(R(c, 'fr'), 'collections/raichu.html', 'fr')
+            add_pocket(R(c, 'en'), 'en/collections/raichu.html', 'en')
     # accueil : dernieres arrivees (8 au plus) et tirage au hasard
     for rel, lang, up in (('index.html', 'fr', ''), ('en/index.html', 'en', '../')):
         s = rd(rel)
         m = re.search(r'(<h2 id="t-news">.*?<ul class="grid grid--rail" role="list">)(.*?)(</ul>)', s, re.S)
         if m:
             tiles_old = re.findall(r'<li class="tile".*?</li>(?=<li class="tile"|$)', m.group(2), re.S)
-            tiles_new = [tile(c, lang, up) for c in newest_first]
+            tiles_new = [tile(R(c, lang), lang, up) for c in newest_first]
             s = s[:m.start(2)] + ''.join((tiles_new + tiles_old)[:8]) + s[m.end(2):]
         m = re.search(r'(<template id="hasard"[^>]*>(?:<ul[^>]*>)?)', s)
         if m:
-            s = s[:m.end()] + ''.join(tile(c, lang, up) for c in newest_first) + s[m.end():]
+            s = s[:m.end()] + ''.join(tile(R(c, lang), lang, up) for c in newest_first) + s[m.end():]
         wr(rel, s)
     # 3. compteurs et filtres
     n_f, n_u = st['meta']['nb_fiches'], st['meta']['nb_unites']
@@ -440,9 +465,11 @@ def ajouter():
         fr = lang == 'fr'
         rows = []
         for c in newest_first:
-            rows.append([('cartes/%s.html' % c['slug']) if fr else ('en/cards/%s.html' % c['en']['slug']), fiche.full_name(c, lang),
-                         '%s · %s · %s' % (c['numero'], c['extension']['code'], fiche.LANG[c['langue']][0 if fr else 2]),
-                         fiche.eur_fr(c['prix_eur']) if fr else fiche.eur_en(c['prix_eur']), fiche.search_string(c), c['photo_t'], c['_sel'], ''])
+            rc = R(c, lang)
+            sub = c['numero'] or (c.get('variante') if fr else c['en'].get('variante')) or ''
+            rows.append([('cartes/%s.html' % c['slug']) if fr else ('en/cards/%s.html' % c['en']['slug']), fiche.full_name(rc, lang),
+                         '%s · %s · %s' % (sub, c['extension']['code'], fiche.LANG[c['langue']][0 if fr else 2]),
+                         fiche.eur_fr(c['prix_eur']) if fr else fiche.eur_en(c['prix_eur']), fiche.search_string(rc), c['photo_t'], c['_sel'], ''])
         d['cartes'] = rows + d['cartes']
         with open(P(rel), 'w', encoding='utf-8', newline='') as f:
             json.dump(d, f, ensure_ascii=False, separators=(',', ':'))

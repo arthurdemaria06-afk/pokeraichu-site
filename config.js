@@ -20,6 +20,10 @@
                      modifiables depuis /gestion.html sans republier). Vide = seulement la liste « reservees » ci-dessous.
   reservees        : références des cartes réservées en ce moment, ex. ["108", "113"]. Elles s'affichent
                      « Réservée » partout sur le site, et le bouton propose d'être prévenu si elles se libèrent.
+  vendues          : références des cartes vendues, ex. ["010", "113"]. Elles s'affichent « Vendue » partout sur le site,
+                     même sans le Gist. La page /gestion.html les reprend et les écrit dans le Gist au prochain enregistrement.
+  vendues_le       : date de la liste « vendues » (format ISO, heure UTC). Dès que le Gist est enregistré après cette date,
+                     c'est lui qui fait foi (une carte remise en vente depuis /gestion.html redevient disponible).
   taux_change      : taux indicatifs (1 € = ...) : prix en £ et $ de la version anglaise, calculateur d'import (JPY).
   livraison        : prix indicatifs à la charge de l'acheteur, par zone. « offerte_des » : livraison offerte
                      en France métropolitaine dès ce montant d'achat (après remise). null = sur devis.
@@ -50,6 +54,8 @@
 window.PR_CONFIG = {
   whatsapp: "33659379881",
   reservees: [],
+  vendues: ["010", "012", "027", "031", "032", "077", "088", "094", "113", "117", "125", "234", "281", "G1633", "L04"],
+  vendues_le: "2026-11-19T04:00:00Z",
   instagram: "",
   email: "",
   ebay: "",

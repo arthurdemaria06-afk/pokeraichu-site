@@ -9,7 +9,7 @@ Deux usages :
   - construire.py appelle appliquer_modifs() : modifications enregistrees depuis /gestion.html (_ajouts/modifs.json) ;
   - en ligne de commande, pour changer la base du depot :
         python3 _outils/modifier.py <racine> <ref> '{"etat": "Excellent"}'
-    cles acceptees : nom_fr, nom_en, etat (carte non gradee), cert (slab), pokemons, pokemons_en, prix_eur.
+    cles acceptees : nom_fr, nom_en, etat (carte non gradee), cert (slab), pokemons, pokemons_en, prix_eur, quantite.
 """
 import copy, difflib, hashlib, json, os, re, sys
 
@@ -196,6 +196,13 @@ def nouvelle(old, m):
                 c['collections'].append(s)
             if p not in pk and s in c['collections'] and p in old['pokemons']:
                 c['collections'].remove(s)
+    if m.get('quantite') is not None:
+        try:
+            q = int(m['quantite'])
+            if 1 <= q <= 99:
+                c['quantite'] = q
+        except (TypeError, ValueError):
+            pass
     if m.get('prix_eur') is not None and old.get('prix_eur') is not None:
         try:
             v = round(float(m['prix_eur']), 2)

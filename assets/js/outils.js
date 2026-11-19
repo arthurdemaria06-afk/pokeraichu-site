@@ -48,10 +48,20 @@
     });
     return o;
   }
+  /* cartes vendues inscrites dans config.js (« vendues ») : reprises tant que le Gist n'a pas ete enregistre depuis
+     « vendues_le » ; le prochain enregistrement les recopie dans le Gist, qui fait foi ensuite */
+  var CV = refs(C.vendues);
+  function seed(s) {
+    if (!CV.length || Date.parse(s.maj) > Date.parse(C.vendues_le)) return s;
+    s.vendues = refs(s.vendues);
+    CV.forEach(function (r) { if (s.vendues.indexOf(r) === -1) s.vendues.push(r); });
+    s.reservees = refs(s.reservees).filter(function (r) { return CV.indexOf(r) === -1; });
+    return s;
+  }
   function readStatus() {
-    if (!GIST) return Promise.resolve({ reservees: [], vendues: [], prix: {} });
-    if (token()) return api('GET').then(function (g) { var f = g.files && g.files[GFILE]; return parseStatus(f ? f.content : '{}'); });
-    return fetch(RAW + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : '{}'; }).then(parseStatus);
+    if (!GIST) return Promise.resolve(seed({ reservees: [], vendues: [], prix: {} }));
+    if (token()) return api('GET').then(function (g) { var f = g.files && g.files[GFILE]; return seed(parseStatus(f ? f.content : '{}')); });
+    return fetch(RAW + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : '{}'; }).then(parseStatus).then(seed);
   }
   function writeStatus(s) {
     s.maj = new Date().toISOString();

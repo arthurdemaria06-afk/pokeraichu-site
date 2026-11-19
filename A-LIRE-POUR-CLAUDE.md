@@ -51,6 +51,10 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
   **Repository access `pokeraichu-site` · Contents Read and write**.
   - Statuts (disponible / réservée / vendue) et **prix en direct** : écrits dans un **Gist secret**
     (`statuts.json`, lien Raw dans `config.js` → `statuts_url`), lus par le site sans republier.
+  - **Ventes inscrites sans le Gist** (Claude n'a pas la clé) : liste `vendues` de `config.js`, datée par `vendues_le`.
+    Le site l'ajoute aux ventes du Gist ; la page de gestion la recopie dans le Gist au premier enregistrement,
+    et un Gist enregistré après `vendues_le` fait ensuite foi (une carte remise en vente redevient disponible).
+    Une vente partielle (une carte en plusieurs exemplaires) se fait en baissant `quantite` avec `modifier.py`.
   - **Ajouter une carte au stock** (`assets/js/ajout.js`) : nom, photos (3 max, recadrées), prix…
     commit en un seul envoi de `_ajouts/cartes.json` + `_ajouts/photos/<ref>-<i>.jpg` via l'API Git Data
     (blobs → tree → commit → ref). Puis Cloudflare reconstruit le site.
@@ -128,6 +132,17 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - Motif « grecque » cuivre (`--raimon`) en bandeaux. Logo : carte orange bordée de brun, éclair jaune (`assets/img/marque.svg`).
 - Ne jamais dessiner Raichu ni d'autres personnages ou visuels officiels Pokémon (droits d'auteur).
 
+### Ajouts faits par Claude dans le dépôt (sans le téléphone)
+
+- Déposer `_ajouts/cartes.json` + `_ajouts/photos/<réf>-<i>.jpg`, lancer `python3 _outils/construire.py . --garder`,
+  puis **supprimer `_ajouts/`** avant le commit. Champs en plus de ceux du téléphone : `prix_sur_demande: true`
+  (avec `prix_eur: null`), `variante` / `variante_en` pour une carte ancienne sans numéro (titre « Roigada (Neo Genesis,
+  dos ancien) », comme les fiches d'origine), `edition` / `edition_en`, `categorie` (`vintage`…), `rarete_en`,
+  `nouveau: false`, et les références de lot `L..`.
+- Photo d'une fiche existante qui n'en a pas : `modifier.appliquer(racine, {réf: {}}, entre=...)` (le crochet `entre`
+  crée les images avec `construire.make_images`). Vérifier ensuite la vignette : une fusion ratée se répare en
+  rendant de nouveau la vignette (`modifier._render_tile`).
+
 ## 6. À faire ou à surveiller
 
 - **Test de l'ajout de carte depuis le téléphone** sur pokeraichu.com : premier essai réel prévu par Arthur.
@@ -142,6 +157,10 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - Idée proposée et non faite : une fiche « Boosters japonais » (Storm Emeralda, Méga Brave, Ninja Spinner) à l'unité.
 
 ## 7. Historique récent (commits)
+
+- (19/11) Ventes de l'Excel marquées « Vendue » (liste `vendues` de config.js, quantités 005, 038, 201 baissées),
+  30 cartes du classeur Ramoloss / Wattouat (réf. 315 à 344, prix sur demande, photos recadrées pour dépanner),
+  photos du classeur pour 081, 083, 094, 098, lot vendu L04 (deux Psykokwak Gym, 43 €)
 
 - (18/11) Bouton « Modifier » de la page de gestion (nom, état, Pokémon) + `_outils/modifier.py` dans la construction
 - `e9f37c2` États « Excellent » des cartes d'avant 2012, photos des slabs PCA 231 et 232, Nymphali à 35 €

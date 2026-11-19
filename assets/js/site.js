@@ -360,9 +360,11 @@
     });
   }
 
-  /* Statuts : reservees (config.js « reservees » + statuts en direct) et vendues en direct (Gist) */
+  /* Statuts : reservees (config.js « reservees » + statuts en direct) et vendues (config.js « vendues » + Gist).
+     Un Gist enregistre apres « vendues_le » fait foi : la page de gestion y a deja recopie la liste de config.js. */
   var RES = (Array.isArray(C.reservees) ? C.reservees : []).map(function (r) { return String(r).trim().toUpperCase(); });
-  var SOLD = [];
+  var SOLD0 = (Array.isArray(C.vendues) ? C.vendues : []).map(function (r) { return String(r).trim().toUpperCase(); });
+  var SOLD = SOLD0.slice();
   function isRes(ref) { return RES.indexOf(String(ref || '').toUpperCase()) !== -1; }
   function isSold(ref) { return SOLD.indexOf(String(ref || '').toUpperCase()) !== -1; }
   /* Lot : vendu ou reserve des qu'une de ses cartes l'est ; une carte suit le statut des lots qui la contiennent */
@@ -419,7 +421,9 @@
     .then(function (r) { return r.ok ? r.json() : null; }).then(function (s) {
       if (!s || typeof s !== 'object') return;
       (Array.isArray(s.reservees) ? s.reservees : []).forEach(function (r) { r = String(r).trim().toUpperCase(); if (RES.indexOf(r) === -1) RES.push(r); });
-      SOLD = (Array.isArray(s.vendues) ? s.vendues : []).map(function (r) { return String(r).trim().toUpperCase(); });
+      var live = (Array.isArray(s.vendues) ? s.vendues : []).map(function (r) { return String(r).trim().toUpperCase(); });
+      var after = Date.parse(s.maj) > Date.parse(C.vendues_le);
+      SOLD = after ? live : SOLD0.concat(live.filter(function (r) { return SOLD0.indexOf(r) === -1; }));
       applyStatuses();
       setLivePrices(s.prix);
       applyLivePrices();

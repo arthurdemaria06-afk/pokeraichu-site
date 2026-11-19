@@ -41,6 +41,8 @@ def deaccent(s):
 
 
 def num(p):
+    if p is None:  # prix sur demande
+        return ''
     p = float(p)
     return str(int(p)) if p == int(p) else ('%.2f' % p).rstrip('0').rstrip('.')
 
@@ -60,11 +62,20 @@ def thousands(n, sep):
 
 
 def eur_fr(p):
+    if p is None:
+        return 'Sur demande'
     return thousands(p, NNBSP) + NNBSP + '€'
 
 
 def eur_en(p):
+    if p is None:
+        return 'On request'
     return '€' + thousands(p, ',')
+
+
+def ask_cls(c):
+    """classe des prix « sur demande » (site.css : .price--ask)"""
+    return ' price--ask' if c.get('prix_eur') is None else ''
 
 
 def is_slab(c):
@@ -180,7 +191,7 @@ def msg_lines(c, lang, kind):
         L = [head, title_short(c, 'fr'), 'Extension : %s, version %s' % (ext_label(c), LANG[c['langue']][1])]
         L.append('Grade : ' + grade_nb(c) if is_slab(c) else 'État : %s (non gradée)' % c['etat']['libelle'])
         if kind == 'res':
-            L.append('Prix : ' + eur_fr(c['prix_eur']))
+            L.append('Prix : ' + (eur_fr(c['prix_eur']) if c['prix_eur'] is not None else 'sur demande'))
         L += ['Réf. ' + c['ref'], 'Langue du site : français']
     else:
         head = {'res': 'Hello, I would like to reserve this card on Poké-Raichu:',
@@ -189,7 +200,7 @@ def msg_lines(c, lang, kind):
         L = [head, title_short(c, 'en'), 'Set: %s, %s version' % (ext_label(c), LANG[c['langue']][2])]
         L.append('Grade: ' + grade_nb(c) if is_slab(c) else 'Condition: %s (raw)' % c['en']['etat'])
         if kind == 'res':
-            L.append('Price: ' + eur_en(c['prix_eur']))
+            L.append('Price: ' + (eur_en(c['prix_eur']) if c['prix_eur'] is not None else 'on request'))
         L += ['Ref. ' + c['ref'], 'Site language: English']
     t = '\n'.join(L)
     if lang == 'fr':
@@ -211,7 +222,14 @@ def specs_html(root, c, lang):
     ext_rel = ('extensions/%s.html' if fr else 'en/sets/%s.html') % es
     lab = esc_text(ext_label(c))
     D.append(('Extension' if fr else 'Set', '<a href="../%s">%s</a>' % (('extensions/' if fr else 'sets/') + es + '.html', lab) if page_exists(root, ext_rel) else lab))
-    D.append(('Numéro' if fr else 'Number', esc_text(c['numero'])))
+    var = c.get('variante') if fr else c['en'].get('variante')
+    if var and c['numero'] in ('(%s)' % var, var, ''):  # carte ancienne sans numero de collection
+        D.append(('Précision' if fr else 'Detail', esc_text(var)))
+    else:
+        D.append(('Numéro' if fr else 'Number', esc_text(c['numero'])))
+    ed = c.get('edition') if fr else c['en'].get('edition')
+    if ed:
+        D.append(('Édition' if fr else 'Edition', esc_text(ed)))
     if c.get('rarete'):
         D.append(('Rareté' if fr else 'Rarity', esc_text(c['rarete'] if fr else c['en']['rarete'])))
     pks = c['pokemons'] if fr else c['en']['pokemons']
@@ -251,10 +269,10 @@ def descr(c, lang):
     if lang == 'fr':
         etat = 'gradée ' + grade_nb(c) if is_slab(c) else 'état ' + c['etat']['libelle']
         return '%s, carte Pokémon %s de l’extension %s, %s. %s, prix %s. Réservation sur le site, paiement sur eBay.' % (
-            full_name(c, 'fr'), LANG[c['langue']][1], c['extension']['nom'], etat, qty_text(c, 'fr'), eur_fr(c['prix_eur']))
+            full_name(c, 'fr'), LANG[c['langue']][1], c['extension']['nom'], etat, qty_text(c, 'fr'), eur_fr(c['prix_eur']) if c['prix_eur'] is not None else 'sur demande')
     etat = 'graded ' + grade_nb(c) if is_slab(c) else c['en']['etat'] + ' condition'
     return '%s, %s Pokémon card from the %s set, %s. %s, price %s. Reserve on the site, pay on eBay.' % (
-        full_name(c, 'en'), LANG[c['langue']][2], c['extension']['nom'], etat, qty_text(c, 'en'), eur_en(c['prix_eur']))
+        full_name(c, 'en'), LANG[c['langue']][2], c['extension']['nom'], etat, qty_text(c, 'en'), eur_en(c['prix_eur']) if c['prix_eur'] is not None else 'on request')
 
 
 def page_title(c, lang):
@@ -301,13 +319,14 @@ def render_product(root, c, lang, shell, ship_block, ship_ld, valid_until, relat
         prod["image"] = [SITE + '/assets/photos/%s-%d-1600.webp' % (c['slug'], i) for i in ph]
     if is_slab(c) and c['etat'].get('cert'):
         prod["mpn"] = c['etat']['cert']
-    offer = {"@type": "Offer", "price": '%.2f' % float(c['prix_eur']), "priceCurrency": "EUR", "url": me,
+    offer = {"@type": "Offer", "price": '%.2f' % float(c['prix_eur'] or 0), "priceCurrency": "EUR", "url": me,
              "availability": "https://schema.org/InStock", "itemCondition": "https://schema.org/UsedCondition",
              "seller": {"@type": "Organization", "name": "Poké-Raichu"}, "priceValidUntil": valid_until}
     offer["shippingDetails"] = ship_ld['shippingDetails']
     offer["hasMerchantReturnPolicy"] = ship_ld['hasMerchantReturnPolicy']
     offer["inventoryLevel"] = {"@type": "QuantitativeValue", "value": int(c['quantite'])}
-    prod["offers"] = offer
+    if c['prix_eur'] is not None:
+        prod["offers"] = offer
     bc = {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
         {"@type": "ListItem", "position": 1, "name": "Accueil" if fr else "Home", "item": SITE + ('/' if fr else '/en/')},
         {"@type": "ListItem", "position": 2, "name": "Catalogue", "item": SITE + ('/catalogue.html' if fr else '/en/catalogue.html')},
@@ -349,12 +368,12 @@ def render_product(root, c, lang, shell, ship_block, ship_ld, valid_until, relat
         esc(full_name(c, lang) + ' · Poké-Raichu'), L['share'])
     art = ('<article class="product" data-lot-ref="%s">\n%s\n<div class="product__info">\n<p class="eyebrow">%s%s</p>\n'
            '<h1 class="product__title">%s <span class="product__num">%s</span></h1>\n<p class="product__en">%s</p>\n'
-           '<p class="product__price-wrap"><span class="product__price">%s</span></p>\n'
+           '<p class="product__price-wrap"><span class="product__price%s">%s</span></p>\n'
            '<p class="product__stock"><span class="status" data-status-text>%s</span> · %s</p>\n%s%s%s\n\n</div>\n</article>\n') % (
-        ref, media_html(root, c, lang, up), BOLT if 'Raichu' in c['pokemons'] else '', esc_text(eyebrow), name, esc_text(c['numero']), esc_text(ext_label(c)), price,
+        ref, media_html(root, c, lang, up), BOLT if 'Raichu' in c['pokemons'] else '', esc_text(eyebrow), name, esc_text(c['numero']), esc_text(ext_label(c)), ask_cls(c), price,
         L['avail'], esc_text(stock), cta, ship_block, specs_html(root, c, lang))
-    buybar = ('<div class="buybar" data-buybar><span class="price">%s</span><a class="btn" href="%s" data-contact data-ref="%s" data-msg="%s" '
-              'data-msg-reserved="%s" data-label-reserved="%s">%s</a></div>\n') % (price, contact, ref, m_res, m_resv, L['lres'], L['res'])
+    buybar = ('<div class="buybar" data-buybar><span class="price%s">%s</span><a class="btn" href="%s" data-contact data-ref="%s" data-msg="%s" '
+              'data-msg-reserved="%s" data-label-reserved="%s">%s</a></div>\n') % (ask_cls(c), price, contact, ref, m_res, m_resv, L['lres'], L['res'])
     main = crumbs + art + (related_html or '\n') + '</div>\n' + buybar
     s = re.sub(r'<div class="crumbs-row">.*?(?=</main>)', lambda m: main, s, count=1, flags=re.S)
     return s
@@ -469,8 +488,8 @@ def render_tile(root, c, lang, up, sel, rec, add, first=False, lqip=None):
     q = int(c['quantite'])
     meta = '' if q == 1 else '<span class="tile__meta"><span class="badge"><span aria-hidden="true">×%d</span><span class="sr-only">%s</span></span></span>' % (q, qty_text(c, lang))
     pick_lab = ('Sélectionner ' if fr else 'Select ') + full_name(c, lang)
-    foot = ('<div class="tile__foot"><span class="tile__price"><span class="price">%s</span></span>%s<button type="button" class="pick" data-pick="%s" aria-pressed="false" aria-label="%s">'
-            '%s</button></div></li>') % (price, meta, c['ref'], esc(pick_lab), PICK_SVG)
+    foot = ('<div class="tile__foot"><span class="tile__price"><span class="price%s">%s</span></span>%s<button type="button" class="pick" data-pick="%s" aria-pressed="false" aria-label="%s">'
+            '%s</button></div></li>') % (ask_cls(c), price, meta, c['ref'], esc(pick_lab), PICK_SVG)
     return a + '<a class="tile__link" href="%s">%s%s</a>%s' % (href, art, body, foot)
 
 
