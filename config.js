@@ -64,7 +64,7 @@ window.PR_CONFIG = {
   ebay: "",
   ebay_evaluations: { pourcentage: 0, nombre: 0 },
   chaine_whatsapp: "",
-  mesure_audience: { umami: "" },
+  mesure_audience: { umami: "b930f619-59f5-49bb-8bdc-cd87162a0a0b" },
   depot: "arthurdemaria06-afk/pokeraichu-site",
   statuts_url: "https://gist.githubusercontent.com/arthurdemaria06-afk/dcf1d1b3bd2d78231c263bdcba55fc41/raw/statuts.json",
   taux_change: { date: "26/10/2026", GBP: 0.8382, USD: 1.1188, JPY: 176.15 },
