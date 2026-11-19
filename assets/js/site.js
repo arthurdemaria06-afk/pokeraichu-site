@@ -622,6 +622,42 @@
     flSync();
   }
 
+  /* Bouton « remonter en haut » : fleche-eclair qui suit la page des qu'on est descendu d'un demi-ecran.
+     Il se range au-dessus de ce qui est colle en bas a droite (bouton WhatsApp, barre de reservation, barre du salon). */
+  (function () {
+    var b = d.createElement('button');
+    b.type = 'button';
+    b.className = 'haut is-off';
+    b.setAttribute('aria-label', tr('Remonter en haut de la page', 'Back to top'));
+    b.title = tr('Remonter en haut', 'Back to top');
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .8 18.6 7.6H14.4L12.9 10.9H16L14 14.6H16.8L9.2 23.4L11.2 16.8H8L9.7 13.2H6.8L9.8 7.6H5.4Z"/></svg>';
+    d.body.appendChild(b);
+    var voisins = ['.buybar', '.salon-bar', '.wa-float'], tick = 0;
+    function caler() {
+      tick = 0;
+      var vh = window.innerHeight, vw = window.innerWidth, h = 0;
+      b.classList.toggle('is-off', (window.scrollY || 0) < Math.max(300, vh * 0.5));
+      voisins.forEach(function (sel) {
+        var e = d.querySelector(sel);
+        if (!e) return;
+        var cs = getComputedStyle(e);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        var r = e.getBoundingClientRect();
+        if (r.height && r.top < vh && r.bottom > vh - 40 && r.right > vw - 90) h = Math.max(h, vh - r.top);
+      });
+      b.style.bottom = h ? Math.round(h + 12) + 'px' : '';
+    }
+    function plusTard() { if (!tick) tick = requestAnimationFrame(caler); }
+    window.addEventListener('scroll', plusTard, { passive: true });
+    window.addEventListener('resize', plusTard);
+    voisins.forEach(function (sel) { var e = d.querySelector(sel); if (e) e.addEventListener('transitionend', plusTard); });
+    b.addEventListener('click', function (e) {
+      window.scrollTo({ top: 0, behavior: RM ? 'auto' : 'smooth' });
+      if (!e.detail) { var c = d.querySelector('.site-header a'); if (c) c.focus({ preventScroll: true }); }
+    });
+    caler();
+  })();
+
   /* Photos de la fiche : vignettes, defilement au doigt, zoom plein ecran */
   all('[data-gallery]').forEach(function (g) {
     var track = g.querySelector('[data-track]');

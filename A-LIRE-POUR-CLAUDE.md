@@ -198,6 +198,8 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (20/11) Bouton « remonter en haut » sur toutes les pages : flèche-éclair jaune sur rond noir (`.haut`, créé par site.js),
+  visible après un demi-écran de défilement, rangé au-dessus du bouton WhatsApp, de la barre de réservation ou du salon.
 - (20/11) Coffrets 30th Premium Deck ouverts (Arthur a 3 Mentali-ex 043, 3 Noctali-ex 044, 3 Victini 041 et 3 Zeraora
   042) et Pikachu-ex 132/M-P (nuit) FUR échangé contre des displays. Site : fiches S01 (coffret scellé) et 290 retirées
   via `_outils/retirer.py` ; 301, 302 et 303 passées à 3 exemplaires ; lots L02 et L03 gardés. Shopify : PKR-S01 et

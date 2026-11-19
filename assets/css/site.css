@@ -1178,3 +1178,13 @@ main [id],main:target,[id]:target{scroll-margin-top:calc(var(--hdr-colle, 96px) 
 }
 @media (min-width:860px){.product__media{top:calc(var(--hdr-colle, 104px) + 20px)}}
 @media (min-width:980px){.rc-aside{top:calc(var(--hdr-colle, 104px) + 20px)}}
+
+/* bouton « remonter en haut » : flèche-éclair qui suit la page (créé par site.js) */
+.haut{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:20;display:grid;place-items:center;width:48px;height:48px;padding:0;border:0;border-radius:50%;background:var(--sumi);color:var(--yamabuki);box-shadow:0 0 0 1px rgba(251,249,244,.22),0 6px 18px rgba(30,27,24,.3);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .2s ease,transform .2s ease,visibility .2s,bottom .2s ease,background-color .15s ease}
+.haut svg{width:26px;height:26px;fill:currentColor}
+.haut:hover{background:var(--shu-fonce)}
+.haut:active{transform:scale(.94)}
+.haut:focus-visible{outline:3px solid var(--yamabuki);outline-offset:2px}
+.haut.is-off{opacity:0;transform:translateY(12px);visibility:hidden;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.haut{transition:none}}
+@media print{.haut{display:none}}
