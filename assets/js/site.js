@@ -106,6 +106,7 @@
     } catch (e) {}
   }
   track();
+  window.PR_TRACK = track;
 
   /* 0. Langue choisie, memorisee : au premier passage d'une visite, on rouvre le site dans cette langue */
   var LKEY = 'pokeraichu.lang', LSEEN = 'pokeraichu.lang.vu';
@@ -2804,7 +2805,7 @@
     if (!toastEl) { toastEl = el('div', 'toast'); toastEl.setAttribute('role', 'status'); d.body.appendChild(toastEl); }
     toastEl.textContent = '';
     toastEl.appendChild(el('span', '', msg));
-    if (location.href.split('#')[0] !== PAGE) { var a = el('a', '', tr('Mes éclairs', 'My bolts')); a.href = PAGE; toastEl.appendChild(a); }
+    if (location.href.split('#')[0] !== PAGE) { var a = el('a', '', tr('Mes favoris', 'My favourites')); a.href = PAGE; toastEl.appendChild(a); }
     toastEl.classList.add('is-on');
     clearTimeout(toastT);
     toastT = setTimeout(function () { toastEl.classList.remove('is-on'); }, 3200);
@@ -2813,10 +2814,11 @@
     var l = liste().slice(), i = l.indexOf(ref);
     if (i === -1) {
       l.unshift(ref);
-      toast(compte() ? tr('Ajoutée à vos éclairs.', 'Added to your bolts.') : tr('Ajoutée à vos éclairs (sur cet appareil).', 'Added to your bolts (on this device).'));
+      if (window.PR_TRACK) window.PR_TRACK('favori-ajout', { ref: ref });
+      toast(compte() ? tr('Ajoutée à vos favoris.', 'Added to your favourites.') : tr('Ajoutée à vos favoris (sur cet appareil).', 'Added to your favourites (on this device).'));
     } else {
       l.splice(i, 1);
-      toast(tr('Retirée de vos éclairs.', 'Removed from your bolts.'));
+      toast(tr('Retirée de vos favoris.', 'Removed from your favourites.'));
     }
     garder(l);
   }
@@ -2834,7 +2836,7 @@
       var b = el('button', 'eclair');
       b.type = 'button';
       b.setAttribute('data-eclair', ref);
-      b.setAttribute('aria-label', tr('Mettre en éclair : ', 'Bolt: ') + nomTuile(li));
+      b.setAttribute('aria-label', tr('Ajouter aux favoris : ', 'Add to favourites: ') + nomTuile(li));
       b.innerHTML = SVG;
       li.appendChild(b);
     });
@@ -2859,11 +2861,11 @@
       var on = l.indexOf(b.getAttribute('data-eclair')) !== -1;
       b.setAttribute('aria-pressed', String(on));
       var t = b.querySelector('[data-eclair-t]');
-      if (t) t.textContent = on ? tr('Dans mes éclairs', 'In my bolts') : tr('Mettre en éclair', 'Add to my bolts');
+      if (t) t.textContent = on ? tr('Dans mes favoris', 'In my favourites') : tr('Ajouter à mes favoris', 'Add to my favourites');
     });
     Array.prototype.forEach.call(d.querySelectorAll('[data-eclair-n]'), function (n) { n.textContent = l.length; n.hidden = !l.length; });
     var pill = d.querySelector('.eclair-pill');
-    if (pill) pill.setAttribute('aria-label', tr('Mes éclairs', 'My bolts') + ' (' + l.length + ')' + (compte() ? '' : tr(', se connecter', ', sign in')));
+    if (pill) pill.setAttribute('aria-label', tr('Mes favoris', 'My favourites') + ' (' + l.length + ')' + (compte() ? '' : tr(', se connecter', ', sign in')));
     if (pret) pageCompte();
   }
   d.addEventListener('click', function (e) {
@@ -2880,9 +2882,176 @@
   if (lang && !d.querySelector('.eclair-pill')) {
     var p = el('a', 'eclair-pill');
     p.href = PAGE;
-    p.innerHTML = SVG + '<span class="eclair-pill__n" data-eclair-n hidden>0</span>';
+    p.innerHTML = SVG + '<span class="eclair-pill__t">' + tr('Favoris', 'Favourites') + '</span><span class="eclair-pill__n" data-eclair-n hidden>0</span>';
     if (location.href.split('#')[0] === PAGE) p.setAttribute('aria-current', 'page');
     lang.parentNode.insertBefore(p, lang);
+  }
+  /* --- menu à trois traits : compte, favoris, sélection, boutique, services, contact, langue.
+     Construit ici pour toutes les pages (FR et EN) ; les liens partent de la racine du site. */
+  var tete = d.querySelector('.site-header .header-inner');
+  if (tete && !d.querySelector('.menu-btn')) {
+    var U = function (fr, en) { return new URL(EN ? en : fr, ROOT).href; };
+    var IC = {
+      compte: '<svg class="tiroir__i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 19.5c1.2-3.4 4-5.1 7.2-5.1s6 1.7 7.2 5.1"/></svg>',
+      sel: '<svg class="tiroir__i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="3.5" width="11" height="15" rx="1.6"/><path d="M8.5 21h9.2a1.3 1.3 0 0 0 1.3-1.3V7"/></svg>'
+    };
+    var GROUPES = [
+      [tr('Boutique', 'Shop'), [
+        [tr('Catalogue', 'Catalogue'), U('catalogue.html', 'en/catalogue.html')],
+        [tr('Nouveautés', 'New arrivals'), U('catalogue.html?tri=recent', 'en/catalogue.html?tri=recent')],
+        [tr('Coups de foudre · vente de la semaine', 'Lightning deals · this week'), U('coups-de-foudre.html', 'en/lightning-deals.html')],
+        [tr('Collections', 'Collections'), U('collections.html', 'en/collections.html')],
+        ['Raichu', U('collections/raichu.html', 'en/collections/raichu.html'), 1],
+        [tr('Cartes gradées', 'Graded cards'), U('collections/gradees.html', 'en/collections/graded.html')]
+      ]],
+      [tr('Services', 'Services'), [
+        [tr('Recherche au Japon', 'Find a card in Japan'), U('recherche.html', 'en/find-a-card.html')],
+        [tr('Importer soi-même ou acheter ici', 'Import yourself or buy here'), U('importer-du-japon.html', 'en/import-from-japan.html')],
+        [tr('Questions fréquentes', 'FAQ'), U('faq.html', 'en/faq.html')],
+        [tr('À propos', 'About'), U('a-propos.html', 'en/about.html')],
+        [tr('Contact', 'Contact'), U('contact.html', 'en/contact.html')]
+      ]]
+    ];
+    var LEGAL = [
+      [tr('Conditions de vente', 'Terms of sale'), U('conditions-de-vente.html', 'en/terms-of-sale.html')],
+      [tr('Confidentialité', 'Privacy'), U('confidentialite.html', 'en/privacy.html')],
+      [tr('Mentions légales', 'Legal notice'), U('mentions-legales.html', 'en/legal-notice.html')]
+    ];
+    var ICI = location.href.split('#')[0];
+    var mb = el('button', 'menu-btn');
+    mb.type = 'button';
+    mb.setAttribute('aria-expanded', 'false');
+    mb.setAttribute('aria-controls', 'menu-tiroir');
+    mb.innerHTML = '<span class="menu-btn__l" aria-hidden="true"><i></i><i></i><i></i></span><span class="menu-btn__t">' + tr('Menu', 'Menu') + '</span>';
+    var langNav = tete.querySelector('nav.lang');
+    tete.insertBefore(mb, langNav ? langNav.nextSibling : null);
+    var tiroir = null, avant = null;
+    var lien = function (texte, href, extra) {
+      var a = el('a', 'tiroir__a');
+      a.href = href;
+      if (extra) a.innerHTML = extra;
+      a.appendChild(el('span', 'tiroir__txt', texte));
+      if (href === ICI) a.setAttribute('aria-current', 'page');
+      a.addEventListener('click', function () { if (window.PR_TRACK) window.PR_TRACK('menu', { lien: texte.slice(0, 50) }); });
+      return a;
+    };
+    var construire = function () {
+      tiroir = el('div', 'tiroir');
+      tiroir.id = 'menu-tiroir';
+      tiroir.hidden = true;
+      var fond = el('div', 'tiroir__fond');
+      fond.setAttribute('data-menu-x', '');
+      var pan = el('div', 'tiroir__pan');
+      pan.setAttribute('role', 'dialog');
+      pan.setAttribute('aria-modal', 'true');
+      pan.setAttribute('aria-label', tr('Menu du site', 'Site menu'));
+      var haut = el('div', 'tiroir__haut');
+      haut.appendChild(el('span', 'tiroir__titre', tr('Menu', 'Menu')));
+      var x = el('button', 'tiroir__x');
+      x.type = 'button';
+      x.setAttribute('data-menu-x', '');
+      x.setAttribute('aria-label', tr('Fermer le menu', 'Close menu'));
+      x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+      haut.appendChild(x);
+      pan.appendChild(haut);
+      /* compte */
+      var cpt = el('a', 'tiroir__compte');
+      cpt.href = PAGE;
+      cpt.setAttribute('data-menu-compte', '');
+      pan.appendChild(cpt);
+      /* mon espace */
+      var ul = el('ul', 'tiroir__liste');
+      var li1 = el('li'); var fav = lien(tr('Mes favoris', 'My favourites'), PAGE, SVG); fav.classList.add('tiroir__a--fav');
+      fav.appendChild(el('span', 'tiroir__n')).setAttribute('data-menu-fav', '');
+      li1.appendChild(fav); ul.appendChild(li1);
+      var li2 = el('li'); var sel = lien(tr('Ma sélection', 'My selection'), U('selection.html', 'en/selection.html'), IC.sel);
+      sel.appendChild(el('span', 'tiroir__n')).setAttribute('data-menu-sel', '');
+      li2.appendChild(sel); ul.appendChild(li2);
+      pan.appendChild(ul);
+      GROUPES.forEach(function (g) {
+        pan.appendChild(el('p', 'tiroir__h', g[0]));
+        var u = el('ul', 'tiroir__liste');
+        g[1].forEach(function (it) { var li = el('li'); li.appendChild(lien(it[0], it[1], it[2] ? SVG : '')); u.appendChild(li); });
+        pan.appendChild(u);
+      });
+      /* contact : mêmes liens que le pied de page (WhatsApp, Instagram, eBay, chaîne), déjà réglés par config.js */
+      var pied = d.querySelector('.site-footer [data-channel]');
+      var src = pied ? pied.closest('ul') : null;
+      if (src) {
+        var u2 = el('ul', 'tiroir__liste tiroir__liste--contact');
+        Array.prototype.forEach.call(src.children, function (li) {
+          var a0 = li.querySelector('a');
+          if (li.hidden || !a0) return;
+          var a = a0.cloneNode(true);
+          a.className = 'tiroir__a';
+          var nli = el('li'); nli.appendChild(a); u2.appendChild(nli);
+        });
+        if (u2.children.length) { pan.appendChild(el('p', 'tiroir__h', tr('Nous écrire, nous suivre', 'Contact and follow'))); pan.appendChild(u2); }
+      }
+      /* langue */
+      if (langNav) {
+        var lg = langNav.cloneNode(true);
+        lg.className = 'lang tiroir__lang';
+        pan.appendChild(lg);
+      }
+      var lp = el('p', 'tiroir__legal');
+      LEGAL.forEach(function (it, i) { if (i) lp.appendChild(d.createTextNode(' · ')); var a = el('a', '', it[0]); a.href = it[1]; lp.appendChild(a); });
+      pan.appendChild(lp);
+      tiroir.appendChild(fond);
+      tiroir.appendChild(pan);
+      d.body.appendChild(tiroir);
+      tiroir.addEventListener('click', function (e) { if (e.target.closest('[data-menu-x]')) fermer(); });
+    };
+    var remplir = function () {
+      var c = compte(), box = tiroir.querySelector('[data-menu-compte]');
+      box.innerHTML = IC.compte;
+      var t = el('span', 'tiroir__ct');
+      if (c) {
+        t.appendChild(el('strong', '', tr('Bonjour ', 'Hello ') + (c.prenom || '')));
+        t.appendChild(el('span', '', tr('Mon compte et mes favoris', 'My account and favourites')));
+      } else {
+        t.appendChild(el('strong', '', tr('Se connecter', 'Sign in')));
+        t.appendChild(el('span', '', tr('Avec Google : vos favoris vous suivent sur tous vos appareils', 'With Google: your favourites follow you on all your devices')));
+      }
+      box.appendChild(t);
+      var n = liste().length, nf = tiroir.querySelector('[data-menu-fav]');
+      nf.textContent = n; nf.hidden = !n;
+      var sc = d.querySelector('[data-sel-count]'), ns = sc ? +sc.textContent || 0 : 0, nsel = tiroir.querySelector('[data-menu-sel]');
+      nsel.textContent = ns; nsel.hidden = !ns;
+    };
+    var cle = function (e) {
+      if (e.key === 'Escape') { e.preventDefault(); fermer(); return; }
+      if (e.key !== 'Tab') return;
+      var f = tiroir.querySelectorAll('a[href], button');
+      if (!f.length) return;
+      var a = f[0], z = f[f.length - 1];
+      if (e.shiftKey && d.activeElement === a) { e.preventDefault(); z.focus(); }
+      else if (!e.shiftKey && d.activeElement === z) { e.preventDefault(); a.focus(); }
+    };
+    var ouvrir = function () {
+      if (!tiroir) construire();
+      remplir();
+      avant = d.activeElement;
+      tiroir.hidden = false;
+      void tiroir.offsetWidth;
+      tiroir.classList.add('is-open');
+      d.documentElement.classList.add('menu-ouvert');
+      mb.setAttribute('aria-expanded', 'true');
+      d.addEventListener('keydown', cle);
+      var x = tiroir.querySelector('.tiroir__x'); if (x) x.focus();
+      if (window.PR_TRACK) window.PR_TRACK('menu-ouvert');
+    };
+    var fermer = function () {
+      if (!tiroir || tiroir.hidden) return;
+      tiroir.classList.remove('is-open');
+      d.documentElement.classList.remove('menu-ouvert');
+      mb.setAttribute('aria-expanded', 'false');
+      d.removeEventListener('keydown', cle);
+      setTimeout(function () { if (!tiroir.classList.contains('is-open')) tiroir.hidden = true; }, 220);
+      if (avant && avant.focus) avant.focus();
+    };
+    mb.addEventListener('click', function () { if (tiroir && !tiroir.hidden && tiroir.classList.contains('is-open')) fermer(); else ouvrir(); });
+    window.addEventListener('pageshow', function (e) { if (e.persisted) fermer(); });
   }
   decorer();
   /* vignettes ajoutées plus tard (recherche, filtres, listes) */
@@ -2968,11 +3137,11 @@
   function connecte(rep) {
     msg(tr('Connexion…', 'Signing in…'));
     req('connexion', { method: 'POST', body: JSON.stringify({ credential: rep.credential, eclairs: liste(), langue: EN ? 'en' : 'fr' }) }).then(function (r) {
-      if (r._status !== 200) { msg(r._status === 503 ? tr('Les comptes ne sont pas encore ouverts. Vos éclairs restent gardés sur cet appareil.', 'Accounts are not open yet. Your bolts stay saved on this device.') : tr('La connexion a échoué. Réessayez.', 'Sign-in failed. Please try again.'), true); return; }
+      if (r._status !== 200) { msg(r._status === 503 ? tr('Les comptes ne sont pas encore ouverts. Vos favoris restent gardés sur cet appareil.', 'Accounts are not open yet. Your favourites stay saved on this device.') : tr('La connexion a échoué. Réessayez.', 'Sign-in failed. Please try again.'), true); return; }
       ecrire(KCPT, JSON.stringify({ prenom: r.client.prenom, email: r.client.email }));
       ecrire(KSYNC, '1', true);
       garder(r.eclairs, true);
-      msg(r.nouveau ? tr('Compte créé. Vos éclairs vous suivent maintenant sur tous vos appareils.', 'Account created. Your bolts now follow you on all your devices.') : tr('Connecté.', 'Signed in.'));
+      msg(r.nouveau ? tr('Compte créé. Vos favoris vous suivent maintenant sur tous vos appareils.', 'Account created. Your favourites now follow you on all your devices.') : tr('Connecté.', 'Signed in.'));
     }).catch(function () { msg(tr('Pas de réseau. Réessayez.', 'No connection. Please try again.'), true); });
   }
   box.addEventListener('click', function (e) {
@@ -2983,11 +3152,11 @@
       req('deconnexion', { method: 'POST' }).catch(function () {}).then(function () {
         ecrire(KCPT, null); ecrire(KSYNC, null, true);
         try { window.google && window.google.accounts.id.disableAutoSelect(); } catch (e2) {}
-        msg(tr('Déconnecté. Vos éclairs restent sur cet appareil.', 'Signed out. Your bolts stay on this device.'));
+        msg(tr('Déconnecté. Vos favoris restent sur cet appareil.', 'Signed out. Your favourites stay on this device.'));
         maj();
       });
     } else if (act === 'supprimer') {
-      if (!window.confirm(tr('Supprimer votre compte et la liste enregistrée ? Vos éclairs restent sur cet appareil.', 'Delete your account and the saved list? Your bolts stay on this device.'))) return;
+      if (!window.confirm(tr('Supprimer votre compte et la liste enregistrée ? Vos favoris restent sur cet appareil.', 'Delete your account and the saved list? Your favourites stay on this device.'))) return;
       req('moi', { method: 'DELETE' }).then(function (r) {
         if (r._status !== 200 && r._status !== 401) { msg(tr('La suppression a échoué. Réessayez ou écrivez-nous.', 'Deletion failed. Please try again or contact us.'), true); return; }
         ecrire(KCPT, null); ecrire(KSYNC, null, true);

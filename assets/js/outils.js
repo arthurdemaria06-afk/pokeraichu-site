@@ -679,7 +679,7 @@
     var tot = 0, comptes = {};
     cl.forEach(function (c) { c.eclairs.forEach(function (e) { tot++; comptes[e.ref] = (comptes[e.ref] || 0) + 1; }); });
     var tete = el('div', 'clients__tete');
-    tete.appendChild(el('p', 'count', cl.length + ' client(s) · ' + tot + ' éclair(s)'));
+    tete.appendChild(el('p', 'count', cl.length + ' client(s) · ' + tot + ' favori(s)'));
     var maj = el('button', 'linkbtn', 'Rafraîchir');
     maj.type = 'button';
     maj.addEventListener('click', charger);
@@ -697,10 +697,10 @@
     cl.forEach(function (c) {
       var det = el('details', 'client');
       var nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim() || c.email;
-      det.appendChild(el('summary', 'client__sum', nom + ' · ' + c.eclairs.length + ' éclair(s) · depuis le ' + date(c.cree_le)));
+      det.appendChild(el('summary', 'client__sum', nom + ' · ' + c.eclairs.length + ' favori(s) · depuis le ' + date(c.cree_le)));
       var info = el('p', 'client__info');
       var mail = el('a', '', c.email);
-      mail.href = 'mailto:' + c.email + '?subject=' + encodeURIComponent('Poké-Raichu : vos éclairs');
+      mail.href = 'mailto:' + c.email + '?subject=' + encodeURIComponent('Poké-Raichu : vos favoris');
       info.appendChild(mail);
       info.appendChild(d.createTextNode(' · ' + (c.langue === 'en' ? 'anglais' : 'français') + ' · inscrit le ' + date(c.cree_le, true) + ' · vu le ' + date(c.vu_le, true)));
       det.appendChild(info);

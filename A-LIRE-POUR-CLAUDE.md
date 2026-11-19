@@ -209,3 +209,11 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - `f2c2f5d` Déménagement vers Cloudflare et l'adresse pokeraichu.com (worker formulaires, mentions légales, redirection Netlify)
 - `92fd50c` Redirections compatibles Cloudflare
 - `01cc236` Lien « Gestion » en pied de page, visible seulement sur l'appareil où la clé est enregistrée
+
+
+## Menu à trois traits et « Mes favoris » (19/11/2026)
+- Le menu ☰ (bouton `.menu-btn`, tiroir `#menu-tiroir`) est construit par `assets/js/site.js` (bloc favoris) sur toutes les pages FR et EN : compte Google, Mes favoris, Ma sélection, Boutique (catalogue, nouveautés `?tri=recent`, coups de foudre, collections, Raichu, gradées), Services, liens de contact repris du pied de page, langue, mentions. Rien à modifier dans les pages HTML.
+- Sous 480 px, le sélecteur FR/EN de l'en-tête est masqué : il est dans le menu.
+- Côté visiteurs, les « éclairs » s'appellent désormais **favoris** (choix d'Arthur : « Coups de foudre » reste le nom de la vente flash de la semaine). Les clés techniques (`pokeraichu.eclairs.v1`, `/api/eclairs`, colonnes D1) ne changent pas.
+- Vignettes : le bandeau Vendue/Réservée est en bas de la photo, l'éclair des favoris en haut à gauche.
+- Mesure d'audience : `window.PR_TRACK(nom, données)` envoie un évènement Umami ; évènements ajoutés : `favori-ajout`, `menu-ouvert`, `menu`.
