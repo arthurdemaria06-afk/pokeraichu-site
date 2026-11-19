@@ -183,7 +183,8 @@ def main(root, refs):
     for rel in ('index.html', 'en/index.html', 'catalogue.html', 'en/catalogue.html'):
         if site.exists(rel):
             s = site.rd(rel)
-            s = re.sub(r'(?<![\d.,])(\d+) (fiches?|listings?)(, | · )(\d+) (articles?|items?)\b',
+            # total du stock seulement : les cartes de collection (coll__count) sont recomptées plus bas
+            s = re.sub(r'(?<!coll__count">)(?<![\d.,])(\d+) (fiches?|listings?)(, | · )(\d+) (articles?|items?)\b',
                        lambda m: '%s%s%s' % (plural(int(m.group(1)) - total_fiches, m.group(2).rstrip('s')), m.group(3), plural(int(m.group(4)) - total_unites, m.group(5).rstrip('s'))), s)
             s = re.sub(r'(?<![\d.,])%d (fiches|listings)\b' % st['meta']['nb_fiches'],
                        lambda m: plural(st['meta']['nb_fiches'] - total_fiches, m.group(1).rstrip('s')), s)

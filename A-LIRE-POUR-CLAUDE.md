@@ -148,7 +148,9 @@ modifiées directement, et les nouvelles cartes sont produites par :
   encadrés et listes JSON-LD qui les citent, recompte pages Pokémon/extension/collections, accueil, catalogue et filtres,
   supprime les pages Pokémon ou extension devenues vides, nettoie `sitemap.xml`, `data/stock.json`, les index de recherche
   et `data/ebay.json`, et redirige (301) les anciennes adresses et les liens courts `/r/`, `/s/` vers la collection la
-  plus proche dans `_redirects`. Penser aussi à Shopify (supprimer le produit) et au pilotage (liste `RETRAITS` de pilotage.js).
+  plus proche dans `_redirects`. Penser aussi à Shopify (supprimer le produit) et au pilotage.
+  **Ne retirer que les réfs qu'Arthur nomme** : une fiche liée (lot, carte d'un coffret, même Pokémon) reste en ligne
+  tant qu'il ne l'a pas citée (erreur du 20/11 : les cartes d'un coffret ouvert avaient été retirées avec le coffret).
 - `data/stock.json` : clés `meta, taxonomies, cartes, vendus, parties, coups_de_foudre` (217 cartes au 16/11).
 - `config.js` : **seul fichier de réglages à la main** (WhatsApp, livraison, remises, coups de foudre, TVA, médiateur…).
   Tout est documenté en tête du fichier.
@@ -196,10 +198,11 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
-- (20/11) Retrait définitif (Arthur ne les a plus) : coffret 30th Premium Deck Mentali & Noctali (S01), ses cartes
-  301 Mentali-ex 043/040, 302 Noctali-ex 044/040, 303 Victini 041/040, lots L02 et L03, et 290 Pikachu-ex 132/M-P (nuit) FUR.
-  Site via `_outils/retirer.py` (pages Noctali/Umbreon supprimées car vides), 7 produits Shopify supprimés, pilotage nettoyé
-  à la prochaine ouverture. Gardés : 024 et 162 Zeraora 042/040, 346 Mentali-ex 211/187 KR.
+- (20/11) Coffrets 30th Premium Deck ouverts (Arthur a 3 Mentali-ex 043, 3 Noctali-ex 044, 3 Victini 041 et 3 Zeraora
+  042) et Pikachu-ex 132/M-P (nuit) FUR échangé contre des displays. Site : fiches S01 (coffret scellé) et 290 retirées
+  via `_outils/retirer.py` ; 301, 302 et 303 passées à 3 exemplaires ; lots L02 et L03 gardés. Shopify : PKR-S01 et
+  PKR-290 supprimés, PKR-301/302/303 (stock 3) et PKR-L02/L03 recréés. Pilotage : voir § Pilotage (`coffretOuvert`).
+  Un premier passage avait retiré à tort 301, 302, 303, L02 et L03 (commit cd51463) : tout est revenu.
 - (20/11) Mesure d'audience : l'appareil qui a la clé de gestion (`pr.gestion.jeton`) n'est jamais compté, et la case
   « Ne pas compter mes visites » (`pr.moi`) se coche toute seule dessus. Les visites passées restent dans Umami.
 - (19/11) Ajout 347 Minotaupe 079/071 AR (SV5M), 348 Minotaupe 059/049 CHR (sm11b Dream League), 349 Démolosse 206/184 CHR (s8b), prix sur demande, brouillons Shopify PKR-347 à 349.
@@ -251,11 +254,16 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
 - Photos : fiche du site (par n° ou `alias_site`), sinon fiche du site d'un exemplaire au nom identique, sinon image
   officielle Limitless TCG (`tpc/{SET}/{SET}_{n}_R_JP_SM|LG.png`, international `tpci/{SET}/{SET}_{nnn}_R_EN_…`),
   sinon le n°. `_headers` donne à /pilotage.html sa propre CSP (img-src + limitlesstcg.nyc3.cdn.digitaloceanspaces.com).
-- Contrôles avec le site : `alias_site`, `lots_site` (L01 = 095 + G4784, L04 = 313 + 314), `refs_site` des produits
-  (card sets = S02–S10).
-- Retraits définitifs : liste `RETRAITS` de pilotage.js, appliquée une fois à l'ouverture et à chaque import (trace dans
-  le journal et `meta.retraits`) ; `_outils/pilotage/extraire.py` filtre les mêmes articles. Retirés le 19/11 : coffret
-  30th Premium Deck Mentali & Noctali (groupe « Coffret Premium Deck », cartes P1–P4) et Pikachu-ex 132/M-P (nuit) FUR (290).
+- Contrôles avec le site : `alias_site` (P1, P1-2, P1-3 = fiche 301 ; P2… = 302 ; P3… = 303), `lots_site` (L01 = 095 + G4784,
+  L02 = P1 + P2, L03 = P3 + P4, L04 = 313 + 314), `refs_site` des produits (card sets = S02–S10).
+- Coffrets ouverts (20/11) : `coffretOuvert()` de pilotage.js, appliqué une fois à l'ouverture et à chaque import (trace
+  dans le journal et `meta.retraits` = `coffret-ouvert-2026-11-20`). Le produit « coffret » disparaît, ses cartes P1–P4
+  passent du groupe « Coffret Premium Deck » (hors totaux) au groupe « 30 ans » (même coût et même valeur au total ;
+  Victini et Zeraora à 0 € car le prix du coffret était réparti sur Mentali et Noctali), P1-2/P1-3, P2-2/P2-3 et
+  P3-2/P3-3 sont ajoutées sans prix payé (3 exemplaires de chaque), le Pikachu FUR 290 est retiré. Si la version fautive
+  du 20/11 au matin (`meta.retraits` = `retrait-2026-11-19`, cartes P1–P4 supprimées) est déjà passée, les cartes sont
+  reprises dans l'historique des versions (dernière version avant la note « Retirés (plus en stock) »).
+  `_outils/pilotage/extraire.py` reste fidèle au classeur : c'est pilotage.js qui fait la transformation.
 
 **Document (schéma 1)** : `params` (taux_jpy, frais_vente, tva_import, rentabilite_estimee, frais_envoi,
 gardees_dans_totaux), `groupes` (id, nom, ordre, hors_totaux), `cartes` (ref = n° du site, nom, groupe, cat, langue, prix,

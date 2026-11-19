@@ -114,35 +114,97 @@
   }
   function calculer() { S.R = K.calcul(S.doc); }
 
-  /* retraits définitifs : articles qu'Arthur n'a plus, effacés une seule fois (à l'ouverture et à chaque import),
-     tracés dans le journal et dans meta.retraits. Les frais rattachés à un article retiré restent comptés en frais généraux. */
-  var RETRAITS = [{
-    id: 'retrait-2026-11-19',
-    note: 'Retirés (plus en stock) : coffret 30th Premium Deck Mentali & Noctali avec ses cartes, Pikachu-ex 132/M-P (nuit) FUR',
-    carte: function (c) { return c.groupe === 'Coffret Premium Deck' || (c.ref === '290' && /132\/M-P/.test(c.nom || '')); },
-    produits: ['coffret'], groupes: ['Coffret Premium Deck'], site: ['S01', '301', '302', '303', 'L02', 'L03', '290']
-  }];
-  function retirer(doc) {
+  /* coffrets 30th Premium Deck ouverts et Pikachu-ex 132/M-P (nuit) FUR échangé contre des displays (20/11/2026).
+     Appliqué une seule fois, à l'ouverture et à chaque import, tracé dans le journal et dans meta.retraits :
+     - le produit « coffret » disparaît ; ses cartes (groupe « Coffret Premium Deck », hors totaux) passent dans le
+       groupe « 30 ans » et sont comptées à l'unité (même coût, même valeur qu'avant) ;
+     - 3 exemplaires de Mentali-ex 043, Noctali-ex 044 et Victini 041 : les 2 de plus sont ajoutés, prix payé à compléter ;
+     - le Pikachu FUR (290) est retiré.
+     La version déployée le 20/11 au matin retirait aussi les cartes du coffret : si elle est déjà passée sur les données,
+     ces cartes sont reprises dans l'historique des versions (dernière version avant ce retrait). */
+  var OUVERT = 'coffret-ouvert-2026-11-20', GR_COFFRET = 'Coffret Premium Deck', GR_30 = '30 ans';
+  var EXEMPLAIRES = { P1: 3, P2: 3, P3: 3 };
+  function faitsDe(doc) { return (doc.meta && Array.isArray(doc.meta.retraits)) ? doc.meta.retraits : []; }
+  function aReprendre(doc) {
+    return faitsDe(doc).indexOf(OUVERT) === -1 && faitsDe(doc).indexOf('retrait-2026-11-19') !== -1 &&
+      !(doc.cartes || []).some(function (c) { return c.ref === 'P1'; });
+  }
+  function coffretOuvert(doc, repris) {
     doc.meta = doc.meta || {};
-    var faits = Array.isArray(doc.meta.retraits) ? doc.meta.retraits : (doc.meta.retraits = []), notes = [];
-    RETRAITS.forEach(function (m) {
-      if (faits.indexOf(m.id) !== -1) return;
-      var refs = {};
-      m.produits.forEach(function (id) { refs[id] = 1; });
-      doc.cartes = (doc.cartes || []).filter(function (c) { if (m.carte(c)) { refs[c.ref] = 1; return false; } return true; });
-      doc.produits = (doc.produits || []).filter(function (p) { return m.produits.indexOf(p.id) === -1; });
-      doc.groupes = (doc.groupes || []).filter(function (g) { return m.groupes.indexOf(g.id) === -1; });
-      doc.cartes.forEach(function (c) {
-        ['alias_site', 'lots_site'].forEach(function (k) { if (Array.isArray(c[k])) c[k] = c[k].filter(function (r) { return m.site.indexOf(String(r)) === -1; }); });
+    if (!Array.isArray(doc.meta.retraits)) doc.meta.retraits = [];
+    if (doc.meta.retraits.indexOf(OUVERT) !== -1) return '';
+    var cartes = (doc.cartes || []).slice(), refs = {};
+    cartes.forEach(function (c) { refs[c.ref] = 1; });
+    (repris || []).forEach(function (c) { if (!refs[c.ref]) { cartes.push(c); refs[c.ref] = 1; } });
+    var avant = cartes.length;
+    cartes = cartes.filter(function (c) { return !(c.ref === '290' && /132\/M-P/.test(c.nom || '')); });
+    var pika = cartes.length !== avant;
+    doc.produits = (doc.produits || []).filter(function (p) { return p.id !== 'coffret'; });
+    doc.groupes = (doc.groupes || []).filter(function (g) { return g.id !== GR_COFFRET; });
+    var du = cartes.filter(function (c) { return c.groupe === GR_COFFRET; });
+    if (du.length) {
+      cartes = cartes.filter(function (c) { return c.groupe !== GR_COFFRET; });
+      du.forEach(function (c) {
+        c.groupe = GR_30;
+        c.remarque = String(c.remarque || '').replace(/Carte du coffret scellé \(hors totaux[^)]*\)\.?\s*/, 'Carte d’un coffret 30th Premium Deck ouvert. ');
+        /* le prix du coffret était réparti sur Mentali et Noctali : les autres cartes du coffret n'ont rien coûté en plus */
+        if (!c.achat || !c.achat.mode) { c.achat = { mode: 'eur', eur: 0 }; c.remarque += ' Coût du coffret porté par Mentali et Noctali.'; }
       });
-      (doc.charges || []).forEach(function (ch) { if (ch.cible === 'carte' && refs[ch.ref]) { ch.cible = 'general'; delete ch.ref; } });
-      faits.push(m.id);
-      notes.push(m.note);
+      var fin = -1;
+      cartes.forEach(function (c, i) { if (c.groupe === GR_30) fin = i; });
+      Array.prototype.splice.apply(cartes, [fin === -1 ? cartes.length : fin + 1, 0].concat(du));
+    }
+    /* exemplaires en plus, rangés juste après la carte d'origine */
+    var ajoutes = 0;
+    Object.keys(EXEMPLAIRES).forEach(function (ref) {
+      var k = cartes.map(function (c) { return c.ref; }).indexOf(ref);
+      if (k === -1) return;
+      var c = cartes[k], copies = [];
+      for (var i = 2; i <= EXEMPLAIRES[ref]; i++) {
+        var r = ref + '-' + i;
+        if (refs[r]) continue;
+        refs[r] = 1;
+        var n = { ref: r, groupe: c.groupe, vendu: false, prix_vendu: null, vente_date: null, canal: null, gardee: false,
+          alias_site: (c.alias_site || []).slice(), lots_site: [],
+          remarque: 'Ajoutée le 20/11 : ' + i + 'e exemplaire (coffrets ouverts, tu en as ' + EXEMPLAIRES[ref] + '). Prix payé à compléter.' };
+        ['nom', 'nom_en', 'cat', 'langue', 'prix', 'set', 'rarete', 'etat', 'ebay'].forEach(function (f) { if (c[f] != null) n[f] = c[f]; });
+        copies.push(n);
+      }
+      ajoutes += copies.length;
+      Array.prototype.splice.apply(cartes, [k + 1, 0].concat(copies));
     });
-    if (!notes.length) return '';
+    doc.cartes = cartes;
+    doc.meta.retraits.push(OUVERT);
+    var note = 'Coffrets 30th Premium Deck ouverts : cartes comptées à l’unité dans « 30 ans »' +
+      (ajoutes ? ', 3 Mentali-ex 043, 3 Noctali-ex 044 et 3 Victini 041' : '') + (pika ? ' · Pikachu-ex 132/M-P (nuit) FUR échangé : retiré' : '');
     if (!Array.isArray(doc.journal)) doc.journal = [];
-    doc.journal.unshift({ le: new Date().toISOString(), quoi: notes.join(' · ') });
-    return notes.join(' · ');
+    doc.journal.unshift({ le: new Date().toISOString(), quoi: note });
+    return note;
+  }
+  function ouvrirCoffret() {
+    var doc = S.doc;
+    if (faitsDe(doc).indexOf(OUVERT) !== -1) return;
+    function fin(repris) {
+      if (S.doc !== doc) return;
+      var note = coffretOuvert(doc, repris);
+      if (!note) return;
+      calculer();
+      planifier(note);
+      rendre(true);
+      toast(note);
+    }
+    if (!aReprendre(doc)) { fin(null); return; }
+    api('GET', '/historique').then(function (x) {
+      if (x.s !== 200 || !x.j || !Array.isArray(x.j.versions)) return null;
+      var vs = x.j.versions;
+      var retrait = vs.filter(function (v) { return /Retirés \(plus en stock\)/.test(v.note || ''); }).sort(function (a, b) { return a.rev - b.rev; })[0];
+      var base = retrait && vs.filter(function (v) { return v.rev < retrait.rev; }).sort(function (a, b) { return b.rev - a.rev; })[0];
+      if (!base) return null;
+      return api('GET', '/version?rev=' + base.rev).then(function (y) {
+        var repris = y.s === 200 && y.j && y.j.data ? (y.j.data.cartes || []).filter(function (c) { return c.groupe === GR_COFFRET; }) : [];
+        if (repris.length) fin(repris);
+      });
+    }).catch(function () {});
   }
 
   /* ---------------------------------------------------------------- enregistrement (une version par envoi) */
@@ -2529,7 +2591,7 @@
   }
   function ecranApercu(doc, note) {
     ['groupes', 'cartes', 'tickets', 'tickets_ecartes', 'lots', 'produits', 'journal'].forEach(function (k) { if (!Array.isArray(doc[k])) doc[k] = []; });
-    retirer(doc);
+    if (!aReprendre(doc)) coffretOuvert(doc);
     var R = K.calcul(doc), m = principal();
     masquerOnglets();
     var go = bouton('Importer', function () { go.disabled = true; importerDoc(doc, note); });
@@ -2603,10 +2665,9 @@
       if (!x.j.data) { ecranImport(); return; }
       installer(x.j.data);
       sync('ok');
-      var ret = lire(CLE_ATTENTE) ? '' : retirer(S.doc);
-      if (ret) { calculer(); planifier(ret); }
+      var attente = !!lire(CLE_ATTENTE);
       route();
-      if (ret) toast(ret); else reprendreAttente();
+      if (attente) reprendreAttente(); else ouvrirCoffret();
       chargerSite();
     }, function () { ecranMessage('Pas de réseau', 'Impossible de joindre pokeraichu.com. Vérifie ta connexion puis réessaie.', true); });
   }

@@ -141,21 +141,17 @@ while A.cell(r, 1).value not in (None, 'Total'):
     })
     r += 1
 
-# ------------------------------------------------------------------ articles qu'Arthur n'a plus (retirés le 19/11/2026) : jamais réimportés
-# coffret 30th Premium Deck (groupe « Coffret Premium Deck ») et Pikachu-ex 132/M-P (nuit) FUR
-cartes = [c for c in cartes if c['groupe'] != 'Coffret Premium Deck' and not (c['ref'] == '290' and '132/M-P' in (c['nom'] or ''))]
-
-# ------------------------------------------------------------------ correspondances avec les fiches du site
-# lots du site qui regroupent des cartes de la compta
-ALIAS = {}
-LOTS_SITE = {'095': ['L01'], 'G4784': ['L01']}
+# ------------------------------------------------------------------ correspondances avec les fiches du site (19/11/2026)
+# cartes du coffret vendues aussi à l'unité (301 à 303) et lots du site qui regroupent des cartes de la compta
+ALIAS = {'P1': ['301'], 'P2': ['302'], 'P3': ['303']}
+LOTS_SITE = {'095': ['L01'], 'G4784': ['L01'], 'P1': ['L02'], 'P2': ['L02'], 'P3': ['L03'], 'P4': ['L03']}
 for c in cartes:
     c['alias_site'] = ALIAS.get(c['ref'], [])
     for l in LOTS_SITE.get(c['ref'], []):
         if l not in c['lots_site']: c['lots_site'].append(l)
 
 # ------------------------------------------------------------------ produits en quantité
-CS = wf['Card sets 30 ans']; EX = wf['ex']; BO = wf['Boosters']
+CS = wf['Card sets 30 ans']; EX = wf['ex']; BO = wf['Boosters']; SC = wf['Scellé']
 def vente_q(row):
     return {'vendus': num(V.cell(row, 2).value) or 0, 'prix_reel_moyen': num(V.cell(row, 10).value), 'envois': num(V.cell(row, 11).value)}
 produits = [
@@ -166,6 +162,9 @@ produits = [
     dict({'id': 'ex', 'nom': 'Cartes ex (ex basiques des tirages)', 'libelle': 'ex', 'ordre': 9,
           'quantite': num(EX['B4'].value), 'prix_u': num(EX['B5'].value), 'paye_u': num(EX['B6'].value), 'frais_u': None,
           'notes': [txt(EX['A2'].value), txt(EX['A13'].value)]}, **vente_q(23)),
+    dict({'id': 'coffret', 'nom': 'Coffret 30th Premium Deck Mentali & Noctali (scellé)', 'libelle': '30 ans · coffret Premium Deck', 'ordre': 5,
+          'quantite': 1, 'composants': 'Coffret Premium Deck', 'refs_site': ['S01'], 'prix_u': None, 'paye_u': None, 'frais_u': None,
+          'notes': [txt(SC['A2'].value)]}, **vente_q(24)),
     dict({'id': 'boosters', 'nom': "Boosters (displays vendus à l'unité en live Whatnot)", 'libelle': "Boosters (displays, vente à l'unité)", 'ordre': 10,
           'quantite': num(BO['B4'].value) * num(BO['B5'].value), 'displays': num(BO['B4'].value), 'par_display': num(BO['B5'].value),
           'prix_u': num(BO['B7'].value), 'paye_total': num(BO['B4'].value) * num(BO['B6'].value), 'paye_display': num(BO['B6'].value),
@@ -182,12 +181,12 @@ GROUPES = [
     {'id': 'AR SR SAR', 'nom': 'AR SR SAR (photos)', 'ordre': 6},
     {'id': 'Cartes FR', 'nom': 'Cartes FR', 'ordre': 7},
     {'id': 'Classeur', 'nom': 'Classeur', 'ordre': 8},
+    {'id': 'Coffret Premium Deck', 'nom': 'Cartes du coffret Premium Deck', 'hors_totaux': True, 'ordre': 99},
 ]
 
 modele = {
     'schema': 1,
     'meta': {
-        'retraits': ['retrait-2026-11-19'],
         'app': 'Poké-Raichu · pilotage',
         'source': 'POKE-RAICHU-VF.xlsx',
         'importe_le': datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds'),

@@ -32,7 +32,7 @@ print('tickets : écarts', tb)
 G41 = sum(v['paye_eur'] for v in R['tickets'].values())
 hors = ('Lots PSA 10', 'Coffret Premium Deck')
 sans = [(c, o) for c, o in zip(m['cartes'], R['cartes']) if c['ticket'] == 'Sans ticket' and c['groupe'] not in hors]
-G42 = sum(o['paye'] or 0 for c, o in sans) + (R['produits'].get('coffret') or {}).get('paye', 0)  # coffret retiré le 19/11 : écart attendu en G42
+G42 = sum(o['paye'] or 0 for c, o in sans) + R['produits']['coffret']['paye']
 G44 = sum(o['paye'] or 0 for c, o in zip(m['cartes'], R['cartes']) if c['groupe'] not in hors)
 for got, cell in [(G41, 'G41'), (G42, 'G42'), (G41 + G42, 'G43'), (G44, 'G44'), (len(sans) + 1, 'H42')]:
     print(cell, round(got, 6), T[cell].value, 'OK' if eq(got, T[cell].value) else 'ÉCART')
