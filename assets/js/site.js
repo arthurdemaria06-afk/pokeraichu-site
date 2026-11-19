@@ -622,21 +622,27 @@
     flSync();
   }
 
-  /* Bouton « remonter en haut » : fleche-eclair qui suit la page des qu'on est descendu d'un demi-ecran.
-     Il se range au-dessus de ce qui est colle en bas a droite (bouton WhatsApp, barre de reservation, barre du salon). */
+  /* Boutons flottants en bas a droite, sur une seule ligne : « Ecrire sur WhatsApp » puis la fleche-eclair
+     « remonter en haut », qui sort des qu'on est descendu (meme seuil que le bouton WhatsApp sur mobile).
+     L'ensemble se range au-dessus de ce qui est colle en bas (barre de reservation d'une fiche, barre du salon). */
   (function () {
+    var box = d.createElement('div');
+    box.className = 'flottants';
+    var wa = d.querySelector('.wa-float');
+    if (wa) box.appendChild(wa);
     var b = d.createElement('button');
     b.type = 'button';
     b.className = 'haut is-off';
     b.setAttribute('aria-label', tr('Remonter en haut de la page', 'Back to top'));
     b.title = tr('Remonter en haut', 'Back to top');
-    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .8 18.6 7.6H14.4L12.9 10.9H16L14 14.6H16.8L9.2 23.4L11.2 16.8H8L9.7 13.2H6.8L9.8 7.6H5.4Z"/></svg>';
-    d.body.appendChild(b);
-    var voisins = ['.buybar', '.salon-bar', '.wa-float'], tick = 0;
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 .4 21 9H15.4L13.6 12.2H16.6L14.7 15.4H17.2L9.2 23.6 11.1 18H7.7L9.6 14.7H6.8L9.2 9H3Z"/></svg>';
+    box.appendChild(b);
+    d.body.appendChild(box);
+    var voisins = ['.buybar', '.salon-bar'], tick = 0;
     function caler() {
       tick = 0;
       var vh = window.innerHeight, vw = window.innerWidth, h = 0;
-      b.classList.toggle('is-off', (window.scrollY || 0) < Math.max(300, vh * 0.5));
+      b.classList.toggle('is-off', (window.scrollY || 0) <= 320);
       voisins.forEach(function (sel) {
         var e = d.querySelector(sel);
         if (!e) return;
@@ -645,7 +651,7 @@
         var r = e.getBoundingClientRect();
         if (r.height && r.top < vh && r.bottom > vh - 40 && r.right > vw - 90) h = Math.max(h, vh - r.top);
       });
-      b.style.bottom = h ? Math.round(h + 12) + 'px' : '';
+      box.style.bottom = h ? Math.round(h + 10) + 'px' : '';
     }
     function plusTard() { if (!tick) tick = requestAnimationFrame(caler); }
     window.addEventListener('scroll', plusTard, { passive: true });
@@ -2040,7 +2046,7 @@
      s'eteint et revient aussitot ailleurs dans la partie visible. Tout passe par transform/opacity (aucun recalcul de mise
      en page). Arretes onglet cache, impression, pages outils et mouvement reduit. */
   var SKY_TAGS = /^(DIV|SECTION|MAIN|UL|OL|ARTICLE|ASIDE|NAV|FOOTER|HEADER|FORM|DL|FIGURE)$/;
-  var SKY_NOT = '.site-header, .raichu-band, .site-footer, .rc-hero, .buybar, .toast, .wa-float, .wa-check, .salon-bar, dialog, ' +
+  var SKY_NOT = '.site-header, .raichu-band, .site-footer, .rc-hero, .buybar, .toast, .flottants, .wa-float, .wa-check, .salon-bar, dialog, ' +
     '.hsearch, .pop, .pop-veil, .charge, .product__media, .gallery, .zoom';
   function skyRGBA(c) {
     var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(c || '');
