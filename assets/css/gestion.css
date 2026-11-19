@@ -112,3 +112,10 @@ p.annonce__val{font-weight:600}
 /* filtre prix sur demande */
 .gestion .g-filtres,.g-filtres{margin:12px 0 10px;padding:2px 0 4px}
 .g-filtres__n{font-variant-numeric:tabular-nums;opacity:.75}
+/* clients et éclairs */
+.clients__n{font-variant-numeric:tabular-nums;color:var(--nezumi);font-weight:500}
+.clients__tete{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.clients__h{margin:20px 0 6px;font:600 .8rem/1.2 var(--text);letter-spacing:.1em;text-transform:uppercase;color:var(--shu-fonce)}
+.client{border-top:1px solid var(--line)}
+.client__sum{min-height:48px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+.client__info{margin:0 0 6px;font-size:.88rem;color:var(--nezumi)}

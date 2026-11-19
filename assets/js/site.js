@@ -2711,3 +2711,261 @@
   nav.addEventListener('scroll', sync, { passive: true });
   window.addEventListener('resize', sync, { passive: true });
 })();
+
+/* Éclairs : cartes favorites. Bouton éclair sur les vignettes et les fiches, liste gardée sur l'appareil ;
+   une fois connecté avec Google (page Mes éclairs : compte.html, en/account.html), elle suit le client
+   sur tous ses appareils (API /api/..., voir worker/comptes.js). */
+(function () {
+  'use strict';
+  var d = document, C = window.PR_CONFIG || {};
+  var EN = d.documentElement.lang === 'en';
+  function tr(fr, en) { return EN ? en : fr; }
+  var KEY = 'pokeraichu.eclairs.v1', KCPT = 'pokeraichu.compte.v1', KSYNC = 'pokeraichu.eclairs.sync';
+  function lire(k, ses) { try { return (ses ? sessionStorage : localStorage).getItem(k); } catch (e) { return null; } }
+  function ecrire(k, v, ses) { try { var s = ses ? sessionStorage : localStorage; if (v === null) s.removeItem(k); else s.setItem(k, v); } catch (e) {} }
+  var REF = /^(\d{3,5}|[A-Z]\d{2}|G\d{4})$/;
+  var mem = null, pret = false;
+  function liste() {
+    if (mem) return mem;
+    try { var v = JSON.parse(lire(KEY) || '[]'); mem = Array.isArray(v) ? v.filter(function (r) { return REF.test(r); }) : []; } catch (e) { mem = []; }
+    return mem;
+  }
+  function compte() { try { return JSON.parse(lire(KCPT) || 'null'); } catch (e) { return null; } }
+  var rootEl = d.querySelector('[data-root]');
+  var ROOT = rootEl ? new URL(rootEl.getAttribute('data-root'), location.href) : new URL('/', location.href);
+  var PAGE = new URL(EN ? 'en/account.html' : 'compte.html', ROOT).href;
+  var API = new URL('api/', ROOT).href;
+  var SVG = '<svg class="i-bolt" viewBox="0 0 12 20" aria-hidden="true" focusable="false"><path d="M7.6 0 .6 11.4h5L3.9 20l7.5-12.2H6.4L7.6 0z"/></svg>';
+  function el(tag, cls, text) { var e = d.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function req(chemin, opts) {
+    opts = opts || {};
+    opts.credentials = 'same-origin';
+    opts.headers = Object.assign({ accept: 'application/json' }, opts.body ? { 'content-type': 'application/json' } : {}, opts.headers || {});
+    return fetch(API + chemin, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) { j._status = r.status; return j; });
+    });
+  }
+
+  /* --- liste + synchronisation avec le compte */
+  var envoi = null;
+  function garder(l, sansEnvoi) {
+    mem = l.slice(0, 400);
+    ecrire(KEY, JSON.stringify(mem));
+    maj();
+    if (sansEnvoi || !compte()) return;
+    clearTimeout(envoi);
+    envoi = setTimeout(function () {
+      req('eclairs', { method: 'PUT', body: JSON.stringify({ eclairs: mem }) }).then(function (r) {
+        if (r._status === 401) { ecrire(KCPT, null); maj(); }
+      }).catch(function () {});
+    }, 600);
+  }
+  function synchro() {
+    if (!compte() || lire(KSYNC, true)) return;
+    req('moi').then(function (r) {
+      if (r._status === 200 && r.eclairs) { ecrire(KSYNC, '1', true); ecrire(KCPT, JSON.stringify({ prenom: r.client.prenom, email: r.client.email })); garder(r.eclairs, true); }
+      else if (r._status === 401) { ecrire(KCPT, null); maj(); }
+    }).catch(function () {});
+  }
+
+  /* --- petit message en haut de l'écran */
+  var toastEl = null, toastT = null;
+  function toast(msg) {
+    if (!toastEl) { toastEl = el('div', 'toast'); toastEl.setAttribute('role', 'status'); d.body.appendChild(toastEl); }
+    toastEl.textContent = '';
+    toastEl.appendChild(el('span', '', msg));
+    if (location.href.split('#')[0] !== PAGE) { var a = el('a', '', tr('Mes éclairs', 'My bolts')); a.href = PAGE; toastEl.appendChild(a); }
+    toastEl.classList.add('is-on');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { toastEl.classList.remove('is-on'); }, 3200);
+  }
+  function basculer(ref, nom) {
+    var l = liste().slice(), i = l.indexOf(ref);
+    if (i === -1) {
+      l.unshift(ref);
+      toast(compte() ? tr('Ajoutée à vos éclairs.', 'Added to your bolts.') : tr('Ajoutée à vos éclairs (sur cet appareil).', 'Added to your bolts (on this device).'));
+    } else {
+      l.splice(i, 1);
+      toast(tr('Retirée de vos éclairs.', 'Removed from your bolts.'));
+    }
+    garder(l);
+  }
+
+  /* --- boutons */
+  function nomTuile(li) {
+    var n = li.querySelector('.tile__name'), s = li.querySelector('.tile__sub');
+    return ((n ? n.textContent : '') + ' ' + (s ? s.textContent.split('·')[0] : '')).trim();
+  }
+  function decorer(root) {
+    Array.prototype.forEach.call((root || d).querySelectorAll('li.tile[data-ref]'), function (li) {
+      if (li.querySelector('.eclair')) return;
+      var ref = li.getAttribute('data-ref');
+      if (!REF.test(ref)) return;
+      var b = el('button', 'eclair');
+      b.type = 'button';
+      b.setAttribute('data-eclair', ref);
+      b.setAttribute('aria-label', tr('Mettre en éclair : ', 'Bolt: ') + nomTuile(li));
+      b.innerHTML = SVG;
+      li.appendChild(b);
+    });
+    var main = d.querySelector('[data-pick-main]');
+    if (main && !d.querySelector('[data-eclair-main]')) {
+      var ref = main.getAttribute('data-pick');
+      if (REF.test(ref)) {
+        var b = el('button', 'btn btn--ghost eclair-main');
+        b.type = 'button';
+        b.setAttribute('data-eclair', ref);
+        b.setAttribute('data-eclair-main', '');
+        b.innerHTML = SVG + '<span data-eclair-t></span>';
+        main.parentNode.insertBefore(b, main.nextSibling);
+      }
+    }
+    maj();
+  }
+  function maj() {
+    var l = liste();
+    Array.prototype.forEach.call(d.querySelectorAll('[data-eclair]'), function (b) {
+      if (b.classList.contains('linkbtn')) return;
+      var on = l.indexOf(b.getAttribute('data-eclair')) !== -1;
+      b.setAttribute('aria-pressed', String(on));
+      var t = b.querySelector('[data-eclair-t]');
+      if (t) t.textContent = on ? tr('Dans mes éclairs', 'In my bolts') : tr('Mettre en éclair', 'Add to my bolts');
+    });
+    Array.prototype.forEach.call(d.querySelectorAll('[data-eclair-n]'), function (n) { n.textContent = l.length; n.hidden = !l.length; });
+    var pill = d.querySelector('.eclair-pill');
+    if (pill) pill.setAttribute('aria-label', tr('Mes éclairs', 'My bolts') + ' (' + l.length + ')' + (compte() ? '' : tr(', se connecter', ', sign in')));
+    if (pret) pageCompte();
+  }
+  d.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-eclair]');
+    if (!b) return;
+    e.preventDefault();
+    var li = b.closest('li.tile');
+    basculer(b.getAttribute('data-eclair'), li ? nomTuile(li) : '');
+    if (!b.hasAttribute('data-eclair-main')) { b.classList.remove('zap'); void b.offsetWidth; if (liste().indexOf(b.getAttribute('data-eclair')) !== -1) b.classList.add('zap'); }
+  });
+
+  /* pastille de l'en-tête : accès à Mes éclairs et au compte */
+  var lang = d.querySelector('.site-header nav.lang');
+  if (lang && !d.querySelector('.eclair-pill')) {
+    var p = el('a', 'eclair-pill');
+    p.href = PAGE;
+    p.innerHTML = SVG + '<span class="eclair-pill__n" data-eclair-n hidden>0</span>';
+    if (location.href.split('#')[0] === PAGE) p.setAttribute('aria-current', 'page');
+    lang.parentNode.insertBefore(p, lang);
+  }
+  decorer();
+  /* vignettes ajoutées plus tard (recherche, filtres, listes) */
+  if (window.MutationObserver) {
+    var tick = 0;
+    new MutationObserver(function () {
+      if (tick) return;
+      tick = requestAnimationFrame(function () { tick = 0; decorer(); });
+    }).observe(d.body, { childList: true, subtree: true });
+  }
+  synchro();
+  window.addEventListener('storage', function (e) { if (e.key === KEY) { mem = null; maj(); } });
+
+  /* --- page Mes éclairs (compte) */
+  var box = d.getElementById('compte');
+  if (!box) return;
+  var q = function (s) { return box.querySelector(s); };
+  var stock = null, rendu = '';
+  fetch(new URL(box.getAttribute('data-stock'), location.href).href, { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (s) {
+    stock = {};
+    (s.cartes || []).forEach(function (c) { stock[c.ref] = c; });
+    rendu = ''; pageCompte();
+  }).catch(function () { stock = {}; pageCompte(); });
+  function prix(c) {
+    if (c.prix_eur === null || c.prix_eur === undefined) return tr('Sur demande', 'On request');
+    var v = +c.prix_eur;
+    return (v % 1 ? v.toFixed(2) : String(v)).replace('.', EN ? '.' : ',') + (EN ? ' €' : ' €');
+  }
+  function pageCompte() {
+    var cpt = compte();
+    var gid = String(C.google_client_id || '').trim();
+    q('[data-compte-in]').hidden = !cpt;
+    q('[data-compte-out]').hidden = !!cpt;
+    q('[data-compte-soon]').hidden = !!(cpt || gid);
+    q('[data-google]').hidden = !!(cpt || !gid);
+    if (cpt) q('[data-compte-nom]').textContent = cpt.prenom || tr('vous', 'you');
+    if (cpt && cpt.email) q('[data-compte-email]').textContent = cpt.email;
+    if (!cpt && gid) google();
+    if (!stock) return;
+    var l = liste(), cle = l.join(',');
+    if (cle === rendu) return;
+    rendu = cle;
+    var ul = q('[data-ecl-list]');
+    ul.textContent = '';
+    q('[data-ecl-empty]').hidden = l.length > 0;
+    l.forEach(function (ref) {
+      var c = stock[ref];
+      var li = el('li', 'sel-row sel-row--pic');
+      var a = el('a', 'sel-pic' + (c && c.photo_t ? '' : ' sel-pic--none'));
+      if (c) {
+        a.href = new URL(EN ? 'en/cards/' + c.en.slug + '.html' : 'cartes/' + c.slug + '.html', ROOT).href;
+        if (c.photo_t) { var im = el('img'); im.src = new URL(c.photo_t, ROOT).href; im.alt = ''; im.width = 64; im.height = 90; im.loading = 'lazy'; a.appendChild(im); }
+      }
+      li.appendChild(a);
+      var t = el(c ? 'a' : 'span', 'sel-row__name', c ? (EN ? c.en.titre : c.titre) : tr('Réf. ', 'Ref. ') + ref);
+      if (c) t.href = a.href;
+      li.appendChild(t);
+      li.appendChild(el('span', 'sel-row__meta', c ? prix(c) + ' · ' + (c.langue || '') + ' · ' + tr('réf. ', 'ref. ') + ref : tr('Plus en vente', 'No longer for sale')));
+      var x = el('button', 'linkbtn', tr('Retirer', 'Remove'));
+      x.type = 'button';
+      x.setAttribute('data-eclair', ref);
+      li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+  var gisCharge = false;
+  function google() {
+    if (gisCharge) return;
+    gisCharge = true;
+    var s = d.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = function () {
+      try {
+        window.google.accounts.id.initialize({ client_id: String(C.google_client_id).trim(), callback: connecte, ux_mode: 'popup', auto_select: false, context: 'signin' });
+        window.google.accounts.id.renderButton(q('[data-google]'), { theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'left', locale: EN ? 'en' : 'fr', width: 280 });
+      } catch (e) { msg(tr('La connexion Google ne répond pas. Réessayez plus tard.', 'Google sign-in is not responding. Please try again later.'), true); }
+    };
+    s.onerror = function () { msg(tr('La connexion Google ne se charge pas (réseau ou bloqueur de contenu).', 'Google sign-in did not load (network or content blocker).'), true); };
+    d.head.appendChild(s);
+  }
+  function msg(t, warn) { var m = q('[data-compte-msg]'); m.textContent = t || ''; m.classList.toggle('is-warn', !!warn); }
+  function connecte(rep) {
+    msg(tr('Connexion…', 'Signing in…'));
+    req('connexion', { method: 'POST', body: JSON.stringify({ credential: rep.credential, eclairs: liste(), langue: EN ? 'en' : 'fr' }) }).then(function (r) {
+      if (r._status !== 200) { msg(r._status === 503 ? tr('Les comptes ne sont pas encore ouverts. Vos éclairs restent gardés sur cet appareil.', 'Accounts are not open yet. Your bolts stay saved on this device.') : tr('La connexion a échoué. Réessayez.', 'Sign-in failed. Please try again.'), true); return; }
+      ecrire(KCPT, JSON.stringify({ prenom: r.client.prenom, email: r.client.email }));
+      ecrire(KSYNC, '1', true);
+      garder(r.eclairs, true);
+      msg(r.nouveau ? tr('Compte créé. Vos éclairs vous suivent maintenant sur tous vos appareils.', 'Account created. Your bolts now follow you on all your devices.') : tr('Connecté.', 'Signed in.'));
+    }).catch(function () { msg(tr('Pas de réseau. Réessayez.', 'No connection. Please try again.'), true); });
+  }
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-compte-action]');
+    if (!b) return;
+    var act = b.getAttribute('data-compte-action');
+    if (act === 'sortir') {
+      req('deconnexion', { method: 'POST' }).catch(function () {}).then(function () {
+        ecrire(KCPT, null); ecrire(KSYNC, null, true);
+        try { window.google && window.google.accounts.id.disableAutoSelect(); } catch (e2) {}
+        msg(tr('Déconnecté. Vos éclairs restent sur cet appareil.', 'Signed out. Your bolts stay on this device.'));
+        maj();
+      });
+    } else if (act === 'supprimer') {
+      if (!window.confirm(tr('Supprimer votre compte et la liste enregistrée ? Vos éclairs restent sur cet appareil.', 'Delete your account and the saved list? Your bolts stay on this device.'))) return;
+      req('moi', { method: 'DELETE' }).then(function (r) {
+        if (r._status !== 200 && r._status !== 401) { msg(tr('La suppression a échoué. Réessayez ou écrivez-nous.', 'Deletion failed. Please try again or contact us.'), true); return; }
+        ecrire(KCPT, null); ecrire(KSYNC, null, true);
+        msg(tr('Compte supprimé.', 'Account deleted.'));
+        maj();
+      }).catch(function () { msg(tr('Pas de réseau. Réessayez.', 'No connection. Please try again.'), true); });
+    }
+  });
+  pret = true;
+  pageCompte();
+})();

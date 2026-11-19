@@ -1047,3 +1047,27 @@ html:not(.is-flash):not(.is-flash-soon) .nav-flash{display:none}
 @media (max-width:699px){.colls--compact>li:last-child:nth-child(even){grid-column:1/-1}}
 /* Mentions légales : une ligne non renseignée dans config.js n'apparaît pas */
 .legal-empty{display:none!important}
+/* Éclairs (cartes favorites) : bouton sur les vignettes et les fiches, pastille de l'en-tête, page Mes éclairs */
+.eclair{position:absolute;top:7px;left:7px;z-index:2;display:flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1.5px solid #3B2414;border-radius:50%;background:rgba(251,249,244,.93);color:#3B2414;cursor:pointer;box-shadow:0 1px 2px rgba(59,36,20,.28);transition:background-color .15s,transform .15s}
+.eclair .i-bolt{width:11px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round}
+.eclair:hover{background:var(--tint)}
+.eclair[aria-pressed="true"]{background:var(--yamabuki)}
+.eclair[aria-pressed="true"] .i-bolt,.eclair-main[aria-pressed="true"] .i-bolt{fill:currentColor}
+.eclair:focus-visible{outline:2px solid var(--shu);outline-offset:2px}
+.eclair-main .i-bolt{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;color:var(--shu)}
+.eclair-main[aria-pressed="true"]{border-color:#3B2414;background:var(--yamabuki);color:#3B2414}
+.eclair-main[aria-pressed="true"] .i-bolt{color:#3B2414}
+.eclair-pill{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px;padding:0;border:1px solid var(--sumi);border-radius:50%;color:var(--sumi);text-decoration:none}
+.eclair-pill .i-bolt{width:10px;height:17px;color:var(--shu)}
+.eclair-pill:hover,.eclair-pill[aria-current="page"]{background:var(--sumi);color:var(--gofun)}
+.eclair-pill:hover .i-bolt,.eclair-pill[aria-current="page"] .i-bolt{color:var(--yamabuki)}
+.eclair-pill__n{position:absolute;top:-6px;right:-8px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--shu-fonce);color:var(--gofun);font:600 .68rem/19px var(--text);text-align:center;font-variant-numeric:tabular-nums}
+@media (min-width:900px){.eclair-pill{order:3;margin-left:12px}}
+@media (max-width:359px){.header-inner{column-gap:6px}.eclair-pill{width:34px;height:34px}}
+.compte-box{margin:22px 0 0;padding:18px 20px;border:1px solid var(--line);background:var(--gofun)}
+.compte-box p{margin:0}
+.compte-box .muted{margin-top:12px}
+.compte-google{min-height:44px;margin:14px 0 0}
+.compte-msg{min-height:1.4em;margin:12px 0 0}
+.compte-msg.is-warn{color:var(--shu-fonce)}
+#compte .sel-list{margin-top:18px}

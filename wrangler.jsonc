@@ -16,7 +16,7 @@
     "binding": "ASSETS",
     "html_handling": "none",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/", "/contact.html", "/recherche.html", "/en/contact.html", "/en/find-a-card.html"]
+    "run_worker_first": ["/", "/contact.html", "/recherche.html", "/en/contact.html", "/en/find-a-card.html", "/api/*", "/compte.html", "/en/account.html"]
   },
   "send_email": [{ "name": "MAIL" }],
   "observability": { "enabled": true }

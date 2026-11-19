@@ -44,6 +44,28 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
 - `_headers` et `_redirects` : compatibles Cloudflare (776 redirections statiques, codes 301/302 seulement :
   **pas de règle 404 ni 200** dans `_redirects`, Cloudflare les refuse).
 
+### Comptes clients et éclairs (ajoutés le 19/11)
+
+- **Éclairs** = cartes favorites. Bouton éclair rond en haut à gauche de chaque vignette, bouton « Mettre en éclair » sur
+  les fiches, pastille ronde ⚡ + compteur dans l'en-tête (avant FR/EN). Tout est injecté par `site.js` (dernier bloc),
+  aucune page générée n'a été modifiée. Liste locale `pokeraichu.eclairs.v1`.
+- **Page Mes éclairs** : `compte.html` / `en/account.html` (noindex). Bouton Google (Google Identity Services, chargé
+  seulement sur ces pages : CSP propre posée par le worker, `CSP_COMPTE` dans `worker/comptes.js`).
+- **Worker** `worker/comptes.js` (importé par `formulaires.js`), routes `/api/connexion` (jeton Google vérifié en RS256
+  avec les clés publiques Google, `aud` = `google_client_id` de `config.js`), `/api/moi` (GET, DELETE), `/api/eclairs`
+  (PUT), `/api/deconnexion`, `/api/admin/clients` (gestion : en-tête `x-gestion` = clé GitHub du téléphone, vérifiée
+  par `api.github.com/user`, login `arthurdemaria06-afk`, jamais stockée). Session : cookie HttpOnly `pr_session`
+  (180 j), seul le hachage SHA-256 est en base. Écritures refusées si l'en-tête Origin n'est pas le site. E-mail au
+  vendeur (binding `MAIL`, secret `CONTACT_TO`) à chaque nouveau compte.
+- **Base D1** liée sous le nom `DB` (tables créées toutes seules : clients, eclairs, sessions). Sans base : l'API répond
+  503, les éclairs restent sur l'appareil, la page affiche « les comptes ouvrent bientôt ».
+- `wrangler.jsonc` : `/api/*`, `/compte.html`, `/en/account.html` dans `run_worker_first` (sinon Cloudflare sert la
+  page 404 aux navigations sans passer par le worker). `sw.js` ne met jamais `/api/` en cache.
+- Gestion : rubrique « Clients et éclairs » (fiches clients, cartes les plus demandées).
+- Confidentialité FR/EN : section « Compte client » (`#compte` / `#account`).
+- Testé en local avec `wrangler dev` (D1 local, Google et GitHub simulés) : connexion, fusion des éclairs, 2e appareil,
+  jetons refusés (mauvais destinataire, expiré, signature trafiquée, e-mail non vérifié), admin, déconnexion, suppression.
+
 ## 3. Les outils du vendeur (pages non référencées)
 
 - **`/gestion.html`**. Sa clé GitHub (jeton à accès précis) est enregistrée dans le `localStorage` du téléphone
@@ -168,6 +190,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (19/11) Comptes clients (connexion Google) et éclairs : voir § Comptes clients et éclairs. Reste à faire par Arthur : ID client Google dans `config.js` (`google_client_id`) et base D1 liée (`d1_databases` dans `wrangler.jsonc`).
 - (19/11) Ajout 345 Raikou-ex 108/076 KR et 346 Mentali-ex 211/187 KR (SAR, prix sur demande, pas encore sur Shopify comme les cartes du classeur). `construire.py` : la livraison d'une nouvelle fiche est reprise d'une fiche chiffrée si le modèle est en prix sur demande.
 - (19/11) Gestion : petite photo à gauche du nom ; premier prix possible pour les cartes en prix sur demande
 - (19/11) Bouton « Ventes eBay » dans la page de gestion ; « Nouveau pour vous » devient un petit sticker « New » au logo

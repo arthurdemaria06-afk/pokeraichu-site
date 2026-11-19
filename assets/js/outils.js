@@ -637,3 +637,94 @@
     renderDay();
   }
 })();
+
+/* Gestion : clients et listes d'éclairs (comptes créés avec Google sur la page Mes éclairs).
+   La liste n'est servie qu'au propriétaire du dépôt GitHub, reconnu avec la clé déjà enregistrée sur ce téléphone. */
+(function () {
+  'use strict';
+  var d = document, box = d.querySelector('[data-clients]');
+  if (!box) return;
+  var body = box.querySelector('[data-clients-body]'), nb = box.querySelector('[data-clients-n]');
+  var stock = null, charge = false;
+  function el(t, c, x) { var e = d.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+  function cle() { try { return localStorage.getItem('pr.gestion.jeton') || ''; } catch (e) { return ''; } }
+  function date(iso, heure) {
+    if (!iso) return '';
+    var t = new Date(iso);
+    return t.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) + (heure ? ' ' + t.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '');
+  }
+  function prix(c) {
+    if (!c) return 'plus en stock';
+    if (c.prix_eur === null || c.prix_eur === undefined) return 'sur demande';
+    var v = +c.prix_eur;
+    return (v % 1 ? v.toFixed(2).replace('.', ',') : v) + ' €';
+  }
+  function ligne(ref, extra) {
+    var c = stock[ref];
+    var li = el('li', 'sel-row sel-row--pic');
+    var a = el('a', 'sel-pic' + (c && c.photo_t ? '' : ' sel-pic--none'));
+    if (c) { a.href = 'cartes/' + c.slug + '.html'; a.target = '_blank'; a.rel = 'noopener'; }
+    if (c && c.photo_t) { var im = el('img'); im.src = c.photo_t; im.alt = ''; im.width = 48; im.height = 67; im.loading = 'lazy'; a.appendChild(im); }
+    else a.appendChild(el('span', 'sel-pic__top', ref));
+    li.appendChild(a);
+    li.appendChild(el('span', 'sel-row__name', c ? c.titre : 'Réf. ' + ref));
+    li.appendChild(el('span', 'sel-row__meta', 'Réf. ' + ref + (c && c.langue ? ' · ' + c.langue : '') + ' · ' + prix(c) + (extra ? ' · ' + extra : '')));
+    return li;
+  }
+  function message(t) { body.textContent = ''; body.appendChild(el('p', 'muted small', t)); }
+  function afficher(data) {
+    var cl = data.clients || [];
+    nb.textContent = ' · ' + cl.length;
+    body.textContent = '';
+    var tot = 0, comptes = {};
+    cl.forEach(function (c) { c.eclairs.forEach(function (e) { tot++; comptes[e.ref] = (comptes[e.ref] || 0) + 1; }); });
+    var tete = el('div', 'clients__tete');
+    tete.appendChild(el('p', 'count', cl.length + ' client(s) · ' + tot + ' éclair(s)'));
+    var maj = el('button', 'linkbtn', 'Rafraîchir');
+    maj.type = 'button';
+    maj.addEventListener('click', charger);
+    tete.appendChild(maj);
+    body.appendChild(tete);
+    var top = Object.keys(comptes).sort(function (a, b) { return comptes[b] - comptes[a] || (a < b ? -1 : 1); }).slice(0, 10);
+    if (top.length) {
+      body.appendChild(el('h3', 'clients__h', 'Les plus demandées'));
+      var ul = el('ul', 'sel-list'); ul.setAttribute('role', 'list');
+      top.forEach(function (r) { ul.appendChild(ligne(r, comptes[r] + ' client(s)')); });
+      body.appendChild(ul);
+    }
+    body.appendChild(el('h3', 'clients__h', 'Fiches clients'));
+    if (!cl.length) body.appendChild(el('p', 'muted small', 'Aucun compte pour l’instant.'));
+    cl.forEach(function (c) {
+      var det = el('details', 'client');
+      var nom = ((c.prenom || '') + ' ' + (c.nom || '')).trim() || c.email;
+      det.appendChild(el('summary', 'client__sum', nom + ' · ' + c.eclairs.length + ' éclair(s) · depuis le ' + date(c.cree_le)));
+      var info = el('p', 'client__info');
+      var mail = el('a', '', c.email);
+      mail.href = 'mailto:' + c.email + '?subject=' + encodeURIComponent('Poké-Raichu : vos éclairs');
+      info.appendChild(mail);
+      info.appendChild(d.createTextNode(' · ' + (c.langue === 'en' ? 'anglais' : 'français') + ' · inscrit le ' + date(c.cree_le, true) + ' · vu le ' + date(c.vu_le, true)));
+      det.appendChild(info);
+      var ul = el('ul', 'sel-list'); ul.setAttribute('role', 'list');
+      c.eclairs.forEach(function (e) { ul.appendChild(ligne(e.ref, 'ajoutée le ' + date(e.le))); });
+      if (!c.eclairs.length) det.appendChild(el('p', 'muted small', 'Liste vide.'));
+      det.appendChild(ul);
+      body.appendChild(det);
+    });
+  }
+  function charger() {
+    if (!cle()) { message('Enregistrez d’abord votre clé GitHub en haut de la page.'); return; }
+    message('Chargement…');
+    var st = stock ? Promise.resolve() : fetch('data/stock.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (s) {
+      stock = {}; (s.cartes || []).forEach(function (c) { stock[c.ref] = c; });
+    });
+    st.then(function () {
+      return fetch('api/admin/clients', { headers: { 'x-gestion': cle(), accept: 'application/json' }, cache: 'no-store' });
+    }).then(function (r) {
+      if (r.status === 503) { message('Les comptes clients ne sont pas encore activés : il reste à relier la base Cloudflare (voir le message de Claude).'); return; }
+      if (r.status === 401) { message('Clé GitHub refusée : la liste des clients est réservée au propriétaire du site.'); return; }
+      if (!r.ok) { message('Liste indisponible pour le moment (' + r.status + '). Réessayez.'); return; }
+      return r.json().then(afficher);
+    }).catch(function () { message('Pas de réseau. Réessayez.'); });
+  }
+  box.addEventListener('toggle', function () { if (box.open && !charge) { charge = true; charger(); } });
+})();

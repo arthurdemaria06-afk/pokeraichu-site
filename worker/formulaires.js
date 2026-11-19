@@ -3,6 +3,7 @@
    et les transmet par e-mail (Cloudflare Email Routing) à l'adresse enregistrée dans le secret CONTACT_TO.
    Rien n'est stocké. Sans réglage e-mail, l'envoi échoue proprement et le site propose WhatsApp. */
 import { EmailMessage } from 'cloudflare:email';
+import { api, CSP_COMPTE } from './comptes.js';
 
 const FROM = 'site@pokeraichu.com';
 const NOMS = { contact: 'Contact', alerte: 'Alerte d’arrivage', recherche: 'Recherche au Japon' };
@@ -119,6 +120,13 @@ async function page(request, env) {
 
 export default {
   async fetch(request, env) {
+    const chemin = new URL(request.url).pathname;
+    /* comptes clients et éclairs (voir comptes.js) */
+    if (chemin.indexOf('/api/') === 0) {
+      try { return await api(request, env); } catch (e) {
+        return new Response('{"erreur":"indisponible"}', { status: 500, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+      }
+    }
     if (request.method === 'POST') {
       const url = new URL(request.url);
       let res;
@@ -131,6 +139,12 @@ export default {
       }
       return res;
     }
-    return securiser(await page(request, env));
+    const res = securiser(await page(request, env));
+    if (/^\/(compte|en\/account)(\.html)?$/.test(chemin) && /text\/html/i.test(res.headers.get('content-type') || '')) {
+      const r = new Response(res.body, res);
+      r.headers.set('Content-Security-Policy', CSP_COMPTE);
+      return r;
+    }
+    return res;
   }
 };

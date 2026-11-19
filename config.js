@@ -22,6 +22,8 @@
                      « Réservée » partout sur le site, et le bouton propose d'être prévenu si elles se libèrent.
   vendues          : références des cartes vendues, ex. ["010", "113"]. Elles s'affichent « Vendue » partout sur le site,
                      même sans le Gist. La page /gestion.html les reprend et les écrit dans le Gist au prochain enregistrement.
+  google_client_id : identifiant OAuth « Application Web » de Google Cloud (se termine par .apps.googleusercontent.com).
+                     Vide : pas de bouton « Continuer avec Google », les éclairs restent sur l'appareil du visiteur.
   vendues_le       : date de la liste « vendues » (format ISO, heure UTC). Dès que le Gist est enregistré après cette date,
                      c'est lui qui fait foi (une carte remise en vente depuis /gestion.html redevient disponible).
   taux_change      : taux indicatifs (1 € = ...) : prix en £ et $ de la version anglaise, calculateur d'import (JPY).
@@ -56,6 +58,7 @@ window.PR_CONFIG = {
   reservees: [],
   vendues: ["010", "012", "027", "031", "032", "077", "088", "094", "113", "117", "125", "234", "281", "G1633", "L04"],
   vendues_le: "2026-11-19T04:00:00Z",
+  google_client_id: "",
   instagram: "",
   email: "",
   ebay: "",

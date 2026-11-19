@@ -3,10 +3,10 @@
    Styles, scripts, polices et photos versionnés : cache d'abord (ils ne changent jamais à adresse égale).
    Hors ligne : pages déjà vues, liens courts /r/ et /s/ résolus avec le stock gardé, sinon page « Hors ligne ». */
 'use strict';
-var VERSION = '1738a92665';
+var VERSION = '3bb0a5729f';
 var CACHE = 'pr-' + VERSION;
 var SALON = 'pr-salon';
-var PRECACHE = ["/", "/index.html", "/catalogue.html", "/selection.html", "/hors-ligne.html", "/en/index.html", "/en/offline.html", "/en/selection.html", "/config.js", "/data/stock.json", "/assets/css/site.css?v=e85aabfe", "/assets/js/site.js?v=a78bed42", "/assets/js/hasard.js?v=4a27143b", "/assets/fonts/libre-caslon-display-400.woff2", "/assets/fonts/libre-caslon-text-400.woff2", "/assets/fonts/libre-caslon-text-700.woff2", "/assets/img/logo.svg?v=5dfcbaeb", "/assets/img/marque.svg?v=f3e27339", "/favicon.svg?v=f3e27339"];
+var PRECACHE = ["/", "/index.html", "/catalogue.html", "/selection.html", "/hors-ligne.html", "/en/index.html", "/en/offline.html", "/en/selection.html", "/config.js", "/data/stock.json", "/assets/css/site.css?v=c20bb4e5", "/assets/js/site.js?v=a44d3eed", "/assets/js/hasard.js?v=4a27143b", "/assets/fonts/libre-caslon-display-400.woff2", "/assets/fonts/libre-caslon-text-400.woff2", "/assets/fonts/libre-caslon-text-700.woff2", "/assets/img/logo.svg?v=5dfcbaeb", "/assets/img/marque.svg?v=f3e27339", "/favicon.svg?v=f3e27339"];
 var MAX_PAGES = 160;
 
 self.addEventListener('install', function (e) {
@@ -97,6 +97,8 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   if (url.pathname === '/sw.js') return;
+  /* comptes clients : toujours le réseau, jamais de copie */
+  if (/^\/api\//.test(url.pathname)) return;
   /* videos : lecture directe par le navigateur (requetes partielles), jamais copiees dans le cache */
   if (/^\/assets\/videos\//.test(url.pathname) || req.headers.has('range')) return;
   var versioned = /^\/assets\/(css|js|fonts|photos|partage|img)\//.test(url.pathname) && (url.search.indexOf('v=') !== -1 || /^\/assets\/(fonts|photos|partage)\//.test(url.pathname));
