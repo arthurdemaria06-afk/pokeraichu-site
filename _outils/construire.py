@@ -374,7 +374,7 @@ def ajouter():
         rc = ref_card(stock, fiche.is_slab(c), float(c['prix_eur'] or 0) >= 100)
         for lang in ('fr', 'en'):
             src = rd(('cartes/%s.html' if lang == 'fr' else 'en/cards/%s.html') % (rc['slug'] if lang == 'fr' else rc['en']['slug']))
-            sb, sl = fiche.extract_ship(src)
+            sb, sl = fiche.extract_ship(src, ROOT, lang)  # modele en prix sur demande : livraison reprise d une fiche chiffree
             page = fiche.render_product(ROOT, R(c, lang), lang, shells[lang], sb, sl, valid_until, related(c, lang, pool, attrs, lqips))
             wr(('cartes/%s.html' if lang == 'fr' else 'en/cards/%s.html') % (c['slug'] if lang == 'fr' else c['en']['slug']), page)
     # 2. listes

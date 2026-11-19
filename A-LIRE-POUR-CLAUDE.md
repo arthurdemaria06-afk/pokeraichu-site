@@ -168,6 +168,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (19/11) Ajout 345 Raikou-ex 108/076 KR et 346 Mentali-ex 211/187 KR (SAR, prix sur demande, pas encore sur Shopify comme les cartes du classeur). `construire.py` : la livraison d'une nouvelle fiche est reprise d'une fiche chiffrée si le modèle est en prix sur demande.
 - (19/11) Gestion : petite photo à gauche du nom ; premier prix possible pour les cartes en prix sur demande
 - (19/11) Bouton « Ventes eBay » dans la page de gestion ; « Nouveau pour vous » devient un petit sticker « New » au logo
   (l'ancien bandeau couvrait toute la carte : `.art::before` a un `inset`, il faut remettre `bottom` et `left` à `auto`)
