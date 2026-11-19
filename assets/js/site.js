@@ -3179,3 +3179,30 @@
   pret = true;
   pageCompte();
 })();
+
+/* En-tête collant : ombre une fois collé, hauteur visible (--hdr-colle) pour les ancres et les blocs collants,
+   texte d'aide plus court dans la recherche sur téléphone (la barre partage sa ligne avec le menu). */
+(function () {
+  var d = document, hd = d.querySelector('.site-header');
+  if (!hd || !window.requestAnimationFrame || !window.getComputedStyle) return;
+  var racine = d.documentElement, tick = 0, haut = 0;
+  function sync() { tick = 0; hd.classList.toggle('is-colle', (window.scrollY || 0) > 0 && hd.getBoundingClientRect().top <= haut + 0.5); }
+  function mesurer() {
+    haut = parseFloat(getComputedStyle(hd).top) || 0;
+    racine.style.setProperty('--hdr-colle', Math.round(Math.max(0, hd.offsetHeight + Math.min(0, haut))) + 'px');
+    sync();
+  }
+  window.addEventListener('scroll', function () { if (!tick) tick = requestAnimationFrame(sync); }, { passive: true });
+  window.addEventListener('resize', mesurer);
+  if (window.ResizeObserver) new ResizeObserver(mesurer).observe(hd);
+  mesurer();
+  /* texte d'aide de la recherche selon la place disponible (la barre partage sa ligne avec le menu sur téléphone) */
+  var q = d.querySelector('.site-header .hsearch__input');
+  if (q) {
+    var en = racine.lang === 'en', textes = [q.getAttribute('placeholder') || '', en ? 'Search a card…' : 'Chercher une carte…', en ? 'Search…' : 'Rechercher…'];
+    var place = function () { var l = q.getBoundingClientRect().width; if (l) q.setAttribute('placeholder', textes[l >= 300 ? 0 : l >= 200 ? 1 : 2]); };
+    window.addEventListener('resize', place);
+    if (window.ResizeObserver) new ResizeObserver(place).observe(q);
+    place();
+  }
+})();

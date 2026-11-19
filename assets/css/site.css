@@ -1132,3 +1132,49 @@ html:not(.is-flash):not(.is-flash-soon) .nav-flash{display:none}
 .compte-pied[hidden]{display:none}
 .compte-pied .linkbtn{padding:0;font-size:inherit;color:var(--nezumi)}
 .compte-pied .linkbtn:hover{color:var(--shu-fonce)}
+
+/* En-tête collant (19/11/2026) : il suit le défilement sur toutes les pages, en version compacte.
+   Téléphone : ligne 1 = logo et langue (elle remonte avec la page) ; ligne 2 = menu, recherche, favoris, sélection ;
+   ligne 3 = rubriques. Le haut négatif cache la ligne 1 une fois collé : seules les lignes 2 et 3 restent visibles.
+   Ordinateur : tout l'en-tête reste visible, plus serré. --hdr-colle (hauteur visible une fois collé) est calculé par site.js. */
+.site-header{position:sticky;top:0;z-index:25;transition:box-shadow .2s ease}
+.site-header.is-colle{box-shadow:0 10px 20px -16px rgba(30,27,24,.5)}
+/* ancres et éléments ciblés : ils s'arrêtent sous l'en-tête (pas de scroll-padding global, qui ferait sauter la page
+   quand on touche la recherche ou le menu de l'en-tête collé) */
+main [id],main:target,[id]:target{scroll-margin-top:calc(var(--hdr-colle, 96px) + 8px)}
+@media print{.site-header{position:static;box-shadow:none}}
+@media (max-width:899px){
+  :root{--hdr-haut:50px}
+  .site-header{top:calc(6px - var(--hdr-haut))}
+  .header-inner{flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:0;padding-top:0}
+  .header-inner::before{content:"";order:2;flex-basis:100%;height:0}
+  .site-header .brand{order:0;height:var(--hdr-haut);margin-right:auto;padding:0;gap:9px}
+  .site-header .seal{width:30px;height:36px}
+  .site-header .wordmark{font-size:.92rem;letter-spacing:.07em}
+  .site-header nav.lang{display:inline-flex;order:1;margin:0}
+  .site-header .lang a{min-width:30px;height:26px;padding:0 4px}
+  .menu-btn{order:3;width:40px;height:40px;margin:0}
+  .hsearch{order:4;flex:1 1 0;min-width:0;margin:0}
+  .hsearch__input{height:40px;padding:0 44px 0 15px}
+  .hsearch__btn{top:4px;right:4px;width:32px;height:32px}
+  .hsearch__btn .i-search{width:16px;height:16px}
+  /* suggestions sur toute la largeur de l'écran, pas seulement celle de la barre (le menu est à sa gauche) */
+  .hsearch__pop{left:-56px;right:auto;width:min(calc(100vw - 24px),560px)}
+  .eclair-pill{order:5;width:40px;height:40px;margin:0}
+  .sel-pill{order:6;min-height:40px;margin:0;padding-left:11px}
+  .sel-pill__n{min-width:28px;height:28px}
+  .site-nav{order:7;flex-basis:100%;width:100%;margin:4px 0 0}
+  .site-nav a{min-height:36px}
+  /* catalogue : sa recherche est dans les filtres ; le menu reste à gauche, favoris et sélection à droite */
+  .page-catalogue .menu-btn{margin-right:auto}
+  .page-catalogue .site-nav{margin-top:4px}
+}
+@media (max-width:370px){.site-header .wordmark{font-size:.86rem;letter-spacing:.05em}}
+@media (max-width:359px){.header-inner{column-gap:6px}.menu-btn,.eclair-pill{width:36px;height:36px}.sel-pill{min-height:36px}.hsearch__input{height:36px}.hsearch__btn{top:2px;right:2px}.hsearch__pop{left:-50px}}
+@media (min-width:900px){
+  .site-header .brand{padding:10px 0}
+  .site-header .seal{width:36px;height:43px}
+  .site-nav a{min-height:40px}
+}
+@media (min-width:860px){.product__media{top:calc(var(--hdr-colle, 104px) + 20px)}}
+@media (min-width:980px){.rc-aside{top:calc(var(--hdr-colle, 104px) + 20px)}}
