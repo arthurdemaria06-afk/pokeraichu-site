@@ -60,6 +60,7 @@
 
 /* annonces prêtes à copier (eBay, Vinted, Leboncoin) */
 .annonce-btn{min-height:40px;padding:0 16px;font-size:.88rem}
+.ebay-btn{display:inline-flex;align-items:center;min-height:40px;padding:0 16px;font-size:.88rem;text-decoration:none}
 .annonce-ou.is-warn{color:var(--shu-fonce);font-weight:600}
 .annonce{grid-column:1/-1;display:grid;gap:14px;margin-top:12px;padding:14px;border:1px solid var(--edge);border-left:3px solid var(--shu);background:var(--gofun);min-width:0}
 .annonce__tabs{display:flex}

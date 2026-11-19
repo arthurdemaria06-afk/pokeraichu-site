@@ -67,6 +67,9 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
     Cloudflare reconstruit le site. La référence et l'adresse (slug) de la fiche ne changent jamais.
     Lots et scellés ne sont pas modifiables depuis le téléphone. L'attente de publication est gardée dans le
     `localStorage` (`pr.modif.attente`).
+  - **Bouton « Ventes eBay ↗ »** sur chaque carte (sauf lots) : ouvre dans un nouvel onglet les ventes réussies eBay.fr
+    (LH_Sold, LH_Complete). Recherche reprise de `data/ebay.json` (préparée dans l'Excel, carte par carte), sinon
+    construite par `outils.js` sur le même modèle : nom anglais, (n°,n°/total), langue, grade, exclusions.
   - Un lien « Gestion (visible seulement sur ce téléphone) » apparaît en pied de page du site quand la clé est
     enregistrée (`site.js`).
 - `/salon.html` : caisse du stand utilisable hors ligne. `/etiquettes.html`, `/panneau-salon.html` : étiquettes et QR codes.
@@ -157,6 +160,9 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - Idée proposée et non faite : une fiche « Boosters japonais » (Storm Emeralda, Méga Brave, Ninja Spinner) à l'unité.
 
 ## 7. Historique récent (commits)
+
+- (19/11) Bouton « Ventes eBay » dans la page de gestion ; « Nouveau pour vous » devient un petit sticker « New » au logo
+  (l'ancien bandeau couvrait toute la carte : `.art::before` a un `inset`, il faut remettre `bottom` et `left` à `auto`)
 
 - (19/11) Ventes de l'Excel marquées « Vendue » (liste `vendues` de config.js, quantités 005, 038, 201 baissées),
   30 cartes du classeur Ramoloss / Wattouat (réf. 315 à 344, prix sur demande, photos recadrées pour dépanner),

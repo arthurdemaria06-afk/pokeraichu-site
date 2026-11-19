@@ -73,6 +73,47 @@
     return Promise.race([p.catch(function () { return {}; }), new Promise(function (ok) { setTimeout(function () { ok({}); }, 2500); })]);
   }
 
+  /* ------------------------------------------------------------------ recherche eBay (ventes reussies)
+     data/ebay.json : recherches preparees carte par carte dans l'Excel. Sinon, recherche construite sur le meme modele :
+     nom anglais, numero (court et complet), langue, grade, exclusions (autres notations, reproductions, lots). */
+  var EBQ = {};
+  var EB_ALT = { Raichu: ['Pikachu'], Pikachu: ['Raichu'], Mew: ['Mewtwo'], Mewtwo: ['Mew'] };
+  var EB_GRADERS = ['PSA', 'BGS', 'CGC', 'PCA', 'TAG', 'ARS', 'AGS'];
+  var EB_LANG = { JP: '(Japanese,Japan,JP)', FR: '(FR,VF,Français,Française,French)', KR: '(Korean,Korea,KR)' };
+  function loadEbay() {
+    return fetch('data/ebay.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (d) { EBQ = (d && d.recherches) || {}; }).catch(function () {});
+  }
+  function ebayQuery(c) {
+    if (EBQ[c.ref]) return EBQ[c.ref];
+    var en = c.en || {}, words = [], excl = [];
+    var slab = c.etat && c.etat.type && c.etat.type !== 'brute' && c.etat.type !== 'scelle';
+    var sealed = c.etat && c.etat.type === 'scelle';
+    var pk = (en.pokemons && en.pokemons[0]) || en.nom || c.nom_en || c.nom_fr;
+    var dark = /^(Dark|Light) /.exec(en.nom || '');
+    if (slab) words.push('"' + c.etat.libelle + '"');
+    if (sealed) words.push((en.nom || c.nom_fr).replace(/\s*\(.*$/, ''));
+    else if (c.langue === 'FR') words.push('(' + ((c.pokemons && c.pokemons[0]) || c.nom_fr) + ',' + pk + ')');
+    else words.push(dark ? dark[1] + ' ' + pk : pk);
+    var n = String(c.numero || '').split(' + ')[0];
+    var m = /^0*(\d+|[A-Z]*\d+)\/(.+)$/.exec(n);
+    if (sealed) { /* scelle : le nom suffit */ }
+    else if (m) words.push('(' + n.split('/')[0] + ',' + n + ')');
+    else if (en.variante) words.push('(' + en.variante.replace(/, old back$/, '').split(/\s+/).join(',') + ')');
+    if (c.edition) words.push('(1st,1ED,First)');
+    if (EB_LANG[c.langue]) words.push(EB_LANG[c.langue]);
+    if (!dark && c.categorie === 'vintage') excl.push('Dark');
+    (EB_ALT[pk] || []).forEach(function (x) { excl.push(x); });
+    if (slab) EB_GRADERS.forEach(function (g) { if (g !== c.etat.type) excl.push(g); });
+    else if (!sealed) excl = excl.concat(EB_GRADERS, ['graded', 'slab']);
+    excl = excl.concat(['reprint', 'replica', 'proxy', 'custom']);
+    if (!sealed) excl.push('lot');
+    return words.join(' ') + ' ' + excl.map(function (x) { return '-' + x; }).join(' ');
+  }
+  function ebayUrl(c) {
+    return 'https://www.ebay.fr/sch/i.html?_nkw=' + encodeURIComponent(ebayQuery(c)).replace(/%20/g, '+') + '&LH_Sold=1&LH_Complete=1';
+  }
+
   /* ------------------------------------------------------------------ gestion */
   var G = d.getElementById('gestion');
   if (G) {
@@ -259,6 +300,15 @@
         var ctrl = el('div', 'sel-row__ctrl');
         ctrl.appendChild(seg);
         ctrl.appendChild(priceBox(c));
+        if (!/^L\d/.test(c.ref)) {   /* lots : pas de recherche unique */
+          var eb = el('a', 'btn btn--ghost ebay-btn', 'Ventes eBay ↗');
+          eb.href = ebayUrl(c);
+          eb.target = '_blank';
+          eb.rel = 'noopener noreferrer';
+          eb.title = ebayQuery(c);
+          eb.setAttribute('aria-label', 'Ventes réussies sur eBay pour ' + label(c) + ' (nouvel onglet)');
+          ctrl.appendChild(eb);
+        }
         li.appendChild(ctrl);
         if (AN) {
           var ab = el('button', 'btn btn--ghost annonce-btn', anOpen === c.ref ? 'Fermer l’annonce' : 'Annonce');
@@ -282,7 +332,7 @@
         ' prix changé(s) en direct' + (t ? '' : ' · tapez une référence ou un nom pour trouver une carte');
     }
     function load() {
-      Promise.all([loadStock(G.getAttribute('data-stock')), readStatus()]).then(function (r) {
+      Promise.all([loadStock(G.getAttribute('data-stock')), readStatus(), loadEbay()]).then(function (r) {
         cards = r[0].cartes.slice().sort(function (a, b) { return (parseInt(a.ref, 10) || 1e6) - (parseInt(b.ref, 10) || 1e6) || a.ref.localeCompare(b.ref); });
         byRef = {};
         cards.forEach(function (c) { byRef[K(c.ref)] = c; });
