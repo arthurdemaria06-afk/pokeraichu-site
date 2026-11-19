@@ -533,7 +533,7 @@ html[lang="en"] .tile--sold .art::after{content:"SOLD"}
 .recent__list{display:flex;gap:8px;margin:0;padding:0;list-style:none}
 .recent__a{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--gofun);color:var(--sumi);font-size:.86rem;white-space:nowrap;text-decoration:none}
 .recent__a:hover{border-color:var(--sumi)}
-.wa-float{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:20;display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:2px;background:var(--kon);color:var(--gofun);font:600 .8rem/1.2 var(--text);white-space:nowrap;text-decoration:none;box-shadow:0 4px 14px rgba(30,27,24,.22)}
+.wa-float{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:20;display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:2px;background:var(--kon);color:var(--gofun);font:600 .8rem/1.2 var(--text);white-space:nowrap;text-decoration:none;box-shadow:0 0 0 1px rgba(251,249,244,.22),0 4px 14px rgba(30,27,24,.22)}
 .wa-float:hover{background:var(--sumi);color:var(--gofun)}
 .wa-float{transition:transform .2s ease,visibility .2s}
 .wa-float.is-off{transform:translateY(calc(100% + 32px));visibility:hidden}
