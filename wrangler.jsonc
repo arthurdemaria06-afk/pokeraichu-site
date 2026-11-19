@@ -3,6 +3,7 @@
    - build.command fabrique les cartes ajoutées depuis /gestion.html (_outils/construire.py) ;
    - le site entier est publié tel quel (les fichiers listés dans .assetsignore restent privés) ;
    - worker/formulaires.js reçoit seulement les envois de formulaires et les transmet par e-mail.
+   La base D1 « pokeraichu-clients » (binding DB) garde les comptes clients et leurs éclairs.
    L'adresse de réception est le secret CONTACT_TO (réglé dans Cloudflare, jamais dans ce fichier). */
 {
   "name": "pokeraichu-site",
@@ -19,5 +20,6 @@
     "run_worker_first": ["/", "/contact.html", "/recherche.html", "/en/contact.html", "/en/find-a-card.html", "/api/*", "/compte.html", "/en/account.html"]
   },
   "send_email": [{ "name": "MAIL" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "pokeraichu-clients", "database_id": "e4a55d10-13ae-45b9-8d09-7f5227ee7f0b" }],
   "observability": { "enabled": true }
 }
