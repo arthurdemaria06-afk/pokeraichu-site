@@ -248,3 +248,24 @@ a.pl-row:hover{background:var(--washi)}
 .pl-dates__c .input{width:100%;min-width:0}
 .pl-sheet__b > .field{margin-top:10px}
 .pl-sim > .pl-apercu{margin-top:16px}
+
+/* sous-onglets de l'analyse */
+.pl-seg{display:flex;gap:4px;margin:0 0 4px;padding:4px;background:var(--gofun);border:1px solid var(--line);border-radius:999px}
+.pl-seg a{flex:1;display:flex;align-items:center;justify-content:center;min-height:40px;padding:0 10px;border-radius:999px;color:var(--sumi);font:600 .9rem/1.1 var(--text);text-decoration:none;text-align:center}
+.pl-seg a[aria-current="page"]{background:var(--sumi);color:var(--gofun)}
+@media (min-width:1000px){.pl-seg{max-width:520px}}
+/* lignes cliquables en bouton (charges) */
+.pl-row--btn{width:100%;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.pl-row--btn:hover{background:var(--washi)}
+/* cascade des marges */
+.pl-cascade th[scope="row"]{font-weight:400}
+.pl-cascade tr.pl-tot th,.pl-cascade tr.pl-tot td{font-weight:700;border-top:2px solid var(--sumi)}
+.pl-cascade tr.pl-tot--sous th,.pl-cascade tr.pl-tot--sous td{border-top:1px solid var(--edge);background:var(--washi)}
+.pl-cascade tbody tr:first-child th,.pl-cascade tbody tr:first-child td{border-top:0}
+/* cases à cocher en liste */
+.pl-check--l{padding:10px 2px;align-items:center}
+.pl-check--l small{display:block;color:var(--nezumi);font-size:.78rem;line-height:1.35}
+.pl-choix + .pl-label{margin-top:16px}
+.pl-sheet__b > .pl-label{margin:14px 0 4px}
+.pl-bars + .pl-note,.pl-scroll + .pl-note,.pl-rows + .pl-actions{margin-top:12px}
+.pl-form > .pl-apercu{grid-column:1/-1;margin:-4px 0 0;font-size:.84rem}

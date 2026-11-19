@@ -269,4 +269,25 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   probabilité de 10 d'équilibre. Délai de vente : date d'achat de la carte, sinon date de son ticket ; « Dater mes ventes »
   remplit `vente_date` et `date_achat` manquantes.
 - Onglets : Bord · Stock · Ventes · Analyse · Plus (Achats passe dans Plus ; sur ordinateur, liens « Gestion » sous les
-  onglets). Prochaines vagues prévues : charges et voyages (coûts directs, indirects, cachés), puis SASU (TVA, IS, SIG).
+  onglets). Analyse a des sous-onglets : Segments (#analyse), Coûts (#couts), Voyages (#voyages, #voyage/<id>).
+
+**Charges, voyages, coûts complets (vague 2, 19/11/2026)** : `assets/js/pilotage-couts.js` (PRCouts), chargé avant pilotage.js.
+- Document : `charges` [{ id, date, libelle, montant, devise 'EUR'|'JPY', tva, cat, cible 'general'|'voyage'|'carte', voyage, ref,
+  recurrence 'mois'|'an', fin, heures (catégorie temps), note }], `voyages` [{ id, nom, debut, fin, note }] ; rattachement manuel
+  par `voyage` sur un ticket, un lot, une carte ou un produit. Paramètres : taux_horaire, minutes_par_vente, cout_capital
+  (défaut 1,7 % = Livret A au 01/08/2026), cle_voyage ('valeur' | 'nombre'), tva_recuperable (vague 3).
+- Catégories alignées sur le PCG (6251 voyages, 6256 repas, 6241 transport sur achats, 611 gradation, 6222 commissions,
+  6242 envois, 6064 fournitures, 651 abonnements, 626, 623, 627, 6226, 616, 635, 6063, 658, 628) avec nature
+  (directe / structure / cachée) et comportement (variable / fixe). Les récurrences s'ajoutent jusqu'à aujourd'hui.
+- Voyage d'une carte : `c.voyage`, sinon son lot, sinon son ticket (`voyage` ou date dans les dates du voyage), sinon sa
+  date d'achat. Frais du voyage répartis au prorata du coût d'achat (ou par article). Coût complet = achat × (1 + TVA import)
+  + quote-part voyage + frais directs rattachés à la carte.
+- Cascade : CA → marge commerciale → frais d'achat des articles vendus (frais de voyage « déstockés ») → frais de vente →
+  marge sur coûts directs → structure → résultat analytique → coûts cachés (temps, immobilisation au coût du capital,
+  décote prix marché − prix vendu, dépréciation : coût complet > prix marché × réalisation − frais) → résultat économique.
+- Seuil : coûts variables (achats vendus, frais proportionnels), charges fixes (voyages payés dans la période, structure) ;
+  l'écart avec le résultat analytique = frais de voyage mis en stock ou déstockés. Point mort au rythme de la période.
+- Sans charges ni voyages, le résultat analytique = bénéfice net de l'Excel (testé : `_outils/pilotage/test_couts.js`).
+- Écrans : Plus › Charges (#charges), Analyse › Coûts, Analyse › Voyages (création proposée d'après les dates des tickets),
+  bloc « Coût complet » sur la fiche d'une carte, « Après toutes tes charges » sur le Bord, feuilles Charges, Voyages, Coûts
+  dans l'export Excel.

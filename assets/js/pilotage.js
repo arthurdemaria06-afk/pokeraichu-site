@@ -526,8 +526,8 @@
 
   /* ---------------------------------------------------------------- navigation */
   var VUES = {};
-  var ONGLET = { bord: 'bord', stock: 'stock', carte: 'stock', ventes: 'ventes', analyse: 'analyse' };
-  var SECONDAIRE = { achats: 'achats', ticket: 'achats', lots: 'lots', scelle: 'scelle', controles: 'controles', reglages: 'reglages' };
+  var ONGLET = { bord: 'bord', stock: 'stock', carte: 'stock', ventes: 'ventes', analyse: 'analyse', couts: 'analyse', voyages: 'analyse', voyage: 'analyse' };
+  var SECONDAIRE = { achats: 'achats', ticket: 'achats', lots: 'lots', scelle: 'scelle', controles: 'controles', reglages: 'reglages', charges: 'charges' };
   function retour(defaut, texte) {
     return h('a', { class: 'pl-back', href: defaut, text: '‹ ' + texte, onclick: function (e) { if (S.precedent) { e.preventDefault(); history.back(); } } });
   }
@@ -594,6 +594,17 @@
       ]),
       h('p', { class: 'pl-note', text: 'Si tout le stock part au prix marché, le résultat final serait d’environ ' + eurS(k.resultat_projete) + ' (bénéfice déjà réalisé + plus-value du stock).' })
     ])]));
+    if (w.PRCouts) {
+      var X = couts('tout'), nCh = (S.doc.charges || []).length;
+      m.appendChild(section('Après toutes tes charges', nCh ? [h('div', { class: 'pl-kpis' }, [
+        tuile('Résultat analytique', eurS(X.cascade.resultat), 'ventes − achats − toutes les charges', X.cascade.resultat < 0 ? 'pl-neg' : ''),
+        tuile('Charges payées', eur(X.totaux.charges), nCh + ' charge' + pl(nCh) + (X.totaux.stock_frais_voyage > 0.5 ? ' · ' + eur(X.totaux.stock_frais_voyage) + ' de frais encore en stock' : '')),
+        tuile('Coûts cachés', eur(X.cascade.caches), 'temps, capital, décote, dépréciation'),
+        tuile('Point mort', X.seuil.point_mort_date ? (X.seuil.point_mort_jours <= X.seuil.duree ? dateFR(X.seuil.point_mort_date) : 'pas atteint') : '—', X.seuil.sr != null ? 'seuil ' + eur(X.seuil.sr) + ' de CA' : null)
+      ]), h('p', { class: 'pl-note' }, h('a', { href: '#couts', text: 'Cascade des marges, seuil de rentabilité, coûts cachés ›' }))]
+        : [h('div', { class: 'pl-box' }, [h('p', { text: 'Le bénéfice ci-dessus ne compte que tes achats et tes ventes. Ajoute tes frais (voyage, abonnements, fournitures…) pour voir ton vrai résultat.' }),
+          h('div', { class: 'pl-actions' }, [bouton('+ Ajouter une charge', function () { feuilleCharge(null); }), h('a', { class: 'btn btn--ghost', href: '#voyages', text: 'Mes voyages' })])])]));
+    }
     m.appendChild(section('Stock', [h('div', { class: 'pl-kpis' }, [
       tuile('Valeur marché', eur(st.valeur), st.sans_prix ? st.sans_prix + ' carte' + pl(st.sans_prix) + ' sans prix non comptée' + pl(st.sans_prix) : 'au prix marché actuel'),
       tuile('Coût du stock', eur(st.cout_reel + st.cout_estime), 'dont ' + eur(st.cout_estime) + ' estimés'),
@@ -788,6 +799,7 @@
       ])]));
     }
     m.appendChild(section('Achat', [h('div', { class: 'pl-box' }, decrireAchat(r).map(function (x) { return h('p', { class: 'pl-calc' }, x); }))]));
+    if (w.PRCouts && !r.hors) { var cc = blocCoutComplet(c.ref); if (cc) m.appendChild(cc); }
     var infos = [['Nom anglais', c.nom_en], ['Set', c.set], ['Rareté', c.rarete], ['État', c.etat], ['Nom sur le ticket', c.nom_ticket], ['Prix sur le ticket', c.yen != null ? yen(c.yen) : null],
       ['Boutique', c.boutique], ['Date d’achat', dateFR(c.date_achat)], ['Ticket', c.ticket], ['Vérification', c.verif], ['Remarque', c.remarque],
       ['Lots du site', (c.lots_site || []).join(', ')], ['Autre n° sur le site', (c.alias_site || []).join(', ')]].filter(function (x) { return x[1]; });
@@ -1396,6 +1408,7 @@
   VUES.analyse = function (m) {
     var R = S.R, An = w.PRAnalyse;
     m.appendChild(entete('Analyse', 'Ce qui se vend, ce qui rapporte, où placer tes capitaux'));
+    m.appendChild(sousOnglets('analyse'));
     if (!An) { m.appendChild(h('p', { class: 'pl-box', text: 'Le module d’analyse ne s’est pas chargé : recharge la page.' })); return; }
     var fa = S.fa || (S.fa = { dim: 'rarete', budget: +(lire('pr.pilotage.budget') || 0) || 2000, dimBudget: 'rarete', tout: false });
     var A = An.segments(R, fa.dim), Pf = fa.dim === 'type' ? A : An.segments(R, 'type'), T = Pf.total;
@@ -1571,6 +1584,473 @@
     });
   }
 
+  /* ---------------------------------------------------------------- charges, voyages, coûts complets (moteur : assets/js/pilotage-couts.js) */
+  var KC = w.PRCouts;
+  function periodeDe(k) {
+    if (!k || k === 'tout') return null;
+    if (/^\d{4}$/.test(k)) return { debut: k + '-01-01', fin: k + '-12-31', nom: k };
+    if (k === '12m') return { debut: KC.plusJours(aujourdhui(), -364), fin: aujourdhui(), nom: '12 derniers mois' };
+    return null;
+  }
+  function couts(k) {
+    k = k || 'tout';
+    if (S.cacheC && S.cacheC.R === S.R && S.cacheC.k === k) return S.cacheC.x;
+    var x = KC.couts(S.R, S.doc, { aujourdhui: aujourdhui(), periode: periodeDe(k) });
+    S.cacheC = { R: S.R, k: k, x: x };
+    return x;
+  }
+  function sousOnglets(actif) {
+    return h('nav', { class: 'pl-seg', 'aria-label': 'Rubriques de l’analyse' }, [['analyse', 'Segments'], ['couts', 'Coûts'], ['voyages', 'Voyages']].map(function (x) {
+      return h('a', { href: '#' + x[0], 'aria-current': x[0] === actif ? 'page' : null, text: x[1] });
+    }));
+  }
+  function voyageParId(id) { return (S.doc.voyages || []).filter(function (v) { return v.id === id; })[0] || null; }
+  function produitDe(id) { return S.R.produits.filter(function (x) { return x.id === id; })[0] || null; }
+  function libelleCible(c) {
+    if (c.cible === 'voyage') { var V = voyageParId(c.voyage); return 'Voyage · ' + (V ? V.nom : 'supprimé'); }
+    if (c.cible === 'carte') {
+      var r = S.R.parRef[c.ref], x = r ? null : produitDe(c.ref);
+      return r ? 'N° ' + c.ref + ' · ' + (r.c.nom || '') : x ? (x.p.libelle || x.p.nom) : 'N° ' + c.ref + ' (introuvable)';
+    }
+    return 'Toute l’activité';
+  }
+  function montantCharge(c) {
+    if (KC.categorie(c.cat).heures) return nbr(c.heures) + ' h';
+    if (c.devise === 'JPY') return eur(S.R.params.taux ? z(c.montant) / S.R.params.taux : null, 2);
+    return eur(c.montant, 2);
+  }
+  var NATURES = { directe: ['Directe', 'ok'], indirecte: ['Structure', ''], cachee: ['Cachée', 'garde'] };
+  function tagNature(cat) { var n = NATURES[cat.nature] || ['', '']; return badge(n[0], n[1]); }
+  function nouvelId(p) { return p + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+
+  /* liste des charges */
+  VUES.charges = function (m) {
+    var fc = S.fch || (S.fch = { filtre: 'toutes' }), X = couts('tout');
+    var ch = (S.doc.charges || []).slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    m.appendChild(h('a', { class: 'pl-back', href: '#plus', text: '‹ Plus' }));
+    m.appendChild(entete('Charges', 'Voyages, abonnements, fournitures, temps passé',
+      [h('button', { type: 'button', class: 'btn pl-btn-s', text: '+ Charge', onclick: function () { feuilleCharge(null); } })]));
+    if (!ch.length) {
+      m.appendChild(h('div', { class: 'pl-box' }, [h('p', { class: 'pl-big', text: 'Aucune charge pour l’instant' }),
+        h('p', { class: 'pl-note', text: 'Exemples : billets d’avion et hôtel du voyage au Japon, abonnement Shopify, toploaders et sleeves, frais PSA, commission eBay, ton temps passé. Chaque charge est classée (directe, de structure ou cachée) et répartie là où elle doit aller : sur les cartes d’un voyage, sur une carte, ou sur toute l’activité.' }),
+        h('div', { class: 'pl-actions' }, bouton('Ajouter ma première charge', function () { feuilleCharge(null); }))]));
+      return;
+    }
+    var FILTRES = [['toutes', 'Toutes'], ['voyage', 'Voyages'], ['directe', 'Directes'], ['indirecte', 'Structure'], ['cachee', 'Temps'], ['rec', 'Récurrentes']];
+    m.appendChild(h('div', { class: 'pl-chips', role: 'group', 'aria-label': 'Filtrer les charges' }, FILTRES.map(function (f) {
+      return h('button', { type: 'button', class: 'chip', 'data-focus': 'fch-' + f[0], 'aria-pressed': String(fc.filtre === f[0]), text: f[1], onclick: function () { fc.filtre = f[0]; rendre(true); } });
+    })));
+    var liste = ch.filter(function (c) {
+      var cat = KC.categorie(c.cat);
+      if (fc.filtre === 'voyage') return c.cible === 'voyage';
+      if (fc.filtre === 'rec') return !!c.recurrence;
+      if (fc.filtre === 'toutes') return true;
+      return cat.nature === fc.filtre;
+    });
+    var parCharge = {};
+    X.occurrences.forEach(function (o) { var p = parCharge[o.c.id] || (parCharge[o.c.id] = { n: 0, cout: 0, tva: 0 }); p.n++; p.cout += o.cout; p.tva += o.tva; });
+    var tot = 0, tva = 0;
+    liste.forEach(function (c) { var p = parCharge[c.id]; if (p && KC.categorie(c.cat).nature !== 'cachee') { tot += p.cout; tva += p.tva; } });
+    m.appendChild(h('p', { class: 'pl-resume', text: liste.length + ' charge' + pl(liste.length) + ' · ' + eur(tot, 2) + ' payés' + (tva ? ' dont ' + eur(tva, 2) + ' de TVA' : '') }));
+    function ligne(c) {
+      var cat = KC.categorie(c.cat), p = parCharge[c.id] || { n: 0, cout: 0 };
+      var meta = [dateFR(c.date), cat.nom, libelleCible(c)];
+      if (c.recurrence) meta.push((c.recurrence === 'mois' ? 'chaque mois' : 'chaque année') + (c.fin ? ' jusqu’au ' + dateFR(c.fin) : '') + ' · ' + p.n + ' échéance' + pl(p.n));
+      var nums = [h('span', { class: 'pl-row__prix', text: montantCharge(c) + (c.recurrence ? (c.recurrence === 'mois' ? ' /mois' : ' /an') : '') }), tagNature(cat)];
+      if (c.recurrence && p.n > 1) nums.splice(1, 0, h('span', { class: 'pl-row__m', text: eur(p.cout, 2) + ' au total' }));
+      if (c.devise === 'JPY' && !cat.heures) meta.push(yen(c.montant));
+      if (cat.heures) meta.push(S.R.params && S.doc.params.taux_horaire != null ? eur(p.cout, 2) + ' de temps' : 'taux horaire à régler');
+      return h('li', null, h('button', { type: 'button', class: 'pl-row pl-row--sans pl-row--btn', onclick: function () { feuilleCharge(c.id); } }, [
+        h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: c.libelle || cat.nom }), h('span', { class: 'pl-row__meta', text: meta.join(' · ') })]),
+        h('span', { class: 'pl-row__nums' }, nums)
+      ]));
+    }
+    var rec = liste.filter(function (c) { return c.recurrence; }), pon = liste.filter(function (c) { return !c.recurrence; });
+    if (rec.length && fc.filtre !== 'rec') m.appendChild(section('Récurrentes', [h('ul', { class: 'pl-rows' }, rec.map(ligne))]));
+    if (fc.filtre === 'rec') { m.appendChild(h('ul', { class: 'pl-rows pl-sec' }, rec.map(ligne))); return; }
+    var mois = {};
+    pon.forEach(function (c) { var k = String(c.date).slice(0, 7); (mois[k] = mois[k] || []).push(c); });
+    Object.keys(mois).sort().reverse().forEach(function (k) {
+      var l = mois[k], t = 0;
+      l.forEach(function (c) { var p = parCharge[c.id]; if (p && KC.categorie(c.cat).nature !== 'cachee') t += p.cout; });
+      var d0 = new Date(k + '-15T12:00:00Z');
+      var titre = isNaN(d0) ? k : d0.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      m.appendChild(section(titre.charAt(0).toUpperCase() + titre.slice(1) + ' · ' + eur(t, 2), [h('ul', { class: 'pl-rows' }, l.map(ligne))]));
+    });
+  };
+
+  /* ajouter / modifier une charge */
+  var CONSEILS = {
+    voyage: 'Rattache-le au voyage : il sera réparti sur les cartes achetées pendant ce voyage et s’ajoutera à leur coût.',
+    sejour: 'Rattache-le au voyage. Ce qui est personnel (souvenirs, sorties) n’a rien à faire ici.',
+    transport: 'Port ou douane d’un achat : rattache-le à la carte, au voyage, ou laisse « toute l’activité ».',
+    gradation: 'Rattache-la à la carte gradée : elle s’ajoute à son coût. Tarif PSA, envois, assurance et frais au retour compris.',
+    commission: 'La commission de tes réglages ({fv}) est déjà déduite de chaque vente : n’ajoute ici que ce qui s’y ajoute.',
+    envoi: 'Les {envoi} par envoi de tes réglages sont déjà comptés : n’ajoute ici que ce qui s’y ajoute (lot d’enveloppes, port non refacturé…).',
+    fournitures: 'Répartie sur toute l’activité.',
+    abonnement: 'Choisis « Chaque mois » ou « Chaque année » : les échéances s’ajoutent toutes seules jusqu’à aujourd’hui.',
+    materiel: 'Au-delà de 500 € HT, un matériel s’amortit sur plusieurs années une fois en SASU.',
+    temps: 'Temps non payé (chasse aux cartes, photos, annonces, lives) : valorisé à ton taux horaire des réglages, en coût caché.'
+  };
+  function feuilleCharge(id, preset) {
+    var doc = S.doc, c0 = id ? (doc.charges || []).filter(function (c) { return c.id === id; })[0] : null;
+    var init = c0 ? Object.assign({}, c0) : Object.assign({ date: aujourdhui(), devise: 'EUR', cat: 'fournitures', cible: 'general', recurrence: '' }, preset || {});
+    if (!init.cible) init.cible = 'general';
+    if (!init.recurrence) init.recurrence = '';
+    var vs = (doc.voyages || []);
+    if (init.cible === 'voyage' && !init.voyage && vs.length) init.voyage = vs[vs.length - 1].id;
+    if (init.cible === 'voyage' && !vs.length) init.cible = 'general';
+    var refs = S.R.cartes.map(function (r) { return r.ref; }).concat(S.R.produits.map(function (x) { return x.id; }));
+    var dl = h('datalist', { id: 'pl-refs' }, refs.map(function (r) { return h('option', { value: r }); }));
+    var defs = [
+      { k: 'libelle', label: 'Libellé', type: 'text', req: true, ph: 'Billet d’avion, Shopify, toploaders…' },
+      { k: 'cat', label: 'Catégorie', type: 'select', options: KC.CATEGORIES.map(function (x) { return [x.id, x.nom + (x.compte ? ' · ' + x.compte : '')]; }) },
+      { k: 'montant', label: 'Montant TTC', type: 'num', demi: true, si: ['cat', KC.CATEGORIES.filter(function (x) { return !x.heures; }).map(function (x) { return x.id; })] },
+      { k: 'devise', label: 'Devise', type: 'select', demi: true, options: [['EUR', '€'], ['JPY', '¥ (au taux des réglages)']], si: ['cat', KC.CATEGORIES.filter(function (x) { return !x.heures; }).map(function (x) { return x.id; })] },
+      { k: 'heures', label: 'Heures', type: 'num', demi: true, si: ['cat', ['temps']] },
+      { k: 'date', label: 'Date', type: 'date', demi: true, req: true },
+      { k: 'tva', label: 'Dont TVA', type: 'num', demi: true, aide: 'Sur la facture (même devise).', si: ['cat', KC.CATEGORIES.filter(function (x) { return !x.heures; }).map(function (x) { return x.id; })] },
+      { k: 'cible', label: 'Rattacher à', type: 'select', options: [['general', 'Toute l’activité']].concat(vs.length ? [['voyage', 'Un voyage']] : []).concat([['carte', 'Une carte ou un produit']]) },
+      { k: 'voyage', label: 'Voyage', type: 'select', options: vs.map(function (v) { return [v.id, v.nom]; }), si: ['cible', ['voyage']] },
+      { k: 'ref', label: 'N° de la carte ou produit', type: 'text', list: 'pl-refs', ph: 'ex. 102 ou boosters', si: ['cible', ['carte']] },
+      { k: 'recurrence', label: 'Revient', type: 'select', demi: true, options: [['', 'Une seule fois'], ['mois', 'Chaque mois'], ['an', 'Chaque année']] },
+      { k: 'fin', label: 'Jusqu’au (facultatif)', type: 'date', demi: true, si: ['recurrence', ['mois', 'an']] },
+      { k: 'note', label: 'Note (facultatif)', type: 'textarea' }
+    ];
+    var form = formulaire(defs, init);
+    var conseil = h('p', { class: 'pl-apercu', 'aria-live': 'polite' });
+    function majConseil() {
+      var cat = KC.categorie(form.champs.cat.value), t = CONSEILS[cat.id] || 'Répartie sur toute l’activité.';
+      t = t.replace('{fv}', pct(S.R.params.fv)).replace('{envoi}', eur(S.R.params.envoi, 2));
+      if (cat.heures && S.doc.params.taux_horaire == null) t += ' Ton taux horaire n’est pas encore réglé (Réglages).';
+      conseil.textContent = (cat.compte ? 'Compte ' + cat.compte + ' · ' : '') + 'charge ' + ({ directe: 'directe', indirecte: 'de structure', cachee: 'cachée' })[cat.nature] + ', ' + cat.comportement + '. ' + t;
+    }
+    /* la catégorie choisit le rattachement habituel (voyage, carte ou toute l'activité) ; il reste modifiable ensuite */
+    form.champs.cat.addEventListener('change', function () {
+      var cat = KC.categorie(form.champs.cat.value), cible = form.champs.cible;
+      var v = cat.cible && cible.querySelector('option[value="' + cat.cible + '"]') ? cat.cible : 'general';
+      if (cible.value !== v) { cible.value = v; cible.dispatchEvent(new Event('change')); }
+      majConseil();
+    });
+    majConseil();
+    var actions = [bouton('Annuler', fermer, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: c0 ? 'Enregistrer' : 'Ajouter' })];
+    form.champs.cat.parentNode.insertAdjacentElement('afterend', conseil);
+    var corps = [dl, form.el];
+    if (c0) corps.push(h('p', { class: 'pl-note' }, lienBtn('Supprimer cette charge', function () {
+      fermer();
+      modifier('Charge supprimée · ' + (c0.libelle || ''), function (d0) { d0.charges = (d0.charges || []).filter(function (x) { return x.id !== c0.id; }); });
+    }, 'pl-danger')));
+    var fs = feuille(c0 ? 'Modifier la charge' : 'Nouvelle charge', corps, actions);
+    fs.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var x = form.lire();
+      if (!x) return;
+      var cat = KC.categorie(x.cat);
+      if (cat.heures) { if (!(x.heures > 0)) { form.erreur('heures', 'Indique un nombre d’heures.'); return; } }
+      else if (!(x.montant > 0)) { form.erreur('montant', 'Indique un montant positif.'); return; }
+      if (!cat.heures && x.tva != null && (x.tva < 0 || x.tva > x.montant)) { form.erreur('tva', 'La TVA doit être comprise entre 0 et le montant.'); return; }
+      if (x.cible === 'voyage' && !x.voyage) { form.erreur('voyage', 'Choisis le voyage.'); return; }
+      if (x.cible === 'carte') {
+        var rf = String(x.ref || '').trim();
+        var trouve = S.R.parRef[rf] ? rf : (/^\d{1,2}$/.test(rf) && S.R.parRef[rf.padStart(3, '0')] ? rf.padStart(3, '0') : (produitDe(rf) ? rf : null));
+        if (!trouve) { form.erreur('ref', 'Aucune carte ni produit avec ce numéro.'); return; }
+        x.ref = trouve;
+      }
+      if (x.fin && x.fin < x.date) { form.erreur('fin', 'La fin doit venir après la date.'); return; }
+      var ch = { id: c0 ? c0.id : nouvelId('C'), libelle: x.libelle, date: x.date, cat: cat.id, cible: x.cible || 'general' };
+      if (cat.heures) ch.heures = x.heures; else { ch.montant = x.montant; ch.devise = x.devise === 'JPY' ? 'JPY' : 'EUR'; if (x.tva) ch.tva = x.tva; }
+      if (ch.cible === 'voyage') ch.voyage = x.voyage;
+      if (ch.cible === 'carte') ch.ref = x.ref;
+      if (x.recurrence) { ch.recurrence = x.recurrence; if (x.fin) ch.fin = x.fin; }
+      if (x.note) ch.note = x.note;
+      fermer();
+      modifier((c0 ? 'Charge modifiée · ' : 'Charge · ') + ch.libelle + ' · ' + montantCharge(ch), function (d0) {
+        var l = d0.charges || (d0.charges = []), i = l.map(function (y) { return y.id; }).indexOf(ch.id);
+        if (i === -1) l.push(ch); else l[i] = ch;
+      });
+    });
+  }
+
+  /* ---------------------------------------------------------------- coûts et rentabilité */
+  VUES.couts = function (m) {
+    var fc = S.fco || (S.fco = { periode: 'tout' });
+    var ans = KC.annees(S.doc, S.R);
+    if (fc.periode !== 'tout' && fc.periode !== '12m' && ans.indexOf(fc.periode) === -1) fc.periode = 'tout';
+    var X = couts(fc.periode), c = X.cascade, sd = X.seuil, ca = c.ca, nCh = (S.doc.charges || []).length;
+    m.appendChild(entete('Analyse', 'Coûts complets, seuil de rentabilité, coûts cachés'));
+    m.appendChild(sousOnglets('couts'));
+    var chips = h('div', { class: 'pl-chips pl-chips--dims', role: 'group', 'aria-label': 'Période' });
+    [['tout', 'Depuis le début'], ['12m', '12 derniers mois']].concat(ans.map(function (a) { return [a, a]; })).forEach(function (p) {
+      chips.appendChild(h('button', { type: 'button', class: 'chip', 'data-focus': 'per-' + p[0], 'aria-pressed': String(fc.periode === p[0]), text: p[1], onclick: function () { fc.periode = p[0]; rendre(true); } }));
+    });
+    m.appendChild(chips);
+    var info = [];
+    if (!nCh) info.push('Aucune charge saisie : le résultat ci-dessous ne compte que tes achats et tes ventes. ');
+    if (X.non_datees) info.push(X.non_datees + ' vente' + pl(X.non_datees) + ' sans date ne compte' + (X.non_datees > 1 ? 'nt' : '') + ' que dans « Depuis le début ». ');
+    if (info.length || !nCh) m.appendChild(h('div', { class: 'pl-apercu' }, info.concat([nCh ? null : h('span', null, [lienBtn('Ajouter une charge', function () { feuilleCharge(null); })])])));
+    m.appendChild(h('section', { class: 'pl-hero' }, [
+      h('p', { class: 'pl-label', text: 'Résultat analytique' + (X.periode ? ' · ' + X.periode.nom : '') }),
+      h('p', { class: 'pl-hero__v' + (c.resultat < 0 ? ' pl-neg' : ''), text: eurS(c.resultat) }),
+      h('p', { class: 'pl-hero__s', text: 'après toutes les charges saisies · ' + (ca ? pct(c.resultat / ca) + ' du chiffre d’affaires · ' : '') + 'avec les coûts cachés : ' + eurS(c.resultat_economique) })
+    ]));
+    m.appendChild(h('div', { class: 'pl-kpis pl-sec' }, [
+      tuile('Chiffre d’affaires', eur(ca), nbr(X.nb_ventes) + ' vente' + pl(X.nb_ventes)),
+      tuile('Marge commerciale', eur(c.marge_commerciale), ca ? 'taux de marque ' + pct(c.marge_commerciale / ca) : null),
+      tuile('Charges payées', eur(X.totaux.charges), X.totaux.tva ? 'dont ' + eur(X.totaux.tva) + ' de TVA' : nCh + ' charge' + pl(nCh)),
+      tuile('Point mort', sd.point_mort_date ? (sd.point_mort_jours <= sd.duree ? dateFR(sd.point_mort_date) : 'pas atteint') : (sd.cf ? '—' : 'sans charge fixe'),
+        sd.point_mort_date ? (sd.point_mort_jours <= sd.duree ? 'charges fixes couvertes' : 'au rythme actuel : ' + dateFR(sd.point_mort_date)) : null)
+    ]));
+    /* cascade des marges */
+    var L = [
+      ['Chiffre d’affaires', c.ca, 'tot'],
+      ['Coût d’achat des articles vendus', -c.cout_achat],
+      ['Marge commerciale', c.marge_commerciale, 'sous'],
+      ['Frais d’achat des articles vendus (voyages, gradation…)', -c.frais_achat],
+      c.frais_achat_non_affectes ? ['Frais d’achat non rattachés à un article', -c.frais_achat_non_affectes] : null,
+      ['Frais de vente (commissions, envois)', -c.frais_vente],
+      ['Marge sur coûts directs', c.marge_directe, 'sous'],
+      ['Charges de structure', -c.structure],
+      ['Résultat analytique', c.resultat, 'tot'],
+      ['Coûts cachés (non payés)', -c.caches],
+      ['Résultat économique', c.resultat_economique, 'tot']
+    ].filter(Boolean);
+    var tb = h('table', { class: 'pl-table pl-cascade' }, [h('caption', { class: 'sr-only', text: 'Cascade des marges' }),
+      h('thead', null, h('tr', null, [h('th', { scope: 'col', text: 'Du chiffre d’affaires au résultat' }), h('th', { scope: 'col', text: 'Montant' }), h('th', { scope: 'col', text: '% du CA' })])),
+      h('tbody', null, L.map(function (l) {
+        return h('tr', { class: l[2] ? 'pl-tot' + (l[2] === 'sous' ? ' pl-tot--sous' : '') : null }, [h('th', { scope: 'row', text: l[0] }),
+          h('td', { class: l[2] && l[1] < -0.005 ? 'pl-neg' : null, text: eur(Math.abs(l[1]) < 0.005 ? 0 : l[1], 2) }), h('td', { text: ca ? pct(Math.abs(l[1]) < 0.005 ? 0 : l[1] / ca) : '—' })]);
+      }))]);
+    m.appendChild(section('Cascade des marges', [h('div', { class: 'pl-scroll' }, tb)],
+      'Méthode des coûts complets : les frais d’un voyage s’ajoutent au coût des cartes achetées pendant ce voyage et passent en charge au fil des ventes. ' +
+      (X.totaux.stock_frais_voyage > 0.5 ? eur(X.totaux.stock_frais_voyage) + ' de frais de voyage sont encore dans la valeur de ton stock.' : '')));
+    /* directs, indirects, cachés */
+    m.appendChild(section('Directs, indirects, cachés', [h('div', { class: 'pl-kpis' }, [
+      tuile('Coûts directs', eur(X.totaux.directs), (ca ? pct(X.totaux.directs / ca) + ' du CA · ' : '') + 'achats, voyages, gradation, ventes'),
+      tuile('Coûts indirects', eur(X.totaux.indirects), (ca ? pct(X.totaux.indirects / ca) + ' du CA · ' : '') + 'structure : abonnements, fournitures…'),
+      tuile('Coûts cachés', eur(X.totaux.caches), (ca ? pct(X.totaux.caches / ca) + ' du CA · ' : '') + 'temps, capital, décote, dépréciation')
+    ])], 'Directs : rattachés à un article, une vente ou un voyage. Indirects : ceux de la structure, sur toute l’activité. Cachés : jamais payés, mais réels.'));
+    /* seuil de rentabilité */
+    var p = sd.sr ? Math.max(0, Math.min(1, ca / sd.sr)) : (sd.cf ? 0 : 1);
+    var jauge = h('div', { class: 'pl-meter', role: 'img', 'aria-label': sd.sr ? pct(ca / sd.sr) + ' du seuil de rentabilité atteint' : 'seuil non calculable' }, h('span'));
+    jauge.firstChild.style.width = (p * 100) + '%';
+    m.appendChild(section('Seuil de rentabilité', [
+      h('div', { class: 'pl-box' }, [
+        h('p', { class: 'pl-big', text: sd.sr == null ? (sd.cf ? 'Ta marge sur coûts variables est nulle ou négative : pas de seuil possible.' : 'Aucune charge fixe sur la période : chaque vente est déjà du bénéfice.')
+          : ca >= sd.sr ? 'Seuil dépassé de ' + eur(ca - sd.sr) + ' : tes charges fixes sont couvertes' : 'Il manque ' + eur(sd.sr - ca) + ' de chiffre d’affaires pour couvrir tes charges fixes' }),
+        jauge,
+        h('dl', { class: 'pl-dl' }, [
+          h('dt', { text: 'Marge sur coûts variables' }), h('dd', { text: eur(sd.mcv) + (sd.tmcv != null ? ' (' + pct(sd.tmcv) + ' du CA)' : '') }),
+          h('dt', { text: 'Charges fixes de la période' }), h('dd', { text: eur(sd.cf) }),
+          h('dt', { text: 'Seuil de rentabilité' }), h('dd', { text: sd.sr != null ? eur(sd.sr) + ' de CA' : '—' }),
+          h('dt', { text: 'Marge de sécurité' }), h('dd', { text: sd.marge_securite != null ? eurS(sd.marge_securite) + ' (' + pct(sd.indice_securite) + ' du CA)' : '—' }),
+          h('dt', { text: 'Levier opérationnel' }), h('dd', { text: sd.levier != null ? dec1(sd.levier) + ' : +10 % de CA = +' + NF0.format(sd.levier * 10) + ' % de résultat' : '—' }),
+          h('dt', { text: 'Résultat en coûts variables' }), h('dd', { text: eurS(sd.resultat) })
+        ]),
+        Math.abs(sd.ecart) > 0.5 ? h('p', { class: 'pl-note', text: 'Écart de ' + eurS(sd.ecart) + ' avec le résultat analytique : ici, les frais de voyage comptent en entier dans la période où tu les paies ; en coûts complets, ils suivent les cartes jusqu’à leur vente.' }) : null
+      ])
+    ], 'Coûts variables : achats des articles vendus, commissions, envois, gradation, fournitures. Charges fixes : voyages, abonnements, structure. Point mort calculé au rythme de la période (' + nbr(sd.duree) + ' jours depuis le ' + dateFR(sd.debut) + ').'));
+    /* charges par catégorie */
+    if (X.categories.length) m.appendChild(section('Charges par catégorie', [barres(X.categories.map(function (k) {
+      return { l: k.cat.nom, s: (k.cat.compte ? 'compte ' + k.cat.compte + ' · ' : '') + (NATURES[k.cat.nature] || [''])[0].toLowerCase() + ' · ' + k.n + ' ligne' + pl(k.n), v: k.montant, txt: eur(k.montant) };
+    }), 'Charges par catégorie'), h('p', { class: 'pl-note' }, h('a', { href: '#charges', text: 'Voir et modifier les charges ›' }))]));
+    /* coûts cachés */
+    var cc = X.caches, P = X.params;
+    var lc = [
+      ['Temps passé', cc.temps, cc.temps == null ? 'Règle ton taux horaire dans les réglages pour le chiffrer.' : dec1(cc.heures) + ' h × ' + eur(P.taux_horaire, 2) + ' (' + (P.minutes_vente != null ? NF0.format(P.minutes_vente) + ' min par vente' : 'temps par vente non réglé') + (cc.heures_saisies ? ', ' + dec1(cc.heures_saisies) + ' h saisies' : '') + ')'],
+      ['Immobilisation du capital', cc.capital, pct(cc.taux_capital) + ' par an sur le coût complet, le temps que chaque carte reste en stock (ce que l’argent aurait rapporté placé sans risque).'],
+      ['Décote consentie', cc.decote, 'Prix marché moins prix de vente, sur les ventes de la période.'],
+      ['Dépréciation du stock', cc.depreciation, cc.n_depreciation ? cc.n_depreciation + ' carte' + pl(cc.n_depreciation) + ' dont le coût complet dépasse ce qu’elles rapporteraient vendues (prix marché × ' + pct(cc.realisation) + ', frais déduits).' : 'Aucune carte sous son coût complet.']
+    ];
+    var tcc = tableau([
+      { t: 'Coût caché', f: function (l) { return l.length > 2 ? h('span', null, [l[0], h('small', { class: 'pl-t-note', text: l[2] })]) : l[0]; } },
+      { t: 'Montant', f: function (l) { return l[1] == null ? '—' : eur(l[1], 2); } }
+    ], lc, ['Total', cc.total], 'Coûts cachés');
+    m.appendChild(section('Coûts cachés', [tcc, h('p', { class: 'pl-note' }, h('a', { href: '#reglages', text: 'Régler le taux horaire, le temps par vente et le coût du capital ›' }))],
+      'Ils ne sortent pas de ta poche mais réduisent ce que l’activité te rapporte vraiment.'));
+  };
+  function dec1(v) { return vide(v) ? '—' : new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(v); }
+
+  /* ---------------------------------------------------------------- voyages */
+  VUES.voyages = function (m) {
+    var X = couts('tout'), vs = X.voyages.slice().reverse(), prop = KC.proposition(S.doc, S.R);
+    m.appendChild(entete('Analyse', 'Ce que te coûte et te rapporte chaque voyage', [h('button', { type: 'button', class: 'btn pl-btn-s', text: '+ Voyage', onclick: function () { feuilleVoyage(null); } })]));
+    m.appendChild(sousOnglets('voyages'));
+    if (prop) m.appendChild(h('div', { class: 'pl-apercu pl-sec' }, ['Tes tickets japonais vont du ' + dateFR(prop.debut) + ' au ' + dateFR(prop.fin) + ' (' + prop.n + ' tickets datés) sans voyage. ',
+      lienBtn('Créer ce voyage', function () { feuilleVoyage(null, { nom: 'Japon · ' + new Date(prop.debut + 'T12:00:00Z').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' }), debut: prop.debut, fin: prop.fin }); })]));
+    if (!vs.length) {
+      m.appendChild(h('div', { class: 'pl-box pl-sec' }, [h('p', { class: 'pl-big', text: 'Aucun voyage pour l’instant' }),
+        h('p', { class: 'pl-note', text: 'Un voyage regroupe ses frais (avion, hôtel, transports, repas) et les cartes achetées pendant ses dates. Tu sauras ce que chaque carte t’a vraiment coûté, le retour sur investissement du voyage, et le montant d’achats nécessaire pour amortir le prochain.' })]));
+      return;
+    }
+    m.appendChild(h('ul', { class: 'pl-rows pl-sec' }, vs.map(function (v) {
+      var V = v.V;
+      return h('li', null, h('a', { class: 'pl-row pl-row--sans', href: '#voyage/' + encodeURIComponent(V.id) }, [
+        h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: V.nom }),
+          h('span', { class: 'pl-row__meta', text: [V.debut ? dateFR(V.debut) + ' → ' + dateFR(V.fin) : null, v.articles.length + ' article' + pl(v.articles.length) + ' rattaché' + pl(v.articles.length), 'frais ' + eur(v.frais) + (v.taux_frais != null ? ' (+' + pct(v.taux_frais) + ' sur les achats)' : '')].filter(Boolean).join(' · ') })]),
+        h('span', { class: 'pl-row__nums' }, [h('span', { class: 'pl-row__prix ' + sens(v.roi_potentiel), text: v.roi_potentiel != null ? fleche(v.roi_potentiel) + pct(v.roi_potentiel) : '—' }), h('span', { class: 'pl-row__m', text: 'retour potentiel' })])
+      ]));
+    })));
+    m.appendChild(h('p', { class: 'pl-note', text: 'Une carte fait partie d’un voyage si son ticket ou sa date d’achat tombe dans ses dates, ou si tu l’y as rattachée (tickets et lots sans date, produits). Clé de répartition des frais : ' + (X.params.cle_voyage === 'nombre' ? 'le nombre d’articles' : 'le coût d’achat') + ' (Réglages).' }));
+  };
+  VUES.voyage = function (m, id) {
+    var X = couts('tout'), v = X.parVoyage[id];
+    m.appendChild(retour('#voyages', 'Voyages'));
+    if (!v) { m.appendChild(h('p', { class: 'pl-box', text: 'Voyage introuvable.' })); return; }
+    var V = v.V;
+    m.appendChild(entete(V.nom, (V.debut ? dateFR(V.debut) + ' → ' + dateFR(V.fin) + ' · ' + v.duree + ' jour' + pl(v.duree) : 'sans dates'), [h('button', { type: 'button', class: 'btn btn--ghost pl-btn-s', text: 'Modifier', onclick: function () { feuilleVoyage(V.id); } })]));
+    m.appendChild(h('section', { class: 'pl-hero' }, [
+      h('p', { class: 'pl-label', text: 'Retour sur investissement potentiel' }),
+      h('p', { class: 'pl-hero__v' + (v.roi_potentiel < 0 ? ' pl-neg' : ''), text: v.roi_potentiel != null ? (v.roi_potentiel > 0 ? '+' : '') + pct(v.roi_potentiel) : '—' }),
+      h('p', { class: 'pl-hero__s', text: 'si le stock du voyage se vend au prix marché · déjà réalisé : ' + (v.roi_realise != null ? pct(v.roi_realise) : '—') + ' (' + eurS(v.benef) + ')' })
+    ]));
+    m.appendChild(h('div', { class: 'pl-kpis pl-sec' }, [
+      tuile('Coût complet', eur(v.cout_total), 'achats ' + eur(v.cout_achat) + ' + frais ' + eur(v.frais)),
+      tuile('Frais du voyage', eur(v.frais), v.taux_frais != null ? '+' + pct(v.taux_frais) + ' sur le prix des cartes' : 'aucun achat rattaché'),
+      tuile('Déjà récupéré', pct(v.recupere), eur(v.ca) + ' encaissés · ' + nbr(v.n_vendus) + ' vendu' + pl(v.n_vendus)),
+      tuile('Reste en stock', nbr(v.n_stock) + ' article' + pl(v.n_stock), 'valeur marché ' + eur(v.valeur_stock))
+    ]));
+    if (v.seuil_achat != null && v.frais > 0) m.appendChild(h('p', { class: 'pl-apercu pl-sec', text: 'Chaque carte de ce voyage t’a coûté ' + pct(v.taux_frais) + ' de plus que son prix. Avec une marge de ' + pct(v.marge_avant_frais) +
+      ' avant frais, il fallait au moins ' + eur(v.seuil_achat) + ' d’achats pour amortir ' + eur(v.frais) + ' de frais' + (v.achats ? ' ; tu en as fait ' + eur(v.achats) + '.' : '.') + (v.frais_par_jour ? ' Frais par jour : ' + eur(v.frais_par_jour) + '.' : '') }));
+    /* frais */
+    m.appendChild(section('Frais du voyage', [v.charges.length ? h('ul', { class: 'pl-rows' }, chargesDe(v.charges).map(function (c) {
+      var cat = KC.categorie(c.cat);
+      return h('li', null, h('button', { type: 'button', class: 'pl-row pl-row--sans pl-row--btn', onclick: function () { feuilleCharge(c.id); } }, [
+        h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: c.libelle }), h('span', { class: 'pl-row__meta', text: [dateFR(c.date), cat.nom, c.devise === 'JPY' ? yen(c.montant) : null].filter(Boolean).join(' · ') })]),
+        h('span', { class: 'pl-row__nums' }, h('span', { class: 'pl-row__prix', text: montantCharge(c) }))
+      ]));
+    })) : h('p', { class: 'pl-box', text: 'Aucun frais rattaché : ajoute l’avion, l’hôtel, les transports et les repas du voyage.' }),
+    h('div', { class: 'pl-actions' }, bouton('+ Frais du voyage', function () { feuilleCharge(null, { cat: 'voyage', cible: 'voyage', voyage: V.id, date: V.debut || aujourdhui() }); }, 'btn--ghost'))]));
+    /* achats */
+    var cartesV = v.articles.filter(function (a) { return a.type === 'carte'; }), prodV = v.articles.filter(function (a) { return a.type === 'produit'; });
+    var nd = candidatsVoyage(V.id);
+    m.appendChild(section('Achats rattachés', [h('div', { class: 'pl-box' }, [
+      h('dl', { class: 'pl-dl' }, [
+        h('dt', { text: 'Cartes' }), h('dd', { text: nbr(cartesV.length) + ' · ' + eur(somme(cartesV, function (a) { return a.achat; })) }),
+        h('dt', { text: 'Produits' }), h('dd', { text: prodV.length ? nbr(prodV.length) + ' · ' + eur(somme(prodV, function (a) { return a.achat; })) : '—' }),
+        h('dt', { text: 'Total' }), h('dd', { text: eur(v.achats) })
+      ]),
+      prodV.length ? h('p', { class: 'pl-note', text: 'Produits : ' + prodV.map(function (a) { return a.x.p.libelle || a.x.p.nom; }).join(', ') + '.' }) : null,
+      nd.total ? h('p', { class: 'pl-note' }, [nd.libre + ' achat' + pl(nd.libre) + ' sans date (tickets, lots, cartes payées en yens) ou produit' + pl(nd.libre) + ' pas encore rattaché' + pl(nd.libre) + ' à un voyage. ', lienBtn('Choisir ceux de ce voyage', function () { feuilleAchatsVoyage(V.id); })]) : null
+    ])], 'Un ticket ou une date d’achat dans les dates du voyage suffit. Les achats sans date se rattachent à la main.'));
+    var vendues = cartesV.filter(function (a) { return a.vendu; }).sort(function (a, b) { return b.resultat - a.resultat; });
+    if (vendues.length) m.appendChild(section('Ventes de ce voyage', [tableau([
+      { t: 'Carte', f: function (a) { return h('a', { href: '#carte/' + encodeURIComponent(a.ref), text: a.r.c.nom || a.ref }); } },
+      { t: 'Vendue', f: function (a) { return eur(a.ca, 2); } },
+      { t: 'Coût complet', f: function (a) { return eur(a.cout_complet, 2); } },
+      { t: 'Résultat', f: function (a) { return eurS(a.resultat, 2); }, cls: function (a) { return a.resultat < 0 ? 'pl-neg' : ''; } }
+    ], vendues, null, 'Ventes du voyage')]));
+    m.appendChild(h('p', { class: 'pl-note' }, lienBtn('Supprimer ce voyage', function () {
+      confirmer('Supprimer le voyage ?', 'Ses frais resteront dans tes charges, rattachés à toute l’activité, et ses achats ne seront plus rattachés à aucun voyage.', 'Supprimer', function () {
+        location.hash = '#voyages';
+        modifier('Voyage supprimé · ' + V.nom, function (d0) {
+          d0.voyages = (d0.voyages || []).filter(function (x) { return x.id !== V.id; });
+          (d0.charges || []).forEach(function (c) { if (c.voyage === V.id) { delete c.voyage; c.cible = 'general'; } });
+          [].concat(d0.tickets || [], d0.lots || [], d0.cartes || [], d0.produits || []).forEach(function (o) { if (o.voyage === V.id) delete o.voyage; });
+        });
+      }, true);
+    }, 'pl-danger')));
+  };
+  function chargesDe(occ) { var vu = {}, out = []; occ.forEach(function (o) { if (!vu[o.c.id]) { vu[o.c.id] = 1; out.push(o.c); } }); return out; }
+  function somme(l, f) { return l.reduce(function (a, x) { return a + z(f(x)); }, 0); }
+  /* achats qui ne se rattachent pas tout seuls par leur date */
+  function candidatsVoyage(vid) {
+    var doc = S.doc, R = S.R;
+    var tickets = (doc.tickets || []).filter(function (t) { var x = R.ticketsParId[t.id]; return !t.date && x && x.nb > 0 && (!t.voyage || t.voyage === vid); });
+    var lots = (doc.lots || []).filter(function (L) { return !L.voyage || L.voyage === vid; });
+    var cartes = R.cartes.filter(function (r) { var c = r.c, a = c.achat || {}; return a.mode === 'yen' && !c.date_achat && (!c.voyage || c.voyage === vid); });
+    var produits = R.produits.filter(function (x) { return !x.p.voyage || x.p.voyage === vid; });
+    var libre = tickets.filter(function (t) { return !t.voyage; }).length + lots.filter(function (L) { return !L.voyage; }).length + cartes.filter(function (r) { return !r.c.voyage; }).length + produits.filter(function (x) { return !x.p.voyage; }).length;
+    return { tickets: tickets, lots: lots, cartes: cartes, produits: produits, libre: libre, total: tickets.length + lots.length + cartes.length + produits.length };
+  }
+  function feuilleAchatsVoyage(vid) {
+    var V = voyageParId(vid), nd = candidatsVoyage(vid), R = S.R, cases = [];
+    function ligne(type, id, titre, sous, coche) {
+      var i = h('input', { type: 'checkbox' });
+      i.checked = coche;
+      cases.push({ type: type, id: id, i: i });
+      return h('li', null, h('label', { class: 'pl-check pl-check--l' }, [i, h('span', null, [titre, h('small', { text: sous })])]));
+    }
+    var blocs = [];
+    if (nd.tickets.length) blocs.push(h('p', { class: 'pl-label', text: 'Tickets sans date' }), h('ul', { class: 'pl-choix' }, nd.tickets.map(function (t) {
+      var x = R.ticketsParId[t.id];
+      return ligne('ticket', t.id, t.id + ' · ' + (t.boutique || 'boutique non indiquée'), yen(t.total_yen) + ' · ' + x.nb + ' carte' + pl(x.nb) + ' · ' + eur(x.paye_eur), t.voyage === vid);
+    })));
+    if (nd.lots.length) blocs.push(h('p', { class: 'pl-label', text: 'Lots PSA 10' }), h('ul', { class: 'pl-choix' }, nd.lots.map(function (L) {
+      var x = R.lotsParId[L.id];
+      return ligne('lot', L.id, L.id, yen(L.paye_yen) + (x ? ' · ' + eur(x.paye_eur) + ' · ' + x.cartes.length + ' carte' + pl(x.cartes.length) : ''), L.voyage === vid);
+    })));
+    if (nd.cartes.length) blocs.push(h('p', { class: 'pl-label', text: 'Cartes payées en yens, sans date ni ticket' }), h('ul', { class: 'pl-choix' }, nd.cartes.map(function (r) {
+      return ligne('carte', r.ref, r.c.nom, 'N° ' + r.ref + ' · ' + yen(r.c.yen) + (r.c.remarque ? ' · ' + r.c.remarque.slice(0, 80) : ''), r.c.voyage === vid);
+    })));
+    if (nd.produits.length) blocs.push(h('p', { class: 'pl-label', text: 'Produits (scellé)' }), h('ul', { class: 'pl-choix' }, nd.produits.map(function (x) {
+      return ligne('produit', x.id, x.p.libelle || x.p.nom, nbr(x.nb) + ' unités · ' + (x.connu ? eur(x.paye) : 'prix d’achat inconnu'), x.p.voyage === vid);
+    })));
+    var fs = feuille('Achats de « ' + V.nom + ' »', [h('p', { class: 'pl-note', text: 'Coche ce que tu as acheté pendant ce voyage. Les achats datés s’y rattachent déjà tout seuls.' })].concat(blocs),
+      [bouton('Annuler', fermer, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: 'Enregistrer' })]);
+    fs.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      fermer();
+      var n = cases.filter(function (x) { return x.i.checked; }).length;
+      modifier('Achats du voyage ' + V.nom + ' · ' + n + ' rattaché' + pl(n), function (d0) {
+        cases.forEach(function (x) {
+          var o = x.type === 'ticket' ? (d0.tickets || []).filter(function (t) { return t.id === x.id; })[0]
+            : x.type === 'lot' ? (d0.lots || []).filter(function (L) { return L.id === x.id; })[0]
+            : x.type === 'carte' ? trouverCarte(d0, x.id) : (d0.produits || []).filter(function (p) { return p.id === x.id; })[0];
+          if (!o) return;
+          if (x.i.checked) o.voyage = vid; else if (o.voyage === vid) delete o.voyage;
+        });
+      });
+    });
+  }
+  function feuilleVoyage(id, preset) {
+    var V0 = id ? voyageParId(id) : null, init = V0 ? Object.assign({}, V0) : Object.assign({ nom: '', debut: '', fin: '' }, preset || {});
+    var form = formulaire([
+      { k: 'nom', label: 'Nom du voyage', type: 'text', req: true, ph: 'Japon · octobre 2026' },
+      { k: 'debut', label: 'Départ', type: 'date', demi: true, req: true },
+      { k: 'fin', label: 'Retour', type: 'date', demi: true, req: true },
+      { k: 'note', label: 'Note (facultatif)', type: 'textarea' }
+    ], init);
+    var fs = feuille(V0 ? 'Modifier le voyage' : 'Nouveau voyage', [form.el, h('p', { class: 'pl-note', text: 'Les tickets et achats datés entre le départ et le retour seront rattachés à ce voyage, et ses frais répartis sur eux.' })],
+      [bouton('Annuler', fermer, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: V0 ? 'Enregistrer' : 'Créer' })]);
+    fs.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var x = form.lire();
+      if (!x) return;
+      if (x.fin < x.debut) { form.erreur('fin', 'Le retour doit venir après le départ.'); return; }
+      var autre = (S.doc.voyages || []).filter(function (v) { return v.id !== (V0 && V0.id) && v.debut && v.fin && !(x.fin < v.debut || x.debut > v.fin); })[0];
+      if (autre) { form.erreur('debut', 'Ces dates chevauchent « ' + autre.nom + ' ».'); return; }
+      var nid = V0 ? V0.id : nouvelId('V');
+      fermer();
+      modifier((V0 ? 'Voyage modifié · ' : 'Voyage · ') + x.nom, function (d0) {
+        var l = d0.voyages || (d0.voyages = []), o = { id: nid, nom: x.nom, debut: x.debut, fin: x.fin };
+        if (x.note) o.note = x.note;
+        var i = l.map(function (y) { return y.id; }).indexOf(nid);
+        if (i === -1) l.push(o); else l[i] = o;
+      });
+      if (!V0) location.hash = '#voyage/' + encodeURIComponent(nid);
+    });
+  }
+
+  /* bloc « coût complet » de la fiche d'une carte */
+  function blocCoutComplet(ref) {
+    if (!(S.doc.voyages || []).length && !(S.doc.charges || []).length) return null;
+    var a = couts('tout').articles['c:' + ref];
+    if (!a) return null;
+    var V = a.voyage ? voyageParId(a.voyage) : null;
+    var dl = [
+      ['Coût d’achat' + (S.R.params.tva ? ' (TVA import comprise)' : ''), eur(a.cout_achat, 2)],
+      ['Frais du voyage' + (V ? ' « ' + V.nom + ' »' : ''), V ? eur(a.qp_voyage, 2) : 'aucun voyage'],
+      ['Frais directs (gradation, port…)', eur(a.directs_achat, 2)],
+      ['Coût complet', eur(a.cout_complet, 2)]
+    ];
+    if (a.vendu) dl.push(['Frais de vente', eur(a.frais_vente, 2)], ['Résultat complet de la vente', eurS(a.resultat, 2)]);
+    else dl.push(['Marge complète au prix marché', a.latent != null ? eurS(a.latent, 2) : 'prix marché manquant']);
+    return section('Coût complet', [h('div', { class: 'pl-box' }, [
+      h('dl', { class: 'pl-dl' }, [].concat.apply([], dl.map(function (x) { return [h('dt', { text: x[0] }), h('dd', { text: x[1] })]; }))),
+      h('p', { class: 'pl-note' }, lienBtn('+ Frais pour cette carte (gradation, port…)', function () { feuilleCharge(null, { cat: 'gradation', cible: 'carte', ref: ref }); }))
+    ])]);
+  }
+
   /* ---------------------------------------------------------------- menu « Plus » */
   VUES.plus = function (m) {
     var R = S.R, n = nbAlertes(), al = alertes().length;
@@ -1578,6 +2058,9 @@
     function item(href, titre, sous) { return h('li', null, h('a', { href: href }, h('span', null, [titre, sous ? h('small', { text: sous }) : null]))); }
     m.appendChild(h('ul', { class: 'pl-menu' }, [
       item('#achats', 'Achats et tickets', R.tickets.length + ' tickets · ' + eur(R.k.investi) + ' investis au total'),
+      item('#charges', 'Charges', (S.doc.charges || []).length ? (S.doc.charges || []).length + ' charge' + pl((S.doc.charges || []).length) + ' · ' + eur(couts('tout').totaux.charges) + ' payés' : 'Voyages, abonnements, fournitures, temps passé'),
+      item('#voyages', 'Voyages', (S.doc.voyages || []).length ? (S.doc.voyages || []).map(function (v) { return v.nom; }).join(', ') : 'Frais et retour sur investissement de chaque voyage'),
+      item('#couts', 'Coûts et rentabilité', 'Cascade des marges, seuil de rentabilité, coûts cachés'),
       item('#controles', 'Contrôles', al ? al + ' point' + pl(al) + ' à vérifier' + (n ? ' · ' + n + ' à faire avec le site' : '') : 'Tout est en ordre'),
       item('#lots', 'Lots PSA 10', R.lots.length + ' lots · ' + R.lots.reduce(function (s, L) { return s + L.cartes.length; }, 0) + ' cartes'),
       item('#scelle', 'Scellé et quantités', R.produits.map(function (x) { return x.p.id === 'cardsets' ? 'card sets' : x.p.id; }).join(', ')),
@@ -1613,6 +2096,28 @@
       });
     });
     m.appendChild(section('Paramètres de calcul', [f]));
+    var form2 = formulaire([
+      { k: 'taux_horaire', label: 'Valeur d’une heure de ton temps (€)', type: 'num', demi: true, aide: 'Ce que tu gagnerais ailleurs dans l’heure. Vide : temps non chiffré.' },
+      { k: 'minutes_par_vente', label: 'Minutes par vente', type: 'num', demi: true, aide: 'Photo, annonce, échanges, emballage, poste.' },
+      { k: 'cout_capital', label: 'Coût du capital (% par an)', type: 'num', demi: true, aide: 'Par défaut 1,7 % : le Livret A depuis le 1er août 2026. Mets plus si tu vises mieux ailleurs.' },
+      { k: 'cle_voyage', label: 'Répartir les frais de voyage', type: 'select', demi: true, options: [['valeur', 'Selon le prix d’achat'], ['nombre', 'Par article (part égale)']] }
+    ], { taux_horaire: P.taux_horaire, minutes_par_vente: P.minutes_par_vente, cout_capital: (P.cout_capital != null ? P.cout_capital : 0.017) * 100, cle_voyage: P.cle_voyage || 'valeur' });
+    var f2 = h('form', { class: 'pl-box', novalidate: true }, [form2.el, h('div', { class: 'pl-actions' }, h('button', { type: 'submit', class: 'btn', text: 'Enregistrer' }))]);
+    f2.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var x = form2.lire();
+      if (!x) return;
+      if (x.taux_horaire != null && x.taux_horaire < 0) { form2.erreur('taux_horaire', 'Le taux doit être positif.'); return; }
+      if (x.cout_capital != null && (x.cout_capital < 0 || x.cout_capital > 100)) { form2.erreur('cout_capital', 'Entre 0 et 100 %.'); return; }
+      modifier('Réglages des coûts · ' + (x.taux_horaire != null ? eur(x.taux_horaire, 2) + '/h, ' : '') + 'capital ' + pct(z(x.cout_capital) / 100), function (doc) {
+        var p = doc.params;
+        if (x.taux_horaire != null) p.taux_horaire = x.taux_horaire; else delete p.taux_horaire;
+        if (x.minutes_par_vente != null) p.minutes_par_vente = x.minutes_par_vente; else delete p.minutes_par_vente;
+        p.cout_capital = x.cout_capital != null ? x.cout_capital / 100 : 0.017;
+        p.cle_voyage = x.cle_voyage === 'nombre' ? 'nombre' : 'valeur';
+      });
+    });
+    m.appendChild(section('Coûts cachés et répartition', [f2], 'Servent à l’onglet Analyse › Coûts et au coût complet de chaque carte.'));
     var fichier = h('input', { type: 'file', accept: 'application/json,.json', class: 'pl-file', 'aria-label': 'Choisir une sauvegarde .json' });
     fichier.addEventListener('change', function () { if (fichier.files && fichier.files[0]) importerFichier(fichier.files[0]); });
     m.appendChild(section('Tes données', [h('ul', { class: 'pl-menu' }, [
@@ -1725,7 +2230,33 @@
       ['1 € = (yens)', P.taux], ['Frais de vente (fraction)', P.fv], ['TVA à l’import (fraction)', P.tva], ['Rentabilité retenue sans prix d’achat (fraction)', P.rent],
       ['Frais d’envoi par envoi (€)', P.envoi], ['Cartes gardées dans les totaux', P.gardees ? 'Oui' : 'Non'], ['Version des données', S.rev], ['Exporté le', quand(new Date().toISOString())]] };
     var journal = { nom: 'Journal', colonnes: [{ titre: 'Date', largeur: 20 }, { titre: 'Action', largeur: 90 }], lignes: (S.doc.journal || []).map(function (x) { return [quand(x.le), x.quoi]; }) };
-    return [synth, groupes, cartes, ventes, tickets, lots, produits, params, journal];
+    var feuilles = [synth, groupes, cartes, ventes, tickets, lots, produits];
+    if (w.PRCouts) {
+      var X = couts('tout'), cs = X.cascade, sd = X.seuil, cc = X.caches, nocc = {};
+      X.occurrences.forEach(function (o) { var t = nocc[o.c.id] || (nocc[o.c.id] = { n: 0, cout: 0, tva: 0 }); t.n++; t.cout += o.cout; t.tva += o.tva; });
+      feuilles.push({ nom: 'Charges', colonnes: [{ titre: 'Date', format: 'date', largeur: 12 }, { titre: 'Libellé', largeur: 34 }, { titre: 'Catégorie', largeur: 30 }, { titre: 'Compte', largeur: 8 },
+        { titre: 'Nature', largeur: 11 }, { titre: 'Comportement', largeur: 12 }, { titre: 'Rattachée à', largeur: 34 }, { titre: 'Montant', largeur: 12 }, { titre: 'Devise', largeur: 7 },
+        { titre: 'Récurrence', largeur: 11 }, { titre: 'Échéances', largeur: 10 }, { titre: 'Total (€)', format: 'euro' }, { titre: 'dont TVA (€)', format: 'euro' }, { titre: 'Note', largeur: 40 }],
+        lignes: (S.doc.charges || []).slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); }).map(function (c) {
+          var cat = KC.categorie(c.cat), t = nocc[c.id] || { n: 0, cout: 0, tva: 0 };
+          return [c.date, c.libelle, cat.nom, cat.compte, (NATURES[cat.nature] || [''])[0], cat.comportement, libelleCible(c), cat.heures ? c.heures + ' h' : c.montant, cat.heures ? '' : (c.devise === 'JPY' ? '¥' : '€'),
+            c.recurrence ? (c.recurrence === 'mois' ? 'mensuelle' : 'annuelle') : '', t.n, t.cout, t.tva, c.note || ''];
+        }) });
+      feuilles.push({ nom: 'Voyages', colonnes: [{ titre: 'Voyage', largeur: 30 }, { titre: 'Départ', format: 'date', largeur: 12 }, { titre: 'Retour', format: 'date', largeur: 12 }, { titre: 'Jours', largeur: 8 },
+        { titre: 'Articles', largeur: 9 }, { titre: 'Achats (€)', format: 'euro' }, { titre: 'Frais (€)', format: 'euro' }, { titre: 'Frais / achats', format: 'pct', largeur: 12 }, { titre: 'Coût complet (€)', format: 'euro', largeur: 16 },
+        { titre: 'Encaissé (€)', format: 'euro' }, { titre: 'Résultat réalisé (€)', format: 'euro', largeur: 18 }, { titre: 'Plus-value du stock (€)', format: 'euro', largeur: 20 }, { titre: 'ROI réalisé', format: 'pct', largeur: 11 },
+        { titre: 'ROI potentiel', format: 'pct', largeur: 12 }, { titre: 'Achats pour amortir les frais (€)', format: 'euro', largeur: 26 }],
+        lignes: X.voyages.map(function (v) { return [v.V.nom, v.V.debut, v.V.fin, v.duree, v.articles.length, v.achats, v.frais, v.taux_frais, v.cout_total, v.ca, v.benef, v.latent, v.roi_realise, v.roi_potentiel, v.seuil_achat]; }) });
+      feuilles.push({ nom: 'Coûts', filtre: false, colonnes: [{ titre: 'Depuis le début', largeur: 52 }, { titre: 'Montant (€)', format: 'euro', largeur: 16 }, { titre: '% du CA', format: 'pct', largeur: 10 }], gras: [0, 2, 6, 8, 10],
+        lignes: [['Chiffre d’affaires', cs.ca], ['Coût d’achat des articles vendus', -cs.cout_achat], ['Marge commerciale', cs.marge_commerciale], ['Frais d’achat des articles vendus (voyages, gradation…)', -cs.frais_achat],
+          ['Frais d’achat non rattachés à un article', -cs.frais_achat_non_affectes], ['Frais de vente (commissions, envois)', -cs.frais_vente], ['Marge sur coûts directs', cs.marge_directe], ['Charges de structure', -cs.structure],
+          ['Résultat analytique', cs.resultat], ['Coûts cachés', -cs.caches], ['Résultat économique', cs.resultat_economique], ['', null],
+          ['Temps passé', cc.temps], ['Immobilisation du capital', cc.capital], ['Décote consentie', cc.decote], ['Dépréciation du stock', cc.depreciation], ['', null],
+          ['Marge sur coûts variables', sd.mcv], ['Charges fixes', sd.cf], ['Seuil de rentabilité (CA)', sd.sr], ['Marge de sécurité', sd.marge_securite], ['Point mort (date)', null]]
+          .map(function (l) { return [l[0], l[1], cs.ca && l[1] != null && l[0] ? l[1] / cs.ca : null]; }) });
+      var lpm = feuilles[feuilles.length - 1].lignes; lpm[lpm.length - 1][0] = 'Point mort : ' + (sd.point_mort_date ? dateFR(sd.point_mort_date) : '—');
+    }
+    return feuilles.concat([params, journal]);
   }
 
   /* ---------------------------------------------------------------- écrans d'entrée : clé, import, erreurs */
