@@ -3088,7 +3088,7 @@
     q('[data-compte-soon]').hidden = !!(cpt || gid);
     q('[data-google]').hidden = !!(cpt || !gid);
     if (cpt) q('[data-compte-nom]').textContent = cpt.prenom || tr('vous', 'you');
-    if (cpt && cpt.email) q('[data-compte-email]').textContent = cpt.email;
+    var em = q('[data-compte-email]'); if (em && cpt && cpt.email) em.textContent = cpt.email;
     if (!cpt && gid) google();
     if (!stock) return;
     var l = liste(), cle = l.join(',');

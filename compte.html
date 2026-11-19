@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=44570406">
 <link rel="manifest" href="site.webmanifest">
 <link rel="preload" href="assets/fonts/libre-caslon-display-400.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/site.css?v=96c403d8">
+<link rel="stylesheet" href="assets/css/site.css?v=51b7ae44">
 <meta property="og:site_name" content="Poké-Raichu">
 <meta property="og:locale" content="fr_FR">
 <meta property="og:locale:alternate" content="en_GB">
@@ -25,7 +25,7 @@
 <meta property="og:image:alt" content="Logo Poké-Raichu">
 <meta name="twitter:card" content="summary_large_image">
 <script src="config.js" defer></script>
-<script src="assets/js/site.js?v=2312f3b1" data-qr="assets/js/qrcode.js?v=e84be42f" defer></script>
+<script src="assets/js/site.js?v=96d98940" data-qr="assets/js/qrcode.js?v=e84be42f" defer></script>
 </head>
 <body>
 <a class="skip" href="#contenu">Aller au contenu</a>
@@ -41,13 +41,10 @@
 <div class="compte-google" data-google hidden></div>
 <p class="muted small">Connexion avec votre compte Google : nous recevons seulement votre prénom, votre nom et votre adresse e-mail, jamais votre mot de passe. Détails : <a href="confidentialite.html#compte">confidentialité</a>.</p>
 </div>
-<div class="compte-box" data-compte-in hidden>
-<p>Connecté : <strong data-compte-nom></strong> <span class="muted" data-compte-email></span></p>
-<div class="actions"><button type="button" class="linkbtn" data-compte-action="sortir">Se déconnecter</button><button type="button" class="linkbtn" data-compte-action="supprimer">Supprimer mon compte</button></div>
-</div>
 <p class="compte-msg" data-compte-msg aria-live="polite"></p>
 <div class="empty" data-ecl-empty hidden><svg class="i-bolt" viewBox="0 0 12 20" aria-hidden="true" focusable="false"><path d="M7.6 0 .6 11.4h5L3.9 20l7.5-12.2H6.4L7.6 0z"/></svg><p>Aucun favori pour l’instant.</p><p><a href="catalogue.html">Parcourir le catalogue</a></p></div>
 <ul class="sel-list" role="list" data-ecl-list></ul>
+<p class="compte-pied" data-compte-in hidden>Connecté avec Google : <span data-compte-nom></span> · <button type="button" class="linkbtn" data-compte-action="sortir">Se déconnecter</button> · <button type="button" class="linkbtn" data-compte-action="supprimer">Supprimer mon compte</button></p>
 <noscript><p>Les favoris ont besoin de JavaScript.</p></noscript>
 </div>
 </main>
