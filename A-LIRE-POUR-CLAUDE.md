@@ -143,6 +143,12 @@ modifiées directement, et les nouvelles cartes sont produites par :
   - Limites : lots et scellés non gérés ; une carte sans photo ne prend pas de pochette dans le classeur Raichu ;
     ajouter une première photo à une fiche du dépôt se fait par script (paramètre `entre` de `appliquer`, voir le commit `e9f37c2`).
   - Contrôle fait le 18/11 : aller-retour sur les 204 fiches modifiables (changement puis retour) = site identique, 0 conflit.
+- `_outils/retirer.py` : **retire des fiches pour de bon** (carte qu'Arthur n'a plus) :
+  `python3 _outils/retirer.py . <réf> <réf>…`. Supprime fiches FR/EN et photos, enlève vignettes, pochettes, options,
+  encadrés et listes JSON-LD qui les citent, recompte pages Pokémon/extension/collections, accueil, catalogue et filtres,
+  supprime les pages Pokémon ou extension devenues vides, nettoie `sitemap.xml`, `data/stock.json`, les index de recherche
+  et `data/ebay.json`, et redirige (301) les anciennes adresses et les liens courts `/r/`, `/s/` vers la collection la
+  plus proche dans `_redirects`. Penser aussi à Shopify (supprimer le produit) et au pilotage (liste `RETRAITS` de pilotage.js).
 - `data/stock.json` : clés `meta, taxonomies, cartes, vendus, parties, coups_de_foudre` (217 cartes au 16/11).
 - `config.js` : **seul fichier de réglages à la main** (WhatsApp, livraison, remises, coups de foudre, TVA, médiateur…).
   Tout est documenté en tête du fichier.
@@ -190,6 +196,12 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (20/11) Retrait définitif (Arthur ne les a plus) : coffret 30th Premium Deck Mentali & Noctali (S01), ses cartes
+  301 Mentali-ex 043/040, 302 Noctali-ex 044/040, 303 Victini 041/040, lots L02 et L03, et 290 Pikachu-ex 132/M-P (nuit) FUR.
+  Site via `_outils/retirer.py` (pages Noctali/Umbreon supprimées car vides), 7 produits Shopify supprimés, pilotage nettoyé
+  à la prochaine ouverture. Gardés : 024 et 162 Zeraora 042/040, 346 Mentali-ex 211/187 KR.
+- (20/11) Mesure d'audience : l'appareil qui a la clé de gestion (`pr.gestion.jeton`) n'est jamais compté, et la case
+  « Ne pas compter mes visites » (`pr.moi`) se coche toute seule dessus. Les visites passées restent dans Umami.
 - (19/11) Ajout 347 Minotaupe 079/071 AR (SV5M), 348 Minotaupe 059/049 CHR (sm11b Dream League), 349 Démolosse 206/184 CHR (s8b), prix sur demande, brouillons Shopify PKR-347 à 349.
 - (19/11) Comptes clients (connexion Google) et éclairs : voir § Comptes clients et éclairs. Reste à faire par Arthur : ID client Google dans `config.js` (`google_client_id`) et base D1 liée (`d1_databases` dans `wrangler.jsonc`).
 - (19/11) Ajout 345 Raikou-ex 108/076 KR et 346 Mentali-ex 211/187 KR (SAR, prix sur demande ; Shopify : brouillons PKR-345 et PKR-346 à 0 €, à publier avec un prix). `construire.py` : la livraison d'une nouvelle fiche est reprise d'une fiche chiffrée si le modèle est en prix sur demande.
@@ -239,13 +251,16 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
 - Photos : fiche du site (par n° ou `alias_site`), sinon fiche du site d'un exemplaire au nom identique, sinon image
   officielle Limitless TCG (`tpc/{SET}/{SET}_{n}_R_JP_SM|LG.png`, international `tpci/{SET}/{SET}_{nnn}_R_EN_…`),
   sinon le n°. `_headers` donne à /pilotage.html sa propre CSP (img-src + limitlesstcg.nyc3.cdn.digitaloceanspaces.com).
-- Contrôles avec le site : `alias_site` (P1–P3 = fiches 301–303), `lots_site` (L01 = 095 + G4784, L02 = P1 + P2,
-  L03 = P3 + P4, L04 = 313 + 314), `refs_site` des produits (coffret = S01, card sets = S02–S10).
+- Contrôles avec le site : `alias_site`, `lots_site` (L01 = 095 + G4784, L04 = 313 + 314), `refs_site` des produits
+  (card sets = S02–S10).
+- Retraits définitifs : liste `RETRAITS` de pilotage.js, appliquée une fois à l'ouverture et à chaque import (trace dans
+  le journal et `meta.retraits`) ; `_outils/pilotage/extraire.py` filtre les mêmes articles. Retirés le 19/11 : coffret
+  30th Premium Deck Mentali & Noctali (groupe « Coffret Premium Deck », cartes P1–P4) et Pikachu-ex 132/M-P (nuit) FUR (290).
 
 **Document (schéma 1)** : `params` (taux_jpy, frais_vente, tva_import, rentabilite_estimee, frais_envoi,
 gardees_dans_totaux), `groupes` (id, nom, ordre, hors_totaux), `cartes` (ref = n° du site, nom, groupe, cat, langue, prix,
 yen, ticket, achat, vendu, prix_vendu, vente_date, canal, gardee, alias_site, lots_site, infos), `tickets` (id, boutique,
-date, total_yen, detaxe_yen, detaxe_auto), `tickets_ecartes`, `lots` (id, paye_yen), `produits` (cardsets, ex, coffret,
+date, total_yen, detaxe_yen, detaxe_auto), `tickets_ecartes`, `lots` (id, paye_yen), `produits` (cardsets, ex,
 boosters : quantite, prix_u, paye_u ou paye_total, frais_u, vendus, prix_reel_moyen, envois, composants), `journal`.
 
 **Import / mise à jour depuis un Excel** : outils dans `_outils/pilotage/` (voir LISEZMOI.md). On ne transmet jamais les

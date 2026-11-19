@@ -15,3 +15,8 @@ Copier ce dossier hors du dépôt (ex. /home/claude/pilotage), y mettre l'Excel 
 
 Lien à donner à Arthur : https://pokeraichu.com/pilotage.html#import=<id>.<clé>
 La clé n'existe que dans ce lien (jamais dans le dépôt). Supprimer pilotage/import-<id>.bin une fois l'import fait.
+
+Articles retirés (Arthur ne les a plus) : `extraire.py` écarte le coffret 30th Premium Deck (groupe « Coffret Premium Deck »,
+cartes P1–P4) et le Pikachu-ex 132/M-P (nuit) FUR (290), et pilotage.js les retire aussi des données déjà en ligne
+(liste `RETRAITS`). `verifier.py` et `test_calcul.js` comparent au classeur d'origine, qui les contient encore :
+les écarts sur ces lignes (synthèse, G42) sont donc attendus.

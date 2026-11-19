@@ -114,6 +114,37 @@
   }
   function calculer() { S.R = K.calcul(S.doc); }
 
+  /* retraits définitifs : articles qu'Arthur n'a plus, effacés une seule fois (à l'ouverture et à chaque import),
+     tracés dans le journal et dans meta.retraits. Les frais rattachés à un article retiré restent comptés en frais généraux. */
+  var RETRAITS = [{
+    id: 'retrait-2026-11-19',
+    note: 'Retirés (plus en stock) : coffret 30th Premium Deck Mentali & Noctali avec ses cartes, Pikachu-ex 132/M-P (nuit) FUR',
+    carte: function (c) { return c.groupe === 'Coffret Premium Deck' || (c.ref === '290' && /132\/M-P/.test(c.nom || '')); },
+    produits: ['coffret'], groupes: ['Coffret Premium Deck'], site: ['S01', '301', '302', '303', 'L02', 'L03', '290']
+  }];
+  function retirer(doc) {
+    doc.meta = doc.meta || {};
+    var faits = Array.isArray(doc.meta.retraits) ? doc.meta.retraits : (doc.meta.retraits = []), notes = [];
+    RETRAITS.forEach(function (m) {
+      if (faits.indexOf(m.id) !== -1) return;
+      var refs = {};
+      m.produits.forEach(function (id) { refs[id] = 1; });
+      doc.cartes = (doc.cartes || []).filter(function (c) { if (m.carte(c)) { refs[c.ref] = 1; return false; } return true; });
+      doc.produits = (doc.produits || []).filter(function (p) { return m.produits.indexOf(p.id) === -1; });
+      doc.groupes = (doc.groupes || []).filter(function (g) { return m.groupes.indexOf(g.id) === -1; });
+      doc.cartes.forEach(function (c) {
+        ['alias_site', 'lots_site'].forEach(function (k) { if (Array.isArray(c[k])) c[k] = c[k].filter(function (r) { return m.site.indexOf(String(r)) === -1; }); });
+      });
+      (doc.charges || []).forEach(function (ch) { if (ch.cible === 'carte' && refs[ch.ref]) { ch.cible = 'general'; delete ch.ref; } });
+      faits.push(m.id);
+      notes.push(m.note);
+    });
+    if (!notes.length) return '';
+    if (!Array.isArray(doc.journal)) doc.journal = [];
+    doc.journal.unshift({ le: new Date().toISOString(), quoi: notes.join(' · ') });
+    return notes.join(' · ');
+  }
+
   /* ---------------------------------------------------------------- enregistrement (une version par envoi) */
   function sync(etat, texte) {
     var p = q('[data-pl-sync]');
@@ -609,7 +640,7 @@
       tuile('Valeur marché', eur(st.valeur), st.sans_prix ? st.sans_prix + ' carte' + pl(st.sans_prix) + ' sans prix non comptée' + pl(st.sans_prix) : 'au prix marché actuel'),
       tuile('Coût du stock', eur(st.cout_reel + st.cout_estime), 'dont ' + eur(st.cout_estime) + ' estimés'),
       tuile('Plus-value latente', eurS(st.latent), 'si tout se vend au prix marché', sens(st.latent)),
-      tuile('En stock', nbr(st.cartes) + ' cartes', st.unites ? '+ ' + nbr(st.unites) + ' unités (boosters, ex, card sets, coffret)' : null)
+      tuile('En stock', nbr(st.cartes) + ' cartes', st.unites ? '+ ' + nbr(st.unites) + ' unités (boosters, ex, card sets)' : null)
     ])]));
     var pg = st.par_groupe.filter(function (g) { return g.valeur > 0; }).sort(function (a, b) { return b.valeur - a.valeur; });
     if (pg.length) m.appendChild(section('Valeur du stock par groupe', [barres(pg.map(function (g) {
@@ -777,7 +808,7 @@
       h('div', null, [h('h1', { text: c.nom || c.ref }),
         h('p', { class: 'pl-fiche__ref', text: ['N° ' + c.ref, nomGroupe(c.groupe), c.cat, c.langue, c.etat].filter(Boolean).join(' · ') }),
         h('div', { class: 'pl-badges' }, [
-          c.vendu ? badge('Vendue' + (c.vente_date ? ' le ' + dateFR(c.vente_date) : ''), 'vendu') : r.hors ? badge('Hors totaux (dans le coffret)') : badge('En stock', 'ok'),
+          c.vendu ? badge('Vendue' + (c.vente_date ? ' le ' + dateFR(c.vente_date) : ''), 'vendu') : r.hors ? badge('Hors totaux') : badge('En stock', 'ok'),
           c.gardee ? badge('Gardée', 'garde') : null,
           r.source === 'estimé' ? badge('Coût estimé', 'estime') : null,
           es ? badge(es === 'vendue' ? 'Vendue sur le site' : es === 'réservée' ? 'Réservée sur le site' : 'En vente sur le site' + (prixSite(sref) ? ' · ' + eur(prixSite(sref)) : ''), es === 'en vente' ? 'ok' : 'vendu') : null
@@ -1052,7 +1083,7 @@
     m.appendChild(section('D’où vient l’investissement', [barres([
       { l: 'Cartes achetées sur ticket', v: modes.ticket, txt: eur(modes.ticket) },
       { l: 'Lots PSA 10', v: modes.lot, txt: eur(modes.lot) },
-      { l: 'Produits (card sets, boosters, coffret)', v: produits, txt: eur(produits) },
+      { l: 'Produits (card sets, ex, boosters)', v: produits, txt: eur(produits) },
       { l: 'Cartes sans ticket (¥ ou €)', v: modes.yen + modes.eur, txt: eur(modes.yen + modes.eur) }
     ].filter(function (x) { return x.v > 0; }).sort(function (a, b) { return b.v - a.v; }), 'Répartition de l’investissement'),
     h('p', { class: 'pl-note', text: 'Sur ' + eur(tot.eur, 2) + ' payés aux boutiques japonaises, ' + eur(ratt, 2) + ' sont rattachés à des cartes. ' +
@@ -1191,13 +1222,13 @@
   VUES.scelle = function (m) {
     var R = S.R;
     m.appendChild(h('a', { class: 'pl-back', href: '#plus', text: '‹ Plus' }));
-    m.appendChild(entete('Scellé et quantités', 'Card sets, ex, coffret et boosters, vendus au nombre'));
+    m.appendChild(entete('Scellé et quantités', 'Card sets, ex et boosters, vendus au nombre'));
     R.produits.forEach(function (x) {
       var p = x.p, v = x.vente;
       var kids = [
         h('div', { class: 'pl-kpis' }, [
           tuile('En stock', nbr(x.reste) + ' / ' + nbr(x.nb), v.vendus ? nbr(v.vendus) + ' vendu' + pl(v.vendus) : 'aucune vente'),
-          tuile('Prix unitaire', eur(x.prix_u, 2), p.composants ? 'somme des cartes du coffret' : null),
+          tuile('Prix unitaire', eur(x.prix_u, 2), p.composants ? 'somme des cartes qui le composent' : null),
           tuile('Payé', x.connu ? eur(x.paye, 2) : '—', x.connu ? (x.paye_unitaire != null ? eur(x.paye_unitaire, 2) + ' l’unité' : null) : 'pas de prix d’achat'),
           tuile('Marge nette', eurS(x.marge, 2), x.gain != null ? 'gain ' + pct(x.gain) : null, sens(x.marge))
         ])
@@ -2497,6 +2528,8 @@
     ]));
   }
   function ecranApercu(doc, note) {
+    ['groupes', 'cartes', 'tickets', 'tickets_ecartes', 'lots', 'produits', 'journal'].forEach(function (k) { if (!Array.isArray(doc[k])) doc[k] = []; });
+    retirer(doc);
     var R = K.calcul(doc), m = principal();
     masquerOnglets();
     var go = bouton('Importer', function () { go.disabled = true; importerDoc(doc, note); });
@@ -2570,8 +2603,10 @@
       if (!x.j.data) { ecranImport(); return; }
       installer(x.j.data);
       sync('ok');
+      var ret = lire(CLE_ATTENTE) ? '' : retirer(S.doc);
+      if (ret) { calculer(); planifier(ret); }
       route();
-      reprendreAttente();
+      if (ret) toast(ret); else reprendreAttente();
       chargerSite();
     }, function () { ecranMessage('Pas de réseau', 'Impossible de joindre pokeraichu.com. Vérifie ta connexion puis réessaie.', true); });
   }

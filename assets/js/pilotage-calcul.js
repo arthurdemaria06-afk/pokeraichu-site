@@ -88,7 +88,7 @@
       return r;
     });
 
-    /* produits vendus en quantité (card sets, ex, coffret, boosters) */
+    /* produits vendus en quantité (card sets, ex, boosters) */
     var produits = (doc.produits || []).map(function (p) {
       var q = z(p.quantite), prixU, paye, pu, valeur;
       if (p.composants) {

@@ -93,12 +93,20 @@
   setFlashClass();
 
   /* Mesure d'audience Umami, sans cookie ni stockage : desactivee par Global Privacy Control, Do Not Track,
-     le reglage de la page Confidentialite et, pour le vendeur, l'option « ne pas compter mes visites » */
+     le reglage de la page Confidentialite et, pour le vendeur, l'option « ne pas compter mes visites ».
+     Le vendeur n'est jamais compte : appareil ou sa cle de gestion est enregistree, pages outils, et tout navigateur
+     ouvert une fois sur pokeraichu.com/#moi (navigateur integre d'Instagram, autre telephone, ordinateur). */
+  if (location.hash === '#moi') {
+    put('pr.moi', 'oui');
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    setTimeout(function () { toast(tr('Vos visites ne sont plus comptées sur ce navigateur.', 'Your visits are no longer counted on this browser.')); }, 300);
+  }
+  if (get('pr.gestion.jeton') && get('pr.moi') !== 'oui') put('pr.moi', 'oui');
   var UM = String((C.mesure_audience || {}).umami || '').trim();
-  var trackOK = /^[0-9a-f-]{36}$/i.test(UM) && get('pr.mesure') !== 'non' && get('pr.moi') !== 'oui' &&
+  var trackOK = /^[0-9a-f-]{36}$/i.test(UM) && get('pr.mesure') !== 'non' && get('pr.moi') !== 'oui' && !get('pr.gestion.jeton') &&
     !navigator.globalPrivacyControl && navigator.doNotTrack !== '1' &&
     (location.protocol === 'https:' || /^(127\.0\.0\.1|localhost)$/.test(location.hostname)) &&
-    !/\/(gestion|salon)\.html$|\/envoi\//.test(location.pathname);
+    !/\/(gestion|salon|pilotage|etiquettes|tirage|panneau-salon)\.html$|\/envoi\//.test(location.pathname);
   function track(name, data) {
     if (!trackOK) return;
     var payload = { hostname: location.hostname, language: navigator.language || '', referrer: name ? '' : d.referrer,
@@ -1874,7 +1882,7 @@
     var k = cb.getAttribute('data-pref');
     if (k === 'memoire') cb.checked = get('pr.memoire') !== 'non';
     if (k === 'mesure') cb.checked = get('pr.mesure') !== 'non';
-    if (k === 'moi') cb.checked = get('pr.moi') === 'oui';
+    if (k === 'moi') { cb.checked = get('pr.moi') === 'oui' || !!get('pr.gestion.jeton'); cb.disabled = !!get('pr.gestion.jeton'); }
     cb.addEventListener('change', function () {
       if (k === 'memoire') { put('pr.memoire', cb.checked ? 'oui' : 'non'); if (!cb.checked) { ['pr.vus', 'pr.visite', 'pr.recherches'].forEach(function (x) { del(x); }); } }
       if (k === 'mesure') put('pr.mesure', cb.checked ? 'oui' : 'non');

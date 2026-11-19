@@ -64,7 +64,7 @@ def calcul(m):
     # synthèse
     syn = []
     gs = [g for g in m['groupes'] if not g.get('hors_totaux')]
-    order = ['Cartes', 'Lots PSA 10', '30 ans', 'cardsets', 'coffret', 'AR SR SAR', 'Cartes FR', 'Classeur', 'ex', 'boosters']
+    order = ['Cartes', 'Lots PSA 10', '30 ans', 'cardsets', 'AR SR SAR', 'Cartes FR', 'Classeur', 'ex', 'boosters']
     for k in order:
         if k in R['produits']:
             v = R['produits'][k]

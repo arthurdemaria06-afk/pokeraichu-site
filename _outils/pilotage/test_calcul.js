@@ -14,7 +14,7 @@ att.cartes.forEach((x, i) => {
   assert.equal(r.ref, x.ref);
   for (const k of ['paye', 'estime', 'marge', 'gain', 'encaisse', 'benef']) eq(r[k], x[k], x.ref + ' ' + k);
 });
-const mapS = { cardsets: 'cardsets', coffret: 'coffret', ex: 'ex', boosters: 'boosters' };
+const mapS = { cardsets: 'cardsets', ex: 'ex', boosters: 'boosters' };
 att.synthese.forEach(x => {
   const l = x.cle === 'TOTAL' ? R.synthTotal : R.synthese.find(s => s.cle === x.cle);
   assert(l, 'ligne ' + x.cle);
