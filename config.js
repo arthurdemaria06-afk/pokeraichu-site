@@ -58,7 +58,7 @@ window.PR_CONFIG = {
   reservees: [],
   vendues: ["010", "012", "027", "031", "032", "077", "088", "094", "113", "117", "125", "234", "281", "G1633", "L04"],
   vendues_le: "2026-11-19T04:00:00Z",
-  google_client_id: "",
+  google_client_id: "353695117013-jmqarchqnv5tn8stoklm7rdgkebdueuu.apps.googleusercontent.com",
   instagram: "",
   email: "",
   ebay: "",
