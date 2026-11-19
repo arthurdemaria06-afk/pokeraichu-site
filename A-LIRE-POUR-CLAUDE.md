@@ -217,3 +217,38 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - Côté visiteurs, les « éclairs » s'appellent désormais **favoris** (choix d'Arthur : « Coups de foudre » reste le nom de la vente flash de la semaine). Les clés techniques (`pokeraichu.eclairs.v1`, `/api/eclairs`, colonnes D1) ne changent pas.
 - Vignettes : le bandeau Vendue/Réservée est en bas de la photo, l'éclair des favoris en haut à gauche.
 - Mesure d'audience : `window.PR_TRACK(nom, données)` envoie un évènement Umami ; évènements ajoutés : `favori-ajout`, `menu-ouvert`, `menu`.
+
+## Pilotage : contrôle de gestion privé (19/11/2026)
+
+Arthur a demandé de transformer son Excel POKE-RAICHU en « véritable site de gestion » : c'est **/pilotage.html**
+(lien dans le pied de page et dans le menu ☰, seulement sur l'appareil où la clé de gestion est enregistrée, et en bas de /gestion.html).
+
+**Règle d'or : aucune donnée de gestion dans le dépôt (il est public).** Prix payés, marges, tickets, ventes vivent
+dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_hist` (60 dernières versions).
+- `worker/pilotage.js` : GET/PUT `/api/pilotage` (PUT = `{ base, data, note }`, 409 si la révision a changé),
+  `/api/pilotage/historique`, `/api/pilotage/version?rev=N`. Appelé par `worker/comptes.js` après `estVendeur`
+  (en-tête `x-gestion` = clé GitHub d'Arthur, même vérification que la liste des clients).
+- `assets/js/pilotage-calcul.js` : moteur de calcul, mêmes règles que l'Excel (vérifié cellule par cellule : 335 cartes,
+  34 tickets, lots, Synthèse, Ventes, 0 écart). Payé d'une carte : `achat.mode` = ticket (¥ × payé/total du ticket ÷ taux),
+  yen (¥ ÷ taux), lot (payé du lot au prorata du prix marché), eur, ou rien (coût estimé = prix ÷ (1 + TVA + rentabilité)).
+- `assets/js/pilotage.js` : l'application (Bord, Stock, fiche carte, Ventes, Achats/tickets, Lots, Scellé, Contrôles,
+  Réglages). Chaque modification enregistre une version, avec « Annuler » 7 s. Hors ligne : gardé dans
+  localStorage `pr.pilotage.attente` et proposé au retour. Vente : peut passer la fiche en « Vendue » dans le Gist
+  (même format que /gestion.html) ; « Annuler » défait aussi le site.
+- `assets/js/pilotage-xlsx.js` : export .xlsx sans bibliothèque (chargé à la demande). Sauvegarde/import .json dans Réglages.
+- Photos : fiche du site (par n° ou `alias_site`), sinon fiche du site d'un exemplaire au nom identique, sinon image
+  officielle Limitless TCG (`tpc/{SET}/{SET}_{n}_R_JP_SM|LG.png`, international `tpci/{SET}/{SET}_{nnn}_R_EN_…`),
+  sinon le n°. `_headers` donne à /pilotage.html sa propre CSP (img-src + limitlesstcg.nyc3.cdn.digitaloceanspaces.com).
+- Contrôles avec le site : `alias_site` (P1–P3 = fiches 301–303), `lots_site` (L01 = 095 + G4784, L02 = P1 + P2,
+  L03 = P3 + P4, L04 = 313 + 314), `refs_site` des produits (coffret = S01, card sets = S02–S10).
+
+**Document (schéma 1)** : `params` (taux_jpy, frais_vente, tva_import, rentabilite_estimee, frais_envoi,
+gardees_dans_totaux), `groupes` (id, nom, ordre, hors_totaux), `cartes` (ref = n° du site, nom, groupe, cat, langue, prix,
+yen, ticket, achat, vendu, prix_vendu, vente_date, canal, gardee, alias_site, lots_site, infos), `tickets` (id, boutique,
+date, total_yen, detaxe_yen, detaxe_auto), `tickets_ecartes`, `lots` (id, paye_yen), `produits` (cardsets, ex, coffret,
+boosters : quantite, prix_u, paye_u ou paye_total, frais_u, vendus, prix_reel_moyen, envois, composants), `journal`.
+
+**Import / mise à jour depuis un Excel** : outils dans `_outils/pilotage/` (voir LISEZMOI.md). On ne transmet jamais les
+données en clair : `chiffrer.py` dépose `pilotage/import-<id>.bin` (AES-GCM) et donne `#import=<id>.<clé>` ; Arthur
+touche https://pokeraichu.com/pilotage.html#import=… et confirme. Supprimer le .bin du dépôt une fois l'import fait.
+Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à recopier ici : le dépôt est public).

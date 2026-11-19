@@ -5,8 +5,10 @@
      garde les éclairs sur l'appareil du visiteur.
    - Espace vendeur (/gestion.html) : la liste des clients est réservée au propriétaire du dépôt GitHub du site,
      reconnu avec la clé GitHub déjà enregistrée sur son téléphone (elle n'est jamais stockée ici).
+   - Pilotage (/pilotage.html) : mêmes conditions d'accès que la liste des clients, routes /api/pilotage dans pilotage.js.
    Aucune donnée de paiement. Le client peut supprimer son compte à tout moment (page Mes éclairs). */
 import { EmailMessage } from 'cloudflare:email';
+import { pilotage } from './pilotage.js';
 
 const PROPRIETAIRE = 'arthurdemaria06-afk';
 const COOKIE = 'pr_session';
@@ -239,6 +241,14 @@ export async function api(request, env) {
         return { id: c.id, email: c.email, prenom: c.prenom, nom: c.nom, langue: c.langue, cree_le: c.cree_le, vu_le: c.vu_le, eclairs: par[c.id] || [] };
       })
     });
+  }
+
+  /* pilotage (contrôle de gestion) : réservé au vendeur, données dans pilotage.js */
+  if (chemin === '/api/pilotage' || chemin.indexOf('/api/pilotage/') === 0) {
+    let ok = false;
+    try { ok = await estVendeur(request); } catch (e) { ok = false; }
+    if (!ok) return json({ erreur: 'réservé au vendeur' }, 401);
+    return pilotage(request, db, url);
   }
 
   const c = await sessionClient(db, request);

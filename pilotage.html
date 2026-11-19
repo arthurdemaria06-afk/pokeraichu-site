@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pilotage | Poké-Raichu</title>
+<meta name="description" content="Tableau de bord privé de la boutique.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#F3EEE3">
+<meta name="apple-mobile-web-app-title" content="Pilotage">
+<link rel="icon" href="favicon.svg?v=f3e27339" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png?v=f3e27339" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=44570406">
+<link rel="preload" href="assets/fonts/libre-caslon-display-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/site.css?v=51b7ae44">
+<link rel="stylesheet" href="assets/css/pilotage.css?v=b531651d">
+<script src="config.js" defer></script>
+<script src="assets/js/pilotage-calcul.js?v=b4ffa75e" defer></script>
+<script src="assets/js/pilotage.js?v=7c83a767" data-xlsx="assets/js/pilotage-xlsx.js?v=8f5a0e79" defer></script>
+</head>
+<body class="pl">
+<a class="skip" href="#contenu">Aller au contenu</a>
+<div class="band" aria-hidden="true"></div>
+<header class="pl-top">
+<a class="pl-top__brand" href="index.html" aria-label="Poké-Raichu, retour au site"><img src="assets/img/logo.svg?v=5dfcbaeb" alt="" width="30" height="36"></a>
+<div class="pl-top__t"><p class="pl-top__eyebrow">Poké-Raichu · privé</p><p class="pl-top__h">Pilotage</p></div>
+<p class="pl-sync" data-pl-sync role="status" aria-live="polite"></p>
+</header>
+<main id="contenu" class="pl-main" data-pl-main tabindex="-1">
+<p class="pl-attente">Chargement…</p>
+<noscript><p class="pl-attente">Cette page a besoin de JavaScript.</p></noscript>
+</main>
+<nav class="pl-tabs" aria-label="Rubriques" data-pl-tabs hidden>
+<a href="#bord" data-vue="bord"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20h16M7 16.5v-5M12 16.5V6M17 16.5v-8"/></svg><span>Bord</span></a>
+<a href="#stock" data-vue="stock"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4.5" y="3.5" width="11" height="15.5" rx="1.5"/><path d="M19 7.5v11.5a1.5 1.5 0 0 1-1.5 1.5H8.5"/></svg><span>Stock</span></a>
+<a href="#ventes" data-vue="ventes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17.5 6.6A6.6 6.6 0 1 0 17.5 17.4M4.5 10.4h8.5M4.5 13.6h8.5"/></svg><span>Ventes</span></a>
+<a href="#achats" data-vue="achats"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 8h14l-1.2 12H6.2L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg><span>Achats</span></a>
+<a href="#plus" data-vue="plus"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg><span>Plus</span><span class="pl-tabs__n" data-pl-alertes hidden></span></a>
+</nav>
+<div class="pl-toast" data-pl-toast role="status" aria-live="polite" hidden></div>
+<dialog class="pl-sheet" data-pl-sheet aria-labelledby="pl-sheet-t"></dialog>
+</body>
+</html>

@@ -2,6 +2,8 @@ User-agent: *
 Allow: /
 Disallow: /envoi/
 Disallow: /gestion.html
+Disallow: /pilotage.html
+Disallow: /pilotage/
 Disallow: /salon.html
 Disallow: /tirage.html
 

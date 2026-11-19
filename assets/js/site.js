@@ -39,6 +39,10 @@
       a.setAttribute('data-gestion-link', '');
       li.appendChild(a);
       ul.insertBefore(li, ul.firstChild);
+      var lp = el('li'), ap = el('a', null, tr('Pilotage', 'Dashboard'));
+      ap.href = '/pilotage.html';
+      lp.appendChild(ap);
+      ul.insertBefore(lp, li.nextSibling);
     };
     if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', addGestion); else addGestion();
   }
@@ -2912,6 +2916,13 @@
         [tr('Contact', 'Contact'), U('contact.html', 'en/contact.html')]
       ]]
     ];
+    /* sur l'appareil du vendeur seulement (clé de gestion enregistrée) : pilotage et gestion */
+    var vendeur = false;
+    try { vendeur = !!localStorage.getItem('pr.gestion.jeton'); } catch (e) {}
+    if (vendeur) GROUPES.push([tr('Pour toi · ce téléphone', 'Owner · this phone'), [
+      [tr('Pilotage · tableau de bord', 'Dashboard'), '/pilotage.html'],
+      [tr('Gestion du site', 'Shop admin'), '/gestion.html']
+    ]]);
     var LEGAL = [
       [tr('Conditions de vente', 'Terms of sale'), U('conditions-de-vente.html', 'en/terms-of-sale.html')],
       [tr('Confidentialité', 'Privacy'), U('confidentialite.html', 'en/privacy.html')],
