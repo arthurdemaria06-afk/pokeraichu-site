@@ -526,7 +526,7 @@
 
   /* ---------------------------------------------------------------- navigation */
   var VUES = {};
-  var ONGLET = { bord: 'bord', stock: 'stock', carte: 'stock', ventes: 'ventes', analyse: 'analyse', couts: 'analyse', voyages: 'analyse', voyage: 'analyse' };
+  var ONGLET = { bord: 'bord', stock: 'stock', carte: 'stock', ventes: 'ventes', analyse: 'analyse', couts: 'analyse', voyages: 'analyse', voyage: 'analyse', fiscal: 'analyse' };
   var SECONDAIRE = { achats: 'achats', ticket: 'achats', lots: 'lots', scelle: 'scelle', controles: 'controles', reglages: 'reglages', charges: 'charges' };
   function retour(defaut, texte) {
     return h('a', { class: 'pl-back', href: defaut, text: '‹ ' + texte, onclick: function (e) { if (S.precedent) { e.preventDefault(); history.back(); } } });
@@ -905,7 +905,7 @@
     var init = c ? {
       ref: c.ref, langue: c.langue || 'JP', nom: c.nom, groupe: c.groupe, cat: c.cat, prix: c.prix, etat: c.etat, mode: a.mode || '', yen: c.yen,
       ticket: a.ticket || c.ticket, eur: a.eur, lot: a.lot, boutique: c.boutique, date_achat: c.date_achat, nom_en: c.nom_en, rarete: c.rarete, set: c.set,
-      nom_ticket: c.nom_ticket, ebay: c.ebay, verif: c.verif, remarque: c.remarque, gardee: c.gardee
+      nom_ticket: c.nom_ticket, ebay: c.ebay, verif: c.verif, remarque: c.remarque, gardee: c.gardee, provenance: c.provenance || ''
     } : Object.assign({ ref: prochainNumero(), langue: 'JP', groupe: 'Cartes', mode: '' }, depart || {});
     var tickets = [['', '—']].concat(S.doc.tickets.map(function (t) { return [t.id, t.id + ' · ' + (t.boutique || '') + (t.date ? ' · ' + dateFR(t.date) : '')]; }));
     var lots = [['', '—']].concat(S.doc.lots.map(function (l) { return [l.id, l.id]; }));
@@ -923,6 +923,7 @@
       { k: 'ticket', label: 'Ticket', type: 'select', demi: true, options: tickets, si: ['mode', ['ticket']] },
       { k: 'eur', label: 'Payé (€)', type: 'num', demi: true, si: ['mode', ['eur']] },
       { k: 'lot', label: 'Lot', type: 'select', demi: true, options: lots, si: ['mode', ['lot']] },
+      { k: 'provenance', label: 'Achetée à (TVA en SASU)', type: 'select', options: [['', 'Automatique : importée si ticket, yens ou lot'], ['import', 'Importée (Japon, hors UE)'], ['particulier', 'Un particulier (TVA sur la marge)'], ['pro', 'Un professionnel (facture avec TVA)']] },
       { k: 'boutique', label: 'Boutique', type: 'text', demi: true },
       { k: 'date_achat', label: 'Date d’achat', type: 'date', demi: true },
       { k: 'nom_en', label: 'Nom anglais', type: 'text', demi: true },
@@ -954,6 +955,7 @@
         var cc = nouveau ? { vendu: false, prix_vendu: null, vente_date: null, canal: null, alias_site: [], lots_site: [] } : trouverCarte(doc, ancien);
         ['ref', 'langue', 'nom', 'groupe', 'cat', 'prix', 'etat', 'boutique', 'date_achat', 'nom_en', 'rarete', 'set', 'nom_ticket', 'ebay', 'verif', 'remarque'].forEach(function (k) { cc[k] = x[k]; });
         cc.gardee = !!x.gardee;
+        if (x.provenance) cc.provenance = x.provenance; else delete cc.provenance;
         if (x.mode === 'ticket' || x.mode === 'yen') cc.yen = x.yen;
         else if (nouveau) cc.yen = null;
         if (!x.mode) cc.achat = null;
@@ -1600,7 +1602,7 @@
     return x;
   }
   function sousOnglets(actif) {
-    return h('nav', { class: 'pl-seg', 'aria-label': 'Rubriques de l’analyse' }, [['analyse', 'Segments'], ['couts', 'Coûts'], ['voyages', 'Voyages']].map(function (x) {
+    return h('nav', { class: 'pl-seg', 'aria-label': 'Rubriques de l’analyse' }, [['analyse', 'Segments'], ['couts', 'Coûts'], ['voyages', 'Voyages'], ['fiscal', 'SASU']].map(function (x) {
       return h('a', { href: '#' + x[0], 'aria-current': x[0] === actif ? 'page' : null, text: x[1] });
     }));
   }
@@ -2051,6 +2053,205 @@
     ])]);
   }
 
+  /* ---------------------------------------------------------------- SASU : TVA, compte de résultat, IS, rémunération, ratios (moteur : pilotage-fiscal.js) */
+  var CLE_SASU = 'pr.pilotage.sasu';
+  var SOURCES_SASU = [
+    ['Impôt sur les sociétés (service-public)', 'https://entreprendre.service-public.gouv.fr/vosdroits/F23575'],
+    ['Seuils de franchise de TVA 2026 (Légifiscal)', 'https://www.legifiscal.fr/actualites-fiscales/4436-nouveaux-seuils-micro-entreprises-annee-2026.html'],
+    ['TVA sur la marge, art. 297 A du CGI (Légifiscal)', 'https://www.legifiscal.fr/tva/tva-francaise/regimes-specifiques/le-regime-de-la-tva-sur-la-marge.html'],
+    ['CFE (service-public)', 'https://entreprendre.service-public.gouv.fr/vosdroits/F31913']
+  ];
+  function hypothesesSasu(X) {
+    var F = w.PRFiscal, d = F.hypotheses(S.R, X, S.doc), sv = null;
+    try { sv = JSON.parse(lire(CLE_SASU) || 'null'); } catch (e) { sv = null; }
+    return { defaut: d, H: Object.assign({}, d, sv && typeof sv === 'object' ? sv : {}) };
+  }
+  function pct1(v) { return vide(v) ? '—' : NF1.format(v * 100) + ' %'; }
+  function compact(t) { var x = t.querySelector('table'); if (x) x.classList.add('pl-table--compact'); return t; }
+  function courbePoche(opt, largeur) {
+    var pts = opt.pas;
+    if (!pts.length || opt.max <= 0) return null;
+    var W = Math.round(Math.max(300, Math.min(largeur, 720))), H = Math.round(W * 0.55), g = { l: 58, r: 14, t: 30, b: 38 };
+    var yMax = Math.max.apply(null, pts.map(function (p) { return p.poche; })), yMin = Math.min(0, Math.min.apply(null, pts.map(function (p) { return p.poche; })));
+    if (yMax <= yMin) yMax = yMin + 1;
+    function X(v) { return g.l + (W - g.l - g.r) * v / opt.max; }
+    function Y(v) { return g.t + (H - g.t - g.b) * (1 - (v - yMin) / (yMax - yMin)); }
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, class: 'pl-matrice', role: 'img', 'aria-label': 'Argent qui te reste selon le salaire versé ; le maximum est indiqué sous le graphique.' });
+    [0, 0.5, 1].forEach(function (f) {
+      var v = yMin + (yMax - yMin) * f;
+      svg.appendChild(sv('line', { x1: g.l, x2: W - g.r, y1: Y(v), y2: Y(v), class: 'pl-m-grille' }));
+      svg.appendChild(sv('text', { x: g.l - 6, y: Y(v) + 4, 'text-anchor': 'end', class: 'pl-m-tick' }, eur(v)));
+    });
+    [0, 0.5, 1].forEach(function (f) { svg.appendChild(sv('text', { x: X(opt.max * f), y: H - g.b + 15, 'text-anchor': f === 0 ? 'start' : f === 1 ? 'end' : 'middle', class: 'pl-m-tick' }, eur(opt.max * f))); });
+    svg.appendChild(sv('text', { x: W - g.r, y: H - 5, 'text-anchor': 'end', class: 'pl-m-axe' }, 'Salaire net versé dans l’année →'));
+    svg.appendChild(sv('text', { x: 4, y: 11, class: 'pl-m-axe' }, '↑ Te reste après impôts'));
+    svg.appendChild(sv('polyline', { points: pts.map(function (p) { return X(p.salaire).toFixed(1) + ',' + Y(p.poche).toFixed(1); }).join(' '), class: 'pl-courbe' }));
+    var m = opt.meilleur;
+    var c = sv('circle', { cx: X(m.salaire), cy: Y(m.poche), r: 5, class: 'pl-courbe-pt' });
+    c.appendChild(sv('title', null, 'Maximum : salaire ' + eur(m.salaire) + ', il te reste ' + eur(m.poche)));
+    svg.appendChild(c);
+    return svg;
+  }
+  VUES.fiscal = function (m) {
+    var F = w.PRFiscal;
+    m.appendChild(entete('Analyse', 'Ta future SASU : TVA, impôt, rémunération'));
+    m.appendChild(sousOnglets('fiscal'));
+    if (!F || !KC) { m.appendChild(h('p', { class: 'pl-box', text: 'Le simulateur ne s’est pas chargé : recharge la page.' })); return; }
+    var X = couts('tout'), hs = hypothesesSasu(X), H = hs.H, D = hs.defaut, RG = F.REGLES;
+    m.appendChild(h('p', { class: 'pl-apercu pl-sec', text: 'Simulation d’une année complète de SASU avec les règles ' + RG.annee + ' (vérifiées le ' + dateFR(RG.verifie_le) +
+      '). Les hypothèses partent de ton rythme réel et se modifient ci-dessous. Je ne suis ni expert-comptable ni avocat : fais valider par un professionnel avant de décider.' }));
+    var defs = [
+      { k: 'ca', label: 'Ventes sur 12 mois (€)', type: 'num', demi: true, aide: 'Ton rythme actuel : ' + eur(D.ca) + ' (sur ' + nbr(D.base_jours) + ' jours).' },
+      { k: 'taux_cout', label: 'Coût d’achat (% du prix de vente)', type: 'num', demi: true, aide: 'Tes ventes : ' + pct(D.taux_cout) + '.' },
+      { k: 'part_import', label: 'Achats importés du Japon (%)', type: 'num', demi: true, aide: 'Le reste vient de particuliers (TVA sur la marge). Toi : ' + pct(D.part_import) + '.' },
+      { k: 'frais_vente', label: 'Commissions et envois (% des ventes)', type: 'num', demi: true },
+      { k: 'voyages', label: 'Voyages par an', type: 'num', demi: true },
+      { k: 'frais_voyage', label: 'Frais par voyage (€)', type: 'num', demi: true, aide: D.frais_voyage ? 'Moyenne de tes voyages : ' + eur(D.frais_voyage) + '.' : 'Avion, hôtel, transports, repas.' },
+      { k: 'charges_fixes', label: 'Autres charges par an (€ TTC)', type: 'num', demi: true, aide: 'D’après tes charges : ' + eur(D.charges_fixes) + '.' },
+      { k: 'tva_charges', label: 'Dont TVA récupérable (€)', type: 'num', demi: true },
+      { k: 'salaire_net', label: 'Ton salaire net sur l’année (€)', type: 'num', demi: true },
+      { k: 'distribution', label: 'Bénéfice versé en dividendes (%)', type: 'num', demi: true },
+      { k: 'tmi', label: 'Ta tranche d’impôt (TMI)', type: 'select', demi: true, options: [['0', '0 %'], ['0.11', '11 %'], ['0.3', '30 %'], ['0.41', '41 %'], ['0.45', '45 %']] },
+      { k: 'taux_charges', label: 'Cotisations du président (% du net)', type: 'num', demi: true, aide: 'Environ 80 % du salaire net.' },
+      { k: 'capital', label: 'Capital de la SASU (€)', type: 'num', demi: true },
+      { k: 'cfe', label: 'CFE (€ par an)', type: 'num', demi: true, aide: '0 l’année de création ; ensuite 243 à 579 € si le CA de N-2 est entre 5 000 et 10 000 € (selon la commune).' }
+    ];
+    var PCT = { taux_cout: 1, part_import: 1, frais_vente: 1, distribution: 1, taux_charges: 1 };
+    var init = {};
+    defs.forEach(function (df) { var v = H[df.k]; init[df.k] = df.k === 'tmi' ? String(v) : PCT[df.k] ? Math.round(z(v) * 1000) / 10 : (vide(v) ? null : Math.round(v)); });
+    var form = formulaire(defs, init);
+    var zone = h('div', { 'aria-live': 'polite' }), minuteur = null;
+    function lireH() {
+      var o = {};
+      defs.forEach(function (df) {
+        var el = form.champs[df.k];
+        if (df.k === 'tmi') { o.tmi = parseFloat(el.value) || 0; return; }
+        var v = lireNombre(el.value).v;
+        o[df.k] = v == null ? D[df.k] : PCT[df.k] ? v / 100 : v;
+      });
+      return o;
+    }
+    function maj() {
+      var o = lireH();
+      ecrire(CLE_SASU, JSON.stringify(o));
+      H = Object.assign({}, D, o);
+      dessiner();
+    }
+    defs.forEach(function (df) { form.champs[df.k].addEventListener(df.type === 'select' ? 'change' : 'input', function () { clearTimeout(minuteur); minuteur = setTimeout(maj, 350); }); });
+    var hyp = details('Hypothèses de l’année', null, [h('div', { class: 'pl-box' }, [form.el, h('div', { class: 'pl-actions' }, bouton('Reprendre mes chiffres réels', function () {
+      try { localStorage.removeItem(CLE_SASU); } catch (e) {}
+      rendre(true);
+    }, 'btn--ghost'))])]);
+    var resume = h('p', { class: 'pl-note', 'aria-live': 'polite' });
+    m.appendChild(section('Hypothèses', [resume, hyp]));
+    m.appendChild(zone);
+    function dessiner() {
+      zone.textContent = '';
+      resume.textContent = 'Ventes de ' + eur(H.ca) + ' sur 12 mois, coût d’achat ' + pct(H.taux_cout) + ' du prix, ' + pct(H.part_import) + ' d’achats importés, ' + nbr(H.voyages) + ' voyage' + pl(H.voyages) + ' à ' + eur(H.frais_voyage) +
+        ', salaire net ' + eur(H.salaire_net) + ', ' + pct(H.distribution) + ' du bénéfice en dividendes, TMI ' + pct(H.tmi) + '. Ouvre pour modifier.';
+      var fr = F.simuler(H, 'franchise'), re = F.simuler(H, 'reel');
+      var franchiseOk = fr.franchise_possible, choixAuto = franchiseOk && fr.remuneration.poche + fr.sig.resultat_net - fr.remuneration.dividendes >= re.remuneration.poche + re.sig.resultat_net - re.remuneration.dividendes ? 'franchise' : 'reel';
+      var fs = S.fsasu || (S.fsasu = { regime: null });
+      var regime = fs.regime || choixAuto;
+      if (regime === 'franchise' && !fr.franchise_tolerance) regime = 'reel';
+      var x = regime === 'franchise' ? fr : re, sg = x.sig, rm = x.remuneration;
+      /* TVA */
+      var tr = F.tvaReelle(S.R);
+      var lignesTva = [
+        ['TVA facturée aux clients', function (y) { return eur(y.tva.collectee); }],
+        ['TVA payée à l’import (20 %)', function (y) { return eur(y.detail.tva_import); }],
+        ['TVA payée sur tes charges', function (y) { return eur(y.detail.tva_charges); }],
+        ['TVA récupérée', function (y) { return eur(y.regime === 'reel' ? y.tva.deductible : 0); }],
+        ['TVA à reverser', function (y) { return eur(y.tva.a_payer); }],
+        ['TVA à ta charge', function (y) { return eur(y.tva.cout); }],
+        ['Résultat net de la SASU', function (y) { return eurS(y.sig.resultat_net); }],
+        ['Te reste après impôts', function (y) { return eur(y.remuneration.poche); }]
+      ];
+      var ecartTva = re.tva.cout - fr.tva.cout;
+      var verdict = !fr.franchise_tolerance ? 'Avec ' + eur(fr.sig.ca) + ' de ventes, tu dépasses 93 500 € : la franchise est impossible, tu es au réel.'
+        : (Math.abs(ecartTva) < 1 ? 'Les deux régimes se valent sur ces hypothèses.' : ecartTva > 0 ? 'La franchise te coûte ' + eur(ecartTva) + ' de TVA de moins par an que le réel.' : 'Le réel te coûte ' + eur(-ecartTva) + ' de TVA de moins par an que la franchise : la TVA d’import récupérée compte plus que celle que tu factures.')
+          + (fr.franchise_possible ? '' : ' Attention : au-delà de 85 000 € de ventes, la franchise s’arrête l’année suivante.');
+      zone.appendChild(section('TVA : franchise ou réel ?', [
+        h('p', { class: 'pl-big', text: verdict }),
+        compact(tableau([{ t: 'Sur 12 mois', f: function (l) { return l[0]; } }, { t: 'Franchise', f: function (l) { return l[1](fr); } }, { t: 'Réel', f: function (l) { return l[1](re); } }], lignesTva, null, 'Franchise ou réel')),
+        h('p', { class: 'pl-note', text: 'Franchise (CA sous 85 000 €, tolérance 93 500 €) : pas de TVA sur tes ventes, mention « TVA non applicable, art. 293 B du CGI » sur tes factures, mais aucune TVA récupérée, y compris celle de 20 % due à l’import de tes cartes japonaises. ' +
+          'Réel : cartes achetées à des particuliers au régime de la marge (TVA = marge × 20/120, carte par carte, mention « Régime particulier – Biens d’occasion ») ; cartes importées ou achetées à un pro : TVA sur le prix de vente, TVA payée à l’achat récupérée.' }),
+        h('p', { class: 'pl-note', text: 'Sur tes ventes réelles depuis le début, le réel aurait donné ' + eur(tr.collectee) + ' de TVA facturée (' + eur(tr.collectee_marge) + ' sur la marge, ' + eur(tr.collectee_normale) + ' sur le prix des cartes importées)' +
+          (tr.marges_negatives > 0.5 ? ' ; ' + eur(tr.marges_negatives) + ' de marges négatives sans TVA' : '') + ', pour ' + eur(tr.deductible_achats) + ' de TVA d’achat récupérable sur tout ton stock acheté. Provenance : ' + tr.n.import + ' cartes importées, ' + tr.n.particulier + ' de particuliers' + (tr.n.pro ? ', ' + tr.n.pro + ' de pros' : '') + ' (modifiable sur chaque fiche).' })
+      ]));
+      /* choix du régime pour la suite */
+      var chips = h('div', { class: 'pl-chips', role: 'group', 'aria-label': 'Régime de TVA retenu' }, [['franchise', 'En franchise'], ['reel', 'Au réel']].map(function (r) {
+        return h('button', { type: 'button', class: 'chip', 'aria-pressed': String(regime === r[0]), disabled: r[0] === 'franchise' && !fr.franchise_tolerance ? '' : null, text: r[1] + (r[0] === choixAuto ? ' · conseillé' : ''),
+          onclick: function () { fs.regime = r[0]; dessiner(); } });
+      }));
+      /* compte de résultat */
+      var ca = sg.ca;
+      var L = [
+        ['Ventes de marchandises (HT)', sg.ca, 'tot'],
+        ['Coût d’achat des marchandises vendues', -sg.achats],
+        ['Marge commerciale', sg.marge_commerciale, 'sous'],
+        ['Charges externes (voyages, commissions, envois, abonnements…)', -sg.externes],
+        ['Valeur ajoutée', sg.valeur_ajoutee, 'sous'],
+        ['Impôts et taxes (CFE)', -sg.impots],
+        ['Charges de personnel (salaire + cotisations)', -sg.personnel],
+        ['Excédent brut d’exploitation (EBE)', sg.ebe, 'sous'],
+        ['Résultat d’exploitation', sg.resultat_exploitation, 'sous'],
+        ['Impôt sur les sociétés', -sg.is],
+        ['Résultat net', sg.resultat_net, 'tot']
+      ];
+      var tb = h('table', { class: 'pl-table pl-cascade' }, [h('caption', { class: 'sr-only', text: 'Compte de résultat prévisionnel' }),
+        h('thead', null, h('tr', null, [h('th', { scope: 'col', text: 'Soldes intermédiaires de gestion' }), h('th', { scope: 'col', text: 'Montant' }), h('th', { scope: 'col', text: '% du CA' })])),
+        h('tbody', null, L.map(function (l) {
+          return h('tr', { class: l[2] ? 'pl-tot' + (l[2] === 'sous' ? ' pl-tot--sous' : '') : null }, [h('th', { scope: 'row', text: l[0] }),
+            h('td', { class: l[2] && l[1] < -0.005 ? 'pl-neg' : null, text: eur(Math.abs(l[1]) < 0.005 ? 0 : l[1]) }), h('td', { text: ca ? pct(Math.abs(l[1]) < 0.005 ? 0 : l[1] / ca) : '—' })]);
+        }))]);
+      zone.appendChild(section('Compte de résultat prévisionnel', [chips, h('div', { class: 'pl-scroll' }, tb)],
+        'Comptabilité générale : les frais de voyage sont des charges de l’année (compte 6251), pas un coût des cartes comme dans l’onglet Coûts. Capacité d’autofinancement ≈ résultat net (' + eurS(sg.caf) + '), sans amortissement prévu.'));
+      /* IS */
+      zone.appendChild(section('Impôt sur les sociétés', [h('div', { class: 'pl-kpis' }, [
+        tuile('Bénéfice imposable', eurS(sg.rcai)),
+        tuile('Impôt', eur(sg.is), sg.rcai > 0 ? 'taux effectif ' + pct(sg.is / sg.rcai) : 'pas de bénéfice'),
+        tuile('Taux réduit', pct(RG.is_reduit), 'jusqu’à ' + eur(RG.is_plafond) + ' de bénéfice, puis ' + pct(RG.is_normal))
+      ])], 'Taux réduit si le CA est sous 10 M€, le capital entièrement libéré et détenu à 75 % au moins par des personnes physiques (toi).'));
+      /* rémunération */
+      var opt = F.optimiser(H, regime);
+      var courbe = courbePoche(opt, Math.min(m.clientWidth || 360, 760) - 34);
+      zone.appendChild(section('Te payer : salaire ou dividendes', [
+        h('div', { class: 'pl-kpis' }, [
+          tuile('Salaire net', eur(rm.salaire), 'coûte ' + eur(rm.cout_salaire) + ' à la SASU'),
+          tuile('Dividendes', eur(rm.dividendes), rm.dividendes ? 'impôt ' + eur(rm.impot_dividendes) + ' (' + rm.option + ')' : 'rien de distribué'),
+          tuile('Te reste', eur(rm.poche), 'après impôt sur le revenu et dividendes'),
+          tuile('Prélèvements', rm.prelevements != null ? pct(rm.prelevements) : '—', 'du bénéfice avant ta rémunération')
+        ]),
+        courbe ? h('div', { class: 'pl-box pl-matrice-box pl-sec' }, courbe) : null,
+        h('p', { class: 'pl-apercu pl-sec', text: opt.max > 0 ? (opt.meilleur.salaire < 1 ? 'Sur ces hypothèses, c’est sans salaire, tout en dividendes, qu’il te reste le plus : ' + eur(opt.meilleur.poche) + '.'
+          : 'Le salaire qui te laisse le plus : ' + eur(opt.meilleur.salaire) + ' net, soit ' + eur(opt.meilleur.poche) + ' pour toi.') + ' Un salaire ouvre des droits (retraite, santé, indemnités) ; les dividendes n’en ouvrent aucun.' : 'Pas de bénéfice à partager sur ces hypothèses.' }),
+        h('p', { class: 'pl-note', text: 'Dividendes : prélèvement forfaitaire de ' + pct1(RG.pfu) + ' (12,8 % d’impôt + ' + pct1(RG.ps) + ' de prélèvements sociaux) ou barème après abattement de 40 % : le moins cher est retenu. ' +
+          'Réserve légale de ' + eur(rm.reserve) + ' (5 % du bénéfice jusqu’à 10 % du capital). Impôt sur le salaire estimé à ta TMI après l’abattement de 10 %.' })
+      ]));
+      /* ratios */
+      var ra = F.ratios(S.R, X), lr = [
+        ['Taux de marge', ra.taux_marge != null ? pct(ra.taux_marge) : '—', 'marge commerciale ÷ coût d’achat'],
+        ['Taux de marque', ra.taux_marque != null ? pct(ra.taux_marque) : '—', 'marge commerciale ÷ prix de vente'],
+        ['Coefficient multiplicateur', ra.coefficient != null ? dec1(ra.coefficient) : '—', 'prix de vente ÷ coût d’achat'],
+        ['Rotation du stock', ra.rotation != null ? dec1(ra.rotation) + ' fois par an' : '—', 'coût des ventes annualisé ÷ stock au coût'],
+        ['Durée de stockage', ra.duree_stockage != null ? NF0.format(ra.duree_stockage) + ' jours' : '—', 'au rythme actuel des ventes'],
+        ['Besoin en fonds de roulement', eur(ra.bfr) + (ra.bfr_jours != null ? ' · ' + NF0.format(ra.bfr_jours) + ' jours de CA' : ''), 'ton stock au coût (ni crédit client ni fournisseur)'],
+        ['Poids des charges fixes', ra.poids_fixes != null ? pct(ra.poids_fixes) : '—', 'charges fixes ÷ chiffre d’affaires'],
+        ['Rentabilité commerciale', ra.rentabilite_commerciale != null ? pct(ra.rentabilite_commerciale) : '—', 'résultat analytique ÷ chiffre d’affaires'],
+        ['Rentabilité de l’investissement', ra.roi != null ? pct(ra.roi) : '—', 'résultat analytique ÷ achats réels'],
+        ['EBE ÷ CA (prévisionnel)', ca ? pct(sg.ebe / ca) : '—', 'au régime retenu ci-dessus']
+      ];
+      zone.appendChild(section('Ratios de gestion', [tableau([
+        { t: 'Ratio', f: function (l) { return h('span', null, [l[0], h('small', { class: 'pl-t-note', text: l[2] })]); } },
+        { t: 'Valeur', f: function (l) { return l[1]; } }
+      ], lr, null, 'Ratios de gestion')], 'Sur ton activité réelle depuis le début (' + nbr(ra.duree) + ' jours), sauf la dernière ligne.'));
+      zone.appendChild(section('Sources', [h('ul', { class: 'pl-sources' }, SOURCES_SASU.map(function (s) { return h('li', null, h('a', { href: s[1], target: '_blank', rel: 'noopener', text: s[0] + ' ↗' })); }))],
+        'Taux de cotisations du président et option barème des dividendes : estimations à confirmer avec ton expert-comptable.'));
+    }
+    dessiner();
+  };
+
   /* ---------------------------------------------------------------- menu « Plus » */
   VUES.plus = function (m) {
     var R = S.R, n = nbAlertes(), al = alertes().length;
@@ -2061,6 +2262,7 @@
       item('#charges', 'Charges', (S.doc.charges || []).length ? (S.doc.charges || []).length + ' charge' + pl((S.doc.charges || []).length) + ' · ' + eur(couts('tout').totaux.charges) + ' payés' : 'Voyages, abonnements, fournitures, temps passé'),
       item('#voyages', 'Voyages', (S.doc.voyages || []).length ? (S.doc.voyages || []).map(function (v) { return v.nom; }).join(', ') : 'Frais et retour sur investissement de chaque voyage'),
       item('#couts', 'Coûts et rentabilité', 'Cascade des marges, seuil de rentabilité, coûts cachés'),
+      item('#fiscal', 'SASU : TVA, impôt, rémunération', 'Franchise ou réel, compte de résultat, salaire ou dividendes, ratios'),
       item('#controles', 'Contrôles', al ? al + ' point' + pl(al) + ' à vérifier' + (n ? ' · ' + n + ' à faire avec le site' : '') : 'Tout est en ordre'),
       item('#lots', 'Lots PSA 10', R.lots.length + ' lots · ' + R.lots.reduce(function (s, L) { return s + L.cartes.length; }, 0) + ' cartes'),
       item('#scelle', 'Scellé et quantités', R.produits.map(function (x) { return x.p.id === 'cardsets' ? 'card sets' : x.p.id; }).join(', ')),
@@ -2100,8 +2302,9 @@
       { k: 'taux_horaire', label: 'Valeur d’une heure de ton temps (€)', type: 'num', demi: true, aide: 'Ce que tu gagnerais ailleurs dans l’heure. Vide : temps non chiffré.' },
       { k: 'minutes_par_vente', label: 'Minutes par vente', type: 'num', demi: true, aide: 'Photo, annonce, échanges, emballage, poste.' },
       { k: 'cout_capital', label: 'Coût du capital (% par an)', type: 'num', demi: true, aide: 'Par défaut 1,7 % : le Livret A depuis le 1er août 2026. Mets plus si tu vises mieux ailleurs.' },
-      { k: 'cle_voyage', label: 'Répartir les frais de voyage', type: 'select', demi: true, options: [['valeur', 'Selon le prix d’achat'], ['nombre', 'Par article (part égale)']] }
-    ], { taux_horaire: P.taux_horaire, minutes_par_vente: P.minutes_par_vente, cout_capital: (P.cout_capital != null ? P.cout_capital : 0.017) * 100, cle_voyage: P.cle_voyage || 'valeur' });
+      { k: 'cle_voyage', label: 'Répartir les frais de voyage', type: 'select', demi: true, options: [['valeur', 'Selon le prix d’achat'], ['nombre', 'Par article (part égale)']] },
+      { k: 'tva_recuperable', label: 'TVA de tes charges', type: 'select', options: [['non', 'Pas récupérable (particulier ou franchise) : charges comptées TTC'], ['oui', 'Récupérable (SASU au réel) : charges comptées HT']] }
+    ], { taux_horaire: P.taux_horaire, minutes_par_vente: P.minutes_par_vente, cout_capital: (P.cout_capital != null ? P.cout_capital : 0.017) * 100, cle_voyage: P.cle_voyage || 'valeur', tva_recuperable: P.tva_recuperable ? 'oui' : 'non' });
     var f2 = h('form', { class: 'pl-box', novalidate: true }, [form2.el, h('div', { class: 'pl-actions' }, h('button', { type: 'submit', class: 'btn', text: 'Enregistrer' }))]);
     f2.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -2115,6 +2318,7 @@
         if (x.minutes_par_vente != null) p.minutes_par_vente = x.minutes_par_vente; else delete p.minutes_par_vente;
         p.cout_capital = x.cout_capital != null ? x.cout_capital / 100 : 0.017;
         p.cle_voyage = x.cle_voyage === 'nombre' ? 'nombre' : 'valeur';
+        if (x.tva_recuperable === 'oui') p.tva_recuperable = true; else delete p.tva_recuperable;
       });
     });
     m.appendChild(section('Coûts cachés et répartition', [f2], 'Servent à l’onglet Analyse › Coûts et au coût complet de chaque carte.'));

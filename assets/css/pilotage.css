@@ -269,3 +269,14 @@ a.pl-row:hover{background:var(--washi)}
 .pl-sheet__b > .pl-label{margin:14px 0 4px}
 .pl-bars + .pl-note,.pl-scroll + .pl-note,.pl-rows + .pl-actions{margin-top:12px}
 .pl-form > .pl-apercu{grid-column:1/-1;margin:-4px 0 0;font-size:.84rem}
+/* SASU */
+.pl-courbe{fill:none;stroke:var(--shu);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.pl-courbe-pt{fill:var(--shu-fonce);stroke:var(--gofun);stroke-width:2}
+.pl-sources{margin:0;padding:12px 16px 12px 32px;background:var(--gofun);border:1px solid var(--line);line-height:1.6}
+.pl-chips + .pl-scroll{margin-top:4px}
+.chip[disabled]{opacity:.45;cursor:not-allowed}
+.pl-seg a{padding:0 6px}
+.pl-apercu + .pl-note{margin-top:10px}
+.pl-table--compact{font-size:.8rem}
+.pl-table--compact th,.pl-table--compact td{padding:8px 8px}
+.pl-table--compact th:first-child,.pl-table--compact td:first-child{min-width:7.5em}

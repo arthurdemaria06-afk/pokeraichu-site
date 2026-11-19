@@ -291,3 +291,20 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
 - Écrans : Plus › Charges (#charges), Analyse › Coûts, Analyse › Voyages (création proposée d'après les dates des tickets),
   bloc « Coût complet » sur la fiche d'une carte, « Après toutes tes charges » sur le Bord, feuilles Charges, Voyages, Coûts
   dans l'export Excel.
+
+**SASU (vague 3, 19/11/2026)** : `assets/js/pilotage-fiscal.js` (PRFiscal), Analyse › SASU (#fiscal).
+- Année complète simulée ; hypothèses préremplies d'après le rythme réel (ventes annualisées, coût d'achat en % du prix,
+  part importée, voyages, charges), modifiables, gardées dans localStorage `pr.pilotage.sasu` (« Reprendre mes chiffres »).
+- Règles 2026 vérifiées le 19/11/2026 : franchise de TVA 85 000 € / 93 500 € (inchangés en 2026, réforme à 25 000 €
+  abandonnée) ; IS 15 % jusqu'à 42 500 € puis 25 % (CA < 10 M€, capital libéré, 75 % personnes physiques) ; dividendes
+  PFU 31,4 % (12,8 % + 18,6 %) ou barème après 40 % ; réserve légale 5 % jusqu'à 10 % du capital ; président ≈ 80 % de
+  cotisations sur le net ; CFE exonérée l'année de création (minimum 243–579 € si CA N-2 entre 5 000 et 10 000 €).
+- TVA au réel : cartes de particuliers au régime de la marge (art. 297 A : marge × 20/120, carte par carte, pas de
+  déduction), cartes importées ou achetées à un pro : TVA sur le prix, TVA d'achat ou d'import déductible. En franchise
+  la TVA d'import (20 %) est un coût. Coût de la TVA au réel = TVA facturée (l'amont est récupéré) ; en franchise = TVA
+  d'import + TVA des charges. Testé : écart de résultat avant IS = écart de coût de TVA.
+- Provenance d'une carte : `c.provenance` ('import' | 'particulier' | 'pro'), sinon importée si ticket, yens ou lot.
+  Modifiable dans « Modifier » de la fiche. Réglage `tva_recuperable` : charges comptées HT dans l'onglet Coûts.
+- Sorties : comparaison franchise / réel, compte de résultat en SIG, IS, salaire ou dividendes (courbe de ce qui reste
+  selon le salaire, optimum), ratios (marge, marque, coefficient, rotation, durée de stockage, BFR, poids des charges
+  fixes, rentabilités). Mention « je ne suis ni expert-comptable ni avocat » affichée.
