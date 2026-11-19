@@ -317,7 +317,6 @@
       cards.forEach(function (c) {
         if (t && norm(c.ref + ' ' + label(c) + ' ' + (c.nom_en || '')).indexOf(t) === -1) return;
         var cur = statusOf(c.ref), lp = livePrice(c.ref);
-        if (!t && cur === 'dispo' && lp === null && shown >= 60) return;
         shown++;
         var li = el('li', 'sel-row sel-row--pic' + (lp !== null ? ' is-live-price' : ''));
         var pic = el('a', 'sel-pic' + (c.photo_t ? '' : ' sel-pic--none'));
