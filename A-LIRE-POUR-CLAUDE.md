@@ -149,8 +149,13 @@ modifiées directement, et les nouvelles cartes sont produites par :
   supprime les pages Pokémon ou extension devenues vides, nettoie `sitemap.xml`, `data/stock.json`, les index de recherche
   et `data/ebay.json`, et redirige (301) les anciennes adresses et les liens courts `/r/`, `/s/` vers la collection la
   plus proche dans `_redirects`. Penser aussi à Shopify (supprimer le produit) et au pilotage.
+  `--vers=<réf>` : les fiches retirées sont des doublons d'une fiche gardée (adresses et liens courts y mènent).
   **Ne retirer que les réfs qu'Arthur nomme** : une fiche liée (lot, carte d'un coffret, même Pokémon) reste en ligne
   tant qu'il ne l'a pas citée (erreur du 20/11 : les cartes d'un coffret ouvert avaient été retirées avec le coffret).
+- Compteurs « N fiches, M articles » des collections : `modifier.compteurs_collections(racine)` les recalcule depuis
+  `stock.json` (pages de collection FR/EN, cartes de collection de l'accueil et de /collections, taxonomie). Appelé par
+  `construire.py` (à chaque déploiement), `retirer.py` et `modifier.appliquer` : avant le 20/11, les cartes ajoutées
+  n'étaient pas comptées dans les collections (Japon affichait 185 fiches pour 220).
 - `data/stock.json` : clés `meta, taxonomies, cartes, vendus, parties, coups_de_foudre` (217 cartes au 16/11).
 - `config.js` : **seul fichier de réglages à la main** (WhatsApp, livraison, remises, coups de foudre, TVA, médiateur…).
   Tout est documenté en tête du fichier.
@@ -198,6 +203,10 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (20/11) 350 Rondoudou d'Érika 139/103 JP (5 €, vendue : liste `vendues` de config.js, `vendues_le` avancé) ;
+  Darkrai & Cresselia LÉGENDE : une seule fiche, 038 (la paire en photo), à 2 exemplaires, 116 et 280 (moitiés)
+  retirées et redirigées vers 038 (Shopify : PKR-38-210 à 2, PKR-116 et PKR-280 archivés) ; nouvelle photo du lot
+  L04 avec les deux Psykokwak.
 - (20/11) Bouton « remonter en haut » sur toutes les pages : flèche-éclair jaune sur rond noir (`.haut`, créé par site.js),
   visible après un demi-écran de défilement, rangé au-dessus du bouton WhatsApp, de la barre de réservation ou du salon.
 - (20/11) Coffrets 30th Premium Deck ouverts (Arthur a 3 Mentali-ex 043, 3 Noctali-ex 044, 3 Victini 041 et 3 Zeraora

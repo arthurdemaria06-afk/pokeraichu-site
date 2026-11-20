@@ -252,9 +252,9 @@
 /r/113  /cartes/raichu-074-071-psa-10-4878.html  302
 /en/r/113  /en/cards/raichu-074-071-psa-10-4878.html  302
 /s/113  /cartes/raichu-074-071-psa-10-4878.html?stand=1  302
-/r/116  /cartes/darkrai-cresselia-legende-151-103.html  302
-/en/r/116  /en/cards/darkrai-cresselia-legend-151-103.html  302
-/s/116  /cartes/darkrai-cresselia-legende-151-103.html?stand=1  302
+/r/116  /cartes/darkrai-cresselia-legende-151-103-152-103.html  302
+/en/r/116  /en/cards/darkrai-cresselia-legend-151-103-152-103.html  302
+/s/116  /cartes/darkrai-cresselia-legende-151-103-152-103.html  302
 /r/117  /cartes/miaouss-d-alola-115-103.html  302
 /en/r/117  /en/cards/alolan-meowth-115-103.html  302
 /s/117  /cartes/miaouss-d-alola-115-103.html?stand=1  302
@@ -495,9 +495,9 @@
 /r/241  /cartes/mega-gardevoir-ex-087-063.html  302
 /en/r/241  /en/cards/mega-gardevoir-ex-087-063.html  302
 /s/241  /cartes/mega-gardevoir-ex-087-063.html?stand=1  302
-/r/280  /cartes/darkrai-cresselia-legende-152-103.html  302
-/en/r/280  /en/cards/darkrai-cresselia-legend-152-103.html  302
-/s/280  /cartes/darkrai-cresselia-legende-152-103.html?stand=1  302
+/r/280  /cartes/darkrai-cresselia-legende-151-103-152-103.html  302
+/en/r/280  /en/cards/darkrai-cresselia-legend-151-103-152-103.html  302
+/s/280  /cartes/darkrai-cresselia-legende-151-103-152-103.html  302
 /r/281  /cartes/rondoudou-d-erika-139-103-kr.html  302
 /en/r/281  /en/cards/erikas-jigglypuff-139-103-kr.html  302
 /s/281  /cartes/rondoudou-d-erika-139-103-kr.html?stand=1  302
@@ -855,6 +855,9 @@
 /r/349  /cartes/demolosse-206-184.html  302
 /en/r/349  /en/cards/houndoom-206-184.html  302
 /s/349  /cartes/demolosse-206-184.html?stand=1  302
+/r/350  /cartes/rondoudou-d-erika-139-103.html  302
+/en/r/350  /en/cards/erika-s-jigglypuff-139-103.html  302
+/s/350  /cartes/rondoudou-d-erika-139-103.html?stand=1  302
 # Anciennes adresses de fiches (nom corrigé dans l'Excel) : redirection permanente
 /cartes/zekrom-de-n-210-193-psa-10.html  /cartes/zekrom-de-n-210-193-psa-10-9518.html  301
 /cartes/zekrom-de-n-210-193-psa-10  /cartes/zekrom-de-n-210-193-psa-10-9518  301
@@ -893,3 +896,6 @@
 /cartes/pikachu-ex-132-m-p.html  /collections/pikachu.html  301
 /en/cards/pikachu-ex-132-m-p.html  /en/collections/pikachu.html  301
 /en/cards/sealed-30th-premium-deck-espeon-umbreon-box.html  /en/collections/30th-celebration.html  301
+# Fiches retirées (doublons de la fiche 038) : vers cette fiche
+/cartes/darkrai-cresselia-legende-152-103.html  /cartes/darkrai-cresselia-legende-151-103-152-103.html  301
+/en/cards/darkrai-cresselia-legend-152-103.html  /en/cards/darkrai-cresselia-legend-151-103-152-103.html  301

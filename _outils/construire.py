@@ -335,6 +335,12 @@ def main():
             print(line)
     except Exception as e:
         print('modifications ignorées : %r' % e)
+    try:  # compteurs « N fiches, M articles » des collections, recalculés depuis stock.json
+        import modifier
+        if modifier.compteurs_collections(ROOT):
+            print('compteurs des collections mis à jour')
+    except Exception as e:
+        print('compteurs des collections non recalculés : %r' % e)
     cleanup()
 
 

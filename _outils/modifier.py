@@ -450,6 +450,66 @@ def h8(root, rel):
     return hashlib.md5(open(os.path.join(root, rel), 'rb').read()).hexdigest()[:8]
 
 
+COLL_EN = {'japon': 'japan', 'coree': 'korea', 'gradees': 'graded', 'scelle': 'sealed'}
+_CPT = r'(?<![\d.,])(\d+) (fiches?|listings?)(, | · )(\d+) (articles?|items?)\b'
+
+
+def compteurs_collections(root):
+    """Recompte « N fiches, M articles » de chaque collection depuis data/stock.json (fiches = cartes de la collection,
+    articles = somme des quantités) : page de la collection (FR et EN), cartes de collection de toutes les pages,
+    taxonomie de stock.json. Appelé après chaque ajout, retrait ou changement de quantité."""
+    import glob
+    sp = os.path.join(root, 'data/stock.json')
+    st = json.load(open(sp, encoding='utf-8'))
+    cpt = {}
+    for c in st['cartes']:
+        for co in c.get('collections') or []:
+            f, u = cpt.get(co, (0, 0))
+            cpt[co] = (f + 1, u + int(c.get('quantite') or 0))
+    par_page = {}
+    for co, v in cpt.items():
+        par_page['collections/%s.html' % co] = v
+        par_page['en/collections/%s.html' % COLL_EN.get(co, co)] = v
+
+    def texte(m, v):
+        en = m.group(2).startswith('listing')
+        f1, f2 = ('listing', 'item') if en else ('fiche', 'article')
+        return '%d %s%s%s%d %s%s' % (v[0], f1, 's' if v[0] > 1 else '', m.group(3), v[1], f2, 's' if v[1] > 1 else '')
+    n = 0
+    fichiers = glob.glob(os.path.join(root, '*.html')) + glob.glob(os.path.join(root, '*', '*.html')) + glob.glob(os.path.join(root, 'en', '*', '*.html'))
+    for path in fichiers:
+        rel = os.path.relpath(path, root).replace(os.sep, '/')
+        s = open(path, encoding='utf-8').read()
+        t = s
+        if rel in par_page:  # compteurs propres de la page de collection
+            v = par_page[rel]
+            t = re.sub('(?<!coll__count">)' + _CPT, lambda m: texte(m, v), t)
+        if 'coll__count' in t:
+            def carte(mt):
+                k = mt.group(1).split('#')[0].split('?')[0]
+                k = re.sub(r'^(\.\./)+', '', k.replace('https://pokeraichu.com/', '')).lstrip('/')
+                if not k.startswith(('collections/', 'en/collections/')):
+                    k = 'collections/' + k.split('/')[-1]
+                if rel.startswith('en/') and not k.startswith('en/'):
+                    k = 'en/' + k
+                v = par_page.get(k)
+                if not v:
+                    return mt.group(0)
+                a, b = mt.start(2) - mt.start(0), mt.end(2) - mt.start(0)
+                return mt.group(0)[:a] + re.sub(_CPT, lambda m: texte(m, v), mt.group(2)) + mt.group(0)[b:]
+            t = re.sub(r'<a class="coll[^"]*" href="([^"]*)">(?:(?!</a>).)*?<span class="coll__count">([^<]*)</span>', carte, t, flags=re.S)
+        if t != s:
+            open(path, 'w', encoding='utf-8', newline='').write(t)
+            n += 1
+    for t in st.get('taxonomies', {}).get('collections', []):
+        if t.get('slug') in cpt:
+            t['fiches'], t['unites'] = cpt[t['slug']]
+    st['meta']['nb_fiches'] = len(st['cartes'])
+    st['meta']['nb_unites'] = sum(int(c.get('quantite') or 0) for c in st['cartes'])
+    json.dump(st, open(sp, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    return n
+
+
 def versions(root):
     """A appeler apres l'ecriture de data/recherche-*.json : met a jour ?v= dans les pages et la version du service worker."""
     vf, ve = h8(root, 'data/recherche-fr.json'), h8(root, 'data/recherche-en.json')
@@ -513,6 +573,7 @@ def appliquer(root, changes, indent=None, entre=None):
         _dump(root, 'data/stock.json', st, indent)
         _dump(root, 'data/recherche-fr.json', rech['fr'])
         _dump(root, 'data/recherche-en.json', rech['en'])
+        compteurs_collections(root)
         versions(root)
     return log
 

@@ -5,7 +5,8 @@ listes JSON-LD, compteurs (accueil, catalogue, collections, Pokémon, extensions
 pages Pokémon ou extension devenues vides, index de recherche, sitemap, données (stock.json, ebay.json),
 liens courts /r/ et /s/ et anciennes adresses redirigés vers la collection la plus proche.
 
-Usage : python3 _outils/retirer.py <racine> <ref> [<ref>...]
+Usage : python3 _outils/retirer.py <racine> <ref> [<ref>...] [--vers=<ref gardée>]
+  --vers : les fiches retirées sont des doublons d'une fiche gardée ; leurs adresses et liens courts y mènent.
 """
 import json, os, re, sys
 
@@ -31,10 +32,13 @@ def plural(n, mot):
     return '%d %s%s' % (n, mot, 's' if n > 1 else '')
 
 
-def main(root, refs):
+def main(root, refs, vers=None):
     R = set(refs)
     site = M.Site(root)
     st = json.load(open(os.path.join(root, 'data/stock.json'), encoding='utf-8'))
+    garde = next((c for c in st['cartes'] if c['ref'] == vers), None) if vers else None
+    if vers and not garde:
+        sys.exit('Fiche gardée introuvable : %s' % vers)
     cartes = [c for c in st['cartes'] if c['ref'] in R]
     manquantes = R - set(c['ref'] for c in cartes)
     if manquantes:
@@ -47,6 +51,8 @@ def main(root, refs):
         en_coll = {'pikachu': 'pikachu', 'raichu': 'raichu', '30th-celebration': '30th-celebration'}.get(coll)
         cible_fr = 'collections/%s.html' % coll if coll else 'catalogue.html'
         cible_en = 'en/collections/%s.html' % en_coll if en_coll else 'en/catalogue.html'
+        if garde:  # doublon d'une fiche gardée : anciennes adresses et étiquettes mènent à cette fiche
+            cible_fr, cible_en = M.page_of(garde, 'fr'), M.page_of(garde, 'en')
         supprimees[M.page_of(c, 'fr')] = cible_fr
         supprimees[M.page_of(c, 'en')] = cible_en
         c['_cible'] = (cible_fr, cible_en)
@@ -268,8 +274,9 @@ def main(root, refs):
     photos = 0
     for c in cartes:
         d = os.path.join(root, 'assets/photos')
+        motif = re.compile(re.escape(c['slug']) + r'-(\d+-\d+\.(?:webp|jpe?g|png)|partage\.(?:jpe?g|webp))$')
         for f in os.listdir(d):
-            if f.startswith(c['slug'] + '-'):
+            if motif.match(f):
                 os.remove(os.path.join(d, f))
                 photos += 1
 
@@ -291,7 +298,8 @@ def main(root, refs):
             s = re.sub(r'^/s/%s\s.*$' % re.escape(ref), '/s/%s  /%s  302' % (ref, fr), s, flags=re.M)
     ajout = ['/%s  /%s  301' % (rel, cible) for rel, cible in sorted(supprimees.items()) if ('/%s ' % rel) not in s]
     if ajout:
-        s = s.rstrip('\n') + '\n# Fiches retirées (cartes qu’on n’a plus) : vers la collection la plus proche\n' + '\n'.join(ajout) + '\n'
+        s = s.rstrip('\n') + ('\n# Fiches retirées (doublons de la fiche %s) : vers cette fiche\n' % vers if garde else
+                               '\n# Fiches retirées (cartes qu’on n’a plus) : vers la collection la plus proche\n') + '\n'.join(ajout) + '\n'
     open(rd, 'w', encoding='utf-8', newline='').write(s)
 
     # 8. données : stock.json, index de recherche, ebay.json
@@ -335,6 +343,7 @@ def main(root, refs):
         for ref in R:
             (eb.get('recherches') or {}).pop(ref, None)
         json.dump(eb, open(pe, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
+    M.compteurs_collections(root)
     M.versions(root)
 
     print('%d pages modifiées, %d pages supprimées, %d photos supprimées' % (n, effaces, photos))
@@ -346,4 +355,5 @@ def main(root, refs):
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         sys.exit(__doc__)
-    main(sys.argv[1], sys.argv[2:])
+    vers = next((x.split('=', 1)[1] for x in sys.argv[2:] if x.startswith('--vers=')), None)
+    main(sys.argv[1], [x for x in sys.argv[2:] if not x.startswith('--')], vers)
