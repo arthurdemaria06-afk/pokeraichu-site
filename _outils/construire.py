@@ -496,6 +496,12 @@ def ajouter():
         c['ref'], c['slug'], c['ref'], c['en']['slug'], c['ref'], c['slug']) for c in new)
     ms = list(re.finditer(r'^/s/\S+ .*\n', s, re.M))
     s = s[:ms[-1].end()] + lines + s[ms[-1].end():] if ms else lines + s
+    # une ancienne redirection qui partirait de l'adresse d'une nouvelle fiche la cacherait : on la supprime
+    pris = set()
+    for c in new:
+        for u in ('/cartes/%s' % c['slug'], '/en/cards/%s' % c['en']['slug']):
+            pris.update((u, u + '.html'))
+    s = ''.join(l for l in s.splitlines(True) if not (l.split() and l.split()[0] in pris))
     wr('_redirects', s)
     # 5. versions des index de recherche et du service worker
     vf, ve = h8('data/recherche-fr.json'), h8('data/recherche-en.json')
