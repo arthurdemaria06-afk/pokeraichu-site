@@ -10,7 +10,7 @@
    - Chaque enregistrement crée une version (60 gardées) : Réglages → Historique des versions pour revenir en arrière. */
 (function () {
   'use strict';
-  var d = document, w = window, C = w.PR_CONFIG || {}, K = w.PRCalcul;
+  var d = document, w = window, C = w.PR_CONFIG || {}, K = w.PRCalcul, G = w.PRGraph, PB = w.PRBord;
   var CLE_JETON = 'pr.gestion.jeton', CLE_ATTENTE = 'pr.pilotage.attente', CLE_CANAL = 'pr.pilotage.canal';
   var CANAUX = ['WhatsApp', 'Instagram', 'eBay', 'Vinted', 'Leboncoin', 'Whatnot', 'Cardmarket', 'Salon', 'Dépôt-vente', 'Autre'];
   var MODES = [['', 'Pas de prix d’achat (coût estimé)'], ['ticket', 'Ticket japonais (¥, détaxe du ticket)'], ['yen', 'Prix en ¥ sans ticket'],
@@ -20,7 +20,8 @@
   var S = {
     doc: null, rev: 0, maj: null, R: null, vue: 'bord', arg: '', site: null, statuts: null,
     f: { q: '', statut: 'stock', groupe: '', cat: '', langue: '', tri: 'valeur', manque: false },
-    sale: false, note: '', envoi: null, relancer: false, essais: 0, minuteur: null, tt: null, majListe: null
+    sale: false, note: '', envoi: null, relancer: false, essais: 0, minuteur: null, tt: null, majListe: null,
+    fb: { periode: 'tout', groupe: '', langue: '', canal: '', gamme: '' }, tris: {}, vueT: {}
   };
 
   /* ---------------------------------------------------------------- outils */
@@ -88,6 +89,8 @@
   function quand(iso) { var t = new Date(iso); return isNaN(t) ? '' : dateFR(t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0')) + ' à ' + heure(iso); }
   function aujourdhui() { var t = new Date(); return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }
   function sens(v) { return vide(v) || Math.abs(v) < 0.005 ? '' : v > 0 ? 'pl-pos' : 'pl-neg'; }
+  /* dans les tableaux, seul le négatif est coloré */
+  function neg(v) { return !vide(v) && v < -0.005 ? 'pl-neg' : ''; }
   function fleche(v) { return vide(v) || Math.abs(v) < 0.005 ? '' : v > 0 ? '▲ ' : '▼ '; }
   function lireNombre(s) {
     s = String(s == null ? '' : s).replace(/[\s  €¥%]/g, '').replace(',', '.');
@@ -434,16 +437,107 @@
       ]);
     }));
   }
-  function tableau(cols, lignes, total, legende) {
-    var t = h('table', { class: 'pl-table' });
-    if (legende) t.appendChild(h('caption', { class: 'sr-only', text: legende }));
-    t.appendChild(h('thead', null, h('tr', null, cols.map(function (c) { return h('th', { scope: 'col', text: c.t }); }))));
-    t.appendChild(h('tbody', null, lignes.map(function (l) {
-      return h('tr', null, cols.map(function (c, i) { return h(i ? 'td' : 'th', i ? (c.cls ? { class: c.cls(l) } : null) : { scope: 'row' }, c.f(l)); }));
-    })));
-    if (total) t.appendChild(h('tfoot', null, h('tr', null, cols.map(function (c) { return h('td', null, c.f(total)); }))));
-    return h('div', { class: 'pl-scroll' }, t);
+  /* tableau : colonnes { t: titre, f: contenu, cls, v: valeur pour trier, barre: mini-barre proportionnelle à v } ;
+     opts.cle : tri au toucher des en-têtes (gardé pendant la session) */
+  function tableau(cols, lignes, total, legende, opts) {
+    opts = opts || {};
+    var boite = h('div', { class: 'pl-scroll' }), cle = opts.cle;
+    function construire() {
+      var etat = cle ? S.tris[cle] : null, L = lignes.slice();
+      if (etat && cols[etat.i] && cols[etat.i].v) {
+        var fv = cols[etat.i].v, k = etat.sens === 'asc' ? 1 : -1;
+        L.sort(function (a, b) {
+          var x = fv(a), y = fv(b);
+          if (vide(x) || x === '') return vide(y) || y === '' ? 0 : 1;
+          if (vide(y) || y === '') return -1;
+          return k * (typeof x === 'string' ? String(x).localeCompare(String(y), 'fr', { numeric: true }) : x - y);
+        });
+      }
+      var max = {};
+      cols.forEach(function (c, i) { if (c.barre && c.v) max[i] = Math.max.apply(null, L.map(function (l) { return Math.abs(z(c.v(l))); }).concat([0])); });
+      var t = h('table', { class: 'pl-table' });
+      if (legende) t.appendChild(h('caption', { class: 'sr-only', text: legende }));
+      t.appendChild(h('thead', null, h('tr', null, cols.map(function (c, i) {
+        if (!cle || !c.v) return h('th', { scope: 'col', text: c.t });
+        var sensT = etat && etat.i === i ? etat.sens : null;
+        return h('th', { scope: 'col', 'aria-sort': sensT === 'asc' ? 'ascending' : sensT === 'desc' ? 'descending' : null }, h('button', { type: 'button', class: 'pl-tri', 'data-sens': sensT, text: c.t,
+          onclick: function () {
+            var e = S.tris[cle];
+            S.tris[cle] = !e || e.i !== i ? { i: i, sens: i === 0 ? 'asc' : 'desc' } : e.sens === (i === 0 ? 'asc' : 'desc') ? { i: i, sens: i === 0 ? 'desc' : 'asc' } : null;
+            boite.replaceChild(construire(), boite.firstChild);
+          } }));
+      }))));
+      t.appendChild(h('tbody', null, L.map(function (l) {
+        return h('tr', null, cols.map(function (c, i) {
+          var contenu = c.f(l);
+          if (c.barre && c.v && max[i]) {
+            var v = z(c.v(l)), b = h('i');
+            b.style.width = (Math.abs(v) / max[i] * 100) + '%';
+            contenu = h('div', { class: 'pl-td-b' }, [h('span', { class: 'pl-cb' + (v < 0 ? ' pl-cb--neg' : ''), 'aria-hidden': 'true' }, b), h('span', null, contenu)]);
+          }
+          return h(i ? 'td' : 'th', i ? (c.cls ? { class: c.cls(l) } : null) : { scope: 'row' }, contenu);
+        }));
+      })));
+      if (total) t.appendChild(h('tfoot', null, h('tr', null, cols.map(function (c, i) { var x = c.f(total); return h('td', c.cls && i ? { class: c.cls(total) } : null, x); }))));
+      return t;
+    }
+    boite.appendChild(construire());
+    return boite;
   }
+  /* petites icônes (traits) */
+  var ICONES = {
+    table: 'M3.5 5.5h13v9h-13zM3.5 9h13M3.5 12h13M8 5.5v9',
+    info: 'M10 3.2a6.8 6.8 0 1 0 0 13.6 6.8 6.8 0 0 0 0-13.6zM10 9v4.6M10 6.6v.2',
+    fleche: 'M7.5 4.5l5 5.5-5 5.5'
+  };
+  function icone(nom) { return sv('svg', { viewBox: '0 0 20 20', 'aria-hidden': 'true', focusable: 'false' }, sv('path', { d: ICONES[nom] })); }
+  /* carte d'un tableau de bord : titre, sous-titre, contenu ; bouton « Tableau » quand o.table fournit la vue en chiffres */
+  function carte(o) {
+    var corps = h('div', { class: 'pl-carte__b' }, o.corps);
+    var actions = (o.actions || []).slice();
+    if (o.table) {
+      var vueT = null, cle = o.cle || o.titre;
+      var btn = h('button', { type: 'button', class: 'pl-ibtn', 'aria-pressed': 'false', title: 'Voir les chiffres en tableau' }, [icone('table'), 'Tableau']);
+      var basculer = function (on) {
+        btn.setAttribute('aria-pressed', String(on));
+        S.vueT[cle] = on;
+        if (on && !vueT) { vueT = h('div', { class: 'pl-vue-t' }, o.table()); corps.appendChild(vueT); }
+        Array.prototype.forEach.call(corps.children, function (k) { k.hidden = k === vueT ? !on : on; });
+      };
+      btn.addEventListener('click', function () { basculer(btn.getAttribute('aria-pressed') !== 'true'); });
+      actions.push(btn);
+      if (S.vueT[cle]) setTimeout(function () { basculer(true); }, 0);
+    }
+    return h('section', { class: 'pl-carte' + (o.span ? ' ' + o.span : '') }, [
+      h('header', { class: 'pl-carte__h' }, [h('div', null, [h('h2', { text: o.titre }), o.sous ? h('p', { text: o.sous }) : null]), actions.length ? h('div', { class: 'pl-carte__a' }, actions) : null]),
+      corps,
+      o.pied ? h('div', { class: 'pl-carte__pied' }, o.pied) : null
+    ]);
+  }
+  /* écart avec la période d'avant : en % (ou en points pour un taux) ; vert si ça monte et que monter est bien */
+  function ecart(cur, prec, opts) {
+    opts = opts || {};
+    if (vide(cur) || vide(prec)) return null;
+    var dv = opts.points ? (cur - prec) * 100 : (Math.abs(prec) < 0.005 ? null : (cur - prec) / Math.abs(prec) * 100);
+    if (dv == null) return null;
+    var txt = opts.points ? (Math.abs(dv) < 0.05 ? '=' : (dv > 0 ? '▲ ' : '▼ ') + NF1.format(Math.abs(dv)) + ' pt' + (Math.abs(dv) >= 2 ? 's' : ''))
+      : (Math.abs(dv) < 0.5 ? '=' : (dv > 0 ? '▲ ' : '▼ ') + (Math.abs(dv) >= 1000 ? '×' + NF1.format(cur / prec) : NF0.format(Math.abs(dv)) + ' %'));
+    return { txt: txt, sens: Math.abs(dv) < (opts.points ? 0.05 : 0.5) ? null : (dv > 0) === (opts.bas !== true) ? 'hausse' : 'baisse' };
+  }
+  /* tuile chiffrée : libellé, valeur, écart avec la période d'avant, tendance */
+  function kpi(o) {
+    var el = h('div', { class: 'pl-kpi' + (o.hero ? ' pl-kpi--hero' : ' pl-k') + (o.span ? ' ' + o.span : ''), role: 'group', 'aria-label': o.label }, [
+      h('p', { class: 'pl-label', text: o.label }),
+      h('p', { class: 'pl-kpi__v' + (o.cls ? ' ' + o.cls : ''), text: o.v }),
+      o.delta || o.deltaL ? h('div', { class: 'pl-kpi__pied' }, [o.delta ? h('span', { class: 'pl-delta' + (o.delta.sens ? ' pl-delta--' + o.delta.sens : ''), text: o.delta.txt }) : null,
+        o.deltaL ? h('span', { class: 'pl-delta-l', text: o.deltaL }) : null]) : null,
+      o.sous ? h('p', { class: 'pl-kpi__s', text: o.sous }) : null
+    ]);
+    if (o.tend && G) el.appendChild(G.tendance(h('div'), o.tend, o.tendCls || 'g-s1', o.hero ? 70 : 30));
+    if (o.leg) el.appendChild(h('p', { class: 'pl-kpi__leg', text: o.leg }));
+    return el;
+  }
+  function vide2(texte, action) { return h('p', { class: 'pl-vide' }, [texte, action ? h('br') : null, action]); }
   function details(titre, n, contenu, ouvert) {
     var dt = h('details', { class: 'pl-det' }, [h('summary', null, [h('span', null, [titre, n != null ? ' ' : null, n != null ? h('span', { class: 'pl-badge' + (n ? '' : ' pl-badge--ok'), text: n ? String(n) : '✓ 0' }) : null])]), h('div', { class: 'pl-det__b' }, contenu)]);
     if (ouvert) dt.open = true;
@@ -640,6 +734,7 @@
     if (fk) { try { s0 = a.selectionStart; s1 = a.selectionEnd; } catch (e) {} }
     m.textContent = '';
     S.majListe = null;
+    if (G) G.nettoyer();
     VUES[S.vue](m, S.arg);
     var tabs = q('[data-pl-tabs]');
     tabs.hidden = false;
@@ -659,70 +754,226 @@
   }
   function majTexte() { return S.maj ? 'Données du ' + quand(S.maj) + ' · version ' + S.rev : ''; }
 
-  /* ---------------------------------------------------------------- tableau de bord */
-  VUES.bord = function (m) {
-    var R = S.R, k = R.k, st = R.stock;
-    m.appendChild(entete('Tableau de bord', majTexte()));
-    m.appendChild(h('section', { class: 'pl-hero' }, [
-      h('p', { class: 'pl-label', text: 'Bénéfice net réalisé' }),
-      h('p', { class: 'pl-hero__v', text: eurS(k.benef) }),
-      h('p', { class: 'pl-hero__s', text: nbr(k.vendus) + ' vente' + pl(k.vendus) + ' · ' + eur(k.encaisse) + ' encaissés · rentabilité ' + pct(k.rentab) })
-    ]));
-    m.appendChild(section('Ventes', [h('div', { class: 'pl-kpis' }, [
-      tuile('Encaissé', eur(k.encaisse), nbr(k.vendus) + ' article' + pl(k.vendus) + ' vendu' + pl(k.vendus)),
-      tuile('Rentabilité', pct(k.rentab), 'bénéfice ÷ coût d’achat'),
-      tuile('Taux de marque', pct(k.taux_marque), 'bénéfice ÷ prix de vente'),
-      tuile('Prix moyen', eur(k.prix_moyen), 'par article vendu')
-    ])]));
-    var p = k.pct_recupere == null ? 0 : Math.max(0, Math.min(1, k.pct_recupere));
-    var jauge = h('div', { class: 'pl-meter', role: 'img', 'aria-label': pct(k.pct_recupere) + ' de l’investissement récupéré' }, h('span'));
-    jauge.firstChild.style.width = (p * 100) + '%';
-    m.appendChild(section('Ton argent', [h('div', { class: 'pl-box' }, [
-      h('p', { class: 'pl-big', text: k.reste > 0 ? pct(k.pct_recupere) + ' de ton investissement est déjà revenu' : 'Ton investissement est remboursé' }),
-      jauge,
-      h('dl', { class: 'pl-dl' }, [
-        h('dt', { text: 'Investi (prix d’achat réels)' }), h('dd', { text: eur(k.investi) }),
-        h('dt', { text: 'Revenu (encaissé − frais)' }), h('dd', { text: eur(k.recupere) }),
-        h('dt', { text: k.reste > 0 ? 'Reste à récupérer' : 'Gagné en plus' }), h('dd', { text: eur(Math.abs(k.reste)) })
-      ]),
-      h('p', { class: 'pl-note', text: 'Si tout le stock part au prix marché, le résultat final serait d’environ ' + eurS(k.resultat_projete) + ' (bénéfice déjà réalisé + plus-value du stock).' })
-    ])]));
-    if (w.PRCouts) {
-      var X = couts('tout'), nCh = (S.doc.charges || []).length;
-      m.appendChild(section('Après toutes tes charges', nCh ? [h('div', { class: 'pl-kpis' }, [
-        tuile('Résultat analytique', eurS(X.cascade.resultat), 'ventes − achats − toutes les charges', X.cascade.resultat < 0 ? 'pl-neg' : ''),
-        tuile('Charges payées', eur(X.totaux.charges), nCh + ' charge' + pl(nCh) + (X.totaux.stock_frais_voyage > 0.5 ? ' · ' + eur(X.totaux.stock_frais_voyage) + ' de frais encore en stock' : '')),
-        tuile('Coûts cachés', eur(X.cascade.caches), 'temps, capital, décote, dépréciation'),
-        tuile('Point mort', X.seuil.point_mort_date ? (X.seuil.point_mort_jours <= X.seuil.duree ? dateFR(X.seuil.point_mort_date) : 'pas atteint') : '—', X.seuil.sr != null ? 'seuil ' + eur(X.seuil.sr) + ' de CA' : null)
-      ]), h('p', { class: 'pl-note' }, h('a', { href: '#couts', text: 'Cascade des marges, seuil de rentabilité, coûts cachés ›' }))]
-        : [h('div', { class: 'pl-box' }, [h('p', { text: 'Le bénéfice ci-dessus ne compte que tes achats et tes ventes. Ajoute tes frais (voyage, abonnements, fournitures…) pour voir ton vrai résultat.' }),
-          h('div', { class: 'pl-actions' }, [bouton('+ Ajouter une charge', function () { feuilleCharge(null); }), h('a', { class: 'btn btn--ghost', href: '#voyages', text: 'Mes voyages' })])])]));
+  /* ---------------------------------------------------------------- tableau de bord (données : assets/js/pilotage-bord.js, graphiques : pilotage-graph.js)
+     Une barre de filtres (période, groupe, langue, canal) et des sélections faites en touchant les graphiques (groupe, canal,
+     langue, gamme de prix) : tout le tableau suit, comme dans Qlik. Les chiffres du stock sont ceux d'aujourd'hui (la période ne
+     les change pas) ; « investissement récupéré », charges et synthèse sont depuis le début. */
+  function faitsBord() { if (!S.FB || S.FB.R !== S.R) S.FB = { R: S.R, F: PB.faits(S.R) }; return S.FB.F; }
+  function nomFiltre(F, k, v) { return k === 'groupe' ? (F.noms[v] || v) : v; }
+  var LIB_FILTRE = { groupe: 'Groupe', langue: 'Langue', canal: 'Canal', gamme: 'Prix', cat: 'Catégorie' };
+  function choisir(k, v) { S.fb[k] = S.fb[k] === v ? '' : v; rendre(true); }
+  function barreFiltres(F, per, X) {
+    var fb = S.fb;
+    var seg = h('div', { class: 'pl-seg', role: 'group', 'aria-label': 'Période' }, PB.PERIODES.map(function (p) {
+      return h('button', { type: 'button', 'aria-pressed': String(fb.periode === p[0]), 'data-focus': 'per-' + p[0], text: p[1], onclick: function () { fb.periode = p[0]; rendre(true); } });
+    }));
+    function sel(k, label, options) {
+      var s = h('select', { class: 'select' + (fb[k] ? ' est-actif' : ''), 'aria-label': label, 'data-focus': 'fb-' + k }, options.map(function (o) { return h('option', { value: o[0], text: o[1] }); }));
+      s.value = fb[k];
+      if (s.value !== fb[k]) { s.appendChild(h('option', { value: fb[k], text: nomFiltre(F, k, fb[k]) })); s.value = fb[k]; }
+      s.addEventListener('change', function () { fb[k] = s.value; rendre(true); });
+      return s;
     }
-    m.appendChild(section('Stock', [h('div', { class: 'pl-kpis' }, [
-      tuile('Valeur marché', eur(st.valeur), st.sans_prix ? st.sans_prix + ' carte' + pl(st.sans_prix) + ' sans prix non comptée' + pl(st.sans_prix) : 'au prix marché actuel'),
-      tuile('Coût du stock', eur(st.cout_reel + st.cout_estime), 'dont ' + eur(st.cout_estime) + ' estimés'),
-      tuile('Plus-value latente', eurS(st.latent), 'si tout se vend au prix marché', sens(st.latent)),
-      tuile('En stock', nbr(st.cartes) + ' cartes', st.unites ? '+ ' + nbr(st.unites) + ' unités (boosters, ex, card sets)' : null)
-    ])]));
-    var pg = st.par_groupe.filter(function (g) { return g.valeur > 0; }).sort(function (a, b) { return b.valeur - a.valeur; });
-    if (pg.length) m.appendChild(section('Valeur du stock par groupe', [barres(pg.map(function (g) {
-      return { l: g.libelle, s: nbr(g.nb) + (g.produit ? ' unité' : ' carte') + pl(g.nb), v: g.valeur, txt: eur(g.valeur) };
-    }), 'Valeur du stock par groupe')], 'Prix marché des cartes et produits encore en stock.'));
-    var vg = R.ventes.filter(function (v) { return v.vendus > 0; }).sort(function (a, b) { return b.net - a.net; });
-    if (vg.length) m.appendChild(section('Bénéfice réalisé par groupe', [barres(vg.map(function (v) {
-      return { l: v.libelle, s: nbr(v.vendus) + ' vendu' + pl(v.vendus) + ' · ' + eur(v.encaisse) + ' encaissés', v: v.net, txt: eurS(v.net) };
-    }), 'Bénéfice réalisé par groupe')]));
+    var langues = uniques(F.ventes.concat(F.stock).map(function (x) { return x.langue; }));
+    var canaux = uniques(F.ventes.map(function (x) { return x.canal; }));
+    var chips = h('div', { class: 'pl-fbar__sel', 'aria-label': 'Sélections en cours' });
+    var actifs = Object.keys(LIB_FILTRE).filter(function (k) { return fb[k]; });
+    actifs.forEach(function (k) {
+      chips.appendChild(h('span', { class: 'pl-selchip' }, [h('small', { text: LIB_FILTRE[k] }), nomFiltre(F, k, fb[k]),
+        h('button', { type: 'button', 'aria-label': 'Retirer le filtre ' + LIB_FILTRE[k], text: '×', onclick: function () { fb[k] = ''; rendre(true); } })]));
+    });
+    if (actifs.length > 1) chips.appendChild(lienBtn('Tout effacer', function () { actifs.forEach(function (k) { fb[k] = ''; }); rendre(true); }));
+    if (fb.canal) chips.appendChild(h('span', { class: 'pl-fbar__info', text: 'Le canal ne filtre que les ventes.' }));
+    if (X.sans_date) chips.appendChild(h('span', { class: 'pl-fbar__info', text: nbr(X.sans_date) + ' vente' + pl(X.sans_date) + ' sans date ne compte' + (X.sans_date > 1 ? 'nt' : '') + ' que dans « Depuis le début ».' }));
+    var barre = h('div', { class: 'pl-fbar', role: 'region', 'aria-label': 'Filtres du tableau de bord' }, [seg,
+      sel('groupe', 'Groupe', [['', 'Tous les groupes']].concat(F.groupes.map(function (g) { return [g.cle, g.nom]; }))),
+      sel('langue', 'Langue', [['', 'Toutes langues']].concat(langues.map(function (l) { return [l, l]; }))),
+      sel('canal', 'Canal', [['', 'Tous les canaux']].concat(canaux.map(function (c) { return [c, c]; }))),
+      chips]);
+    if (w.IntersectionObserver) {
+      var temoin = h('div', { 'aria-hidden': 'true' });
+      new IntersectionObserver(function (e) { barre.classList.toggle('est-colle', !e[0].isIntersecting); }, { rootMargin: '-' + (d.querySelector('.pl-top') ? d.querySelector('.pl-top').offsetHeight + 1 : 55) + 'px 0px 0px 0px' }).observe(temoin);
+      return [temoin, barre];
+    }
+    return [barre];
+  }
+  var NOM_PAS = { jour: 'par jour', semaine: 'par semaine', mois: 'par mois' };
+  VUES.bord = function (m) {
+    if (!G || !PB) { m.appendChild(entete('Tableau de bord', majTexte())); m.appendChild(h('p', { class: 'pl-box', text: 'Le tableau de bord ne s’est pas chargé entièrement : recharge la page.' })); return; }
+    var R = S.R, fb = S.fb, F = faitsBord(), auj = aujourdhui();
+    var per = PB.periode(fb.periode, auj, F), X = PB.filtrer(F, fb, per);
+    var T = PB.totaux(X.ventes), TP = X.prec ? PB.totaux(X.prec) : null, ST = PB.totauxStock(X.stock);
+    var pas = PB.pasDe(per), SER = PB.serie(X.ventes, per, pas), datees = SER.filter(function (s) { return !s.special; });
+    var filtre = Object.keys(LIB_FILTRE).some(function (k) { return fb[k]; });
+    m.appendChild(entete('Tableau de bord', majTexte()));
+    barreFiltres(F, per, X).forEach(function (e) { m.appendChild(e); });
+    var g = h('div', { class: 'pl-grille' });
+    m.appendChild(g);
+    var compar = TP ? 'vs ' + per.precNom : null;
+    function tend(f) { return datees.length > 1 ? datees.map(f) : null; }
+    var cumul = [], c0 = SER.length && SER[0].special ? SER[0].net : 0;
+    datees.forEach(function (s) { c0 += s.net; cumul.push(c0); });
+    /* ventes : héros + tuiles */
+    g.appendChild(kpi({ hero: true, label: 'Bénéfice net' + (per.tout ? '' : ' · ' + per.nom.toLowerCase()), v: eurS(T.net, 0), cls: T.net < -0.5 ? 'pl-neg' : '',
+      delta: TP ? ecart(T.net, TP.net) : null, deltaL: compar,
+      sous: nbr(T.n) + ' article' + pl(T.n) + ' vendu' + pl(T.n) + ' · ' + eur(T.ca) + ' encaissés · rentabilité ' + pct(T.rentab),
+      tend: cumul.length > 1 ? cumul : null, leg: cumul.length > 1 ? 'Bénéfice cumulé ' + NOM_PAS[pas] + (SER.length && SER[0].special ? ', ventes sans date comprises au départ' : '') : null }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Chiffre d’affaires', v: eur(T.ca, 0), delta: TP ? ecart(T.ca, TP.ca) : null, deltaL: compar, tend: tend(function (s) { return s.ca; }) }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Taux de marque', v: pct(T.marque), sous: 'bénéfice ÷ prix de vente · rentabilité ' + pct(T.rentab),
+      delta: TP ? ecart(T.marque, TP.marque, { points: true }) : null, deltaL: compar, tend: tend(function (s) { return s.marque; }), tendCls: 'g-s2' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Articles vendus', v: nbr(T.n), sous: T.realisation != null ? 'vendus à ' + pct(T.realisation) + ' du prix marché' : null,
+      delta: TP ? ecart(T.n, TP.n) : null, deltaL: compar, tend: tend(function (s) { return s.n; }) }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Panier moyen', v: eur(T.panier), sous: 'par article vendu', delta: TP ? ecart(T.panier, TP.panier) : null, deltaL: compar,
+      tend: tend(function (s) { return s.panier; }), tendCls: 'g-s2' }));
+    /* chiffre d'affaires et bénéfice dans le temps */
+    var aDater = R.cartes.filter(function (r) { return r.c.vendu && !r.hors && (!r.c.vente_date || !dateAchatCarte(r)); }).length;
+    var lienDater = aDater ? lienBtn('Dater mes ventes (' + aDater + ')', feuilleDatesVentes) : null;
+    var vides = !SER.some(function (s) { return s.lignes; });
+    var hostCA = h('div');
+    if (!vides) G.colonnes(hostCA, {
+      cats: SER.map(function (s) { return { cle: s.cle, label: s.label, long: s.long, special: s.special }; }),
+      series: [{ nom: 'Chiffre d’affaires', cls: 'g-s1', valeurs: SER.map(function (s) { return s.lignes ? s.ca : null; }) },
+        { nom: 'Bénéfice net', cls: 'g-s2', type: 'ligne', valeurs: SER.map(function (s) { return s.lignes ? s.net : null; }) }],
+      hauteur: 250, fmt: function (v) { return eur(v, 0); }, etiquettes: SER.length <= 8,
+      detail: function (i) { var s = SER[i]; return s.lignes ? [{ v: nbr(s.n), l: 'article' + pl(s.n) + ' vendu' + pl(s.n), sous: true }, { v: pct(s.marque), l: 'taux de marque', sous: true }] : []; },
+      aria: 'Chiffre d’affaires (barres) et bénéfice net (ligne) ' + NOM_PAS[pas] + ' ; chiffres dans la vue Tableau.'
+    });
+    g.appendChild(carte({ span: 'pl-c8', titre: 'Chiffre d’affaires et bénéfice', sous: per.nom + ' · ' + NOM_PAS[pas] + (SER.length && SER[0].special ? ' · en gris : ventes sans date' : ''),
+      corps: vides ? [vide2('Aucune vente ' + (per.tout ? 'enregistrée' : 'datée sur cette période') + (filtre ? ' avec ces filtres' : '') + '.', lienDater)]
+        : [G.legende([{ nom: 'Chiffre d’affaires', cls: 'g-s1' }, { nom: 'Bénéfice net', cls: 'g-s2', forme: 'ligne' }]), hostCA],
+      table: vides ? null : function () {
+        return tableau([
+          { t: 'Période', f: function (s) { return s.long; } },
+          { t: 'Articles', f: function (s) { return nbr(s.n); } },
+          { t: 'Chiffre d’affaires', f: function (s) { return eur(s.ca, 2); } },
+          { t: 'Bénéfice', f: function (s) { return eurS(s.net, 2); }, cls: function (s) { return s.net < -0.005 ? 'pl-neg' : ''; } },
+          { t: 'Taux de marque', f: function (s) { return pct(s.marque); } }
+        ], SER.filter(function (s) { return s.lignes; }).slice().reverse(), T, 'Ventes ' + NOM_PAS[pas]);
+      },
+      pied: lienDater && !vides ? [lienDater, ' pour les mettre dans le temps.'] : null }));
+    /* investissement récupéré (depuis le début, avec les filtres groupe, langue, prix) */
+    var fSansCanal = Object.assign({}, fb, { canal: '' }), tousSC = F.ventes.filter(function (v) { return PB.garder(v, fSansCanal, false); });
+    var investi = X.achats.reduce(function (a, x) { return a + x.paye; }, 0), TI = PB.totaux(tousSC), recup = TI.recupere, pr = investi ? recup / investi : null;
+    var cu = PB.cumul(tousSC, 'recupere'), hostI = h('div');
+    if (cu.points.length > 1 && G) G.courbe(hostI, {
+      x: cu.points.map(function (p) { return p.date; }), series: [{ nom: 'Récupéré (encaissé − frais)', cls: 'g-s1', valeurs: cu.points.map(function (p) { return p.v; }), pas: true, aire: true }],
+      refs: investi > 0 ? [{ y: investi, label: 'Investi ' + eur(investi, 0) }] : [], hauteur: 150, fmt: function (v) { return eur(v, 0); }, finLabel: false,
+      aria: 'Argent récupéré au fil des ventes, comparé à l’investissement.'
+    });
+    g.appendChild(carte({ span: 'pl-c4 pl-m12', titre: 'Investissement récupéré', sous: 'depuis le début' + (fb.canal ? ', tous canaux' : '') + ' · encaissé − frais ÷ prix d’achat réels',
+      corps: [h('p', { class: 'pl-big', text: investi ? (recup < investi ? pct(pr) + ' déjà revenus' : 'Remboursé : ' + eurS(recup - investi, 0) + ' de plus') : 'Aucun prix d’achat réel' }),
+        G.jauge(pr, { aria: pct(pr) + ' de l’investissement récupéré' }),
+        h('dl', { class: 'pl-dl' }, [h('dt', { text: 'Investi' }), h('dd', { text: eur(investi, 0) }), h('dt', { text: 'Récupéré' }), h('dd', { text: eur(recup, 0) }),
+          h('dt', { text: recup < investi ? 'Reste à récupérer' : 'Gagné en plus' }), h('dd', { text: eur(Math.abs(investi - recup), 0) })]),
+        cu.points.length > 1 ? hostI : null],
+      pied: filtre ? null : ['Si tout le stock part au prix marché : résultat final d’environ ' + eurS(R.k.resultat_projete, 0) + '.'] }));
+    /* bénéfice par groupe, ventes par canal, par langue (sélection au toucher) */
+    var parG = PB.parCle(X.ventes, 'groupe', PB.totaux).sort(function (a, b) { return b.net - a.net; });
+    var hostG = h('div');
+    if (parG.length) G.barres(hostG, { lignes: parG.map(function (x) { return { cle: x.cle, label: F.noms[x.cle] || x.cle, sous: nbr(x.n) + ' vendu' + pl(x.n) + ' · ' + eur(x.ca, 0), v: x.net, txt: eurS(x.net, 0) }; }),
+      sel: fb.groupe || null, onSelect: function (k) { choisir('groupe', k); }, valeurNom: 'bénéfice net', aria: 'Bénéfice net par groupe',
+      detail: function (l) { var x = parG.filter(function (y) { return y.cle === l.cle; })[0]; return [{ v: eur(x.ca, 0), l: 'chiffre d’affaires', sous: true }, { v: pct(x.marque), l: 'taux de marque', sous: true }]; } });
+    g.appendChild(carte({ span: 'pl-c4', titre: 'Bénéfice par groupe', sous: 'touche un groupe pour filtrer tout le tableau', corps: [parG.length ? hostG : vide2('Aucune vente.')],
+      table: parG.length ? function () { return tableauDim(parG, 'Groupe', function (x) { return F.noms[x.cle] || x.cle; }); } : null }));
+    var parC = PB.parCle(X.ventes, 'canal', PB.totaux).sort(function (a, b) { return b.ca - a.ca; });
+    var hostC = h('div');
+    if (parC.length) G.barres(hostC, { lignes: parC.map(function (x) { return { cle: x.cle, label: x.cle, sous: nbr(x.n) + ' vente' + pl(x.n) + ' · bénéfice ' + eurS(x.net, 0), v: x.ca, txt: eur(x.ca, 0) }; }),
+      sel: fb.canal || null, onSelect: function (k) { choisir('canal', k); }, valeurNom: 'chiffre d’affaires', aria: 'Chiffre d’affaires par canal' });
+    g.appendChild(carte({ span: 'pl-c4', titre: 'Ventes par canal', sous: 'chiffre d’affaires', corps: [parC.length ? hostC : vide2('Aucune vente.')],
+      table: parC.length ? function () { return tableauDim(parC, 'Canal', function (x) { return x.cle; }); } : null }));
+    var parL = PB.parCle(X.ventes.filter(function (v) { return v.langue; }), 'langue', PB.totaux).sort(function (a, b) { return b.ca - a.ca; });
+    var hostL = h('div');
+    if (parL.length) G.barres(hostL, { lignes: parL.map(function (x) { return { cle: x.cle, label: x.cle, sous: nbr(x.n) + ' carte' + pl(x.n) + ' · bénéfice ' + eurS(x.net, 0), v: x.ca, txt: eur(x.ca, 0) }; }),
+      sel: fb.langue || null, onSelect: function (k) { choisir('langue', k); }, valeurNom: 'chiffre d’affaires', aria: 'Chiffre d’affaires par langue' });
+    g.appendChild(carte({ span: 'pl-c4 pl-m12', titre: 'Ventes par langue', sous: 'cartes seulement · chiffre d’affaires', corps: [parL.length ? hostL : vide2('Aucune carte vendue.')],
+      table: parL.length ? function () { return tableauDim(parL, 'Langue', function (x) { return x.cle; }); } : null }));
+    /* stock (aujourd'hui) */
+    g.appendChild(h('div', { class: 'pl-titre-groupe' }, [h('h2', { text: 'Stock' }), h('p', { text: 'aujourd’hui, au prix marché' + (filtre ? ' · filtres appliqués' : '') })]));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Valeur marché', v: eur(ST.valeur, 0), sous: ST.sans_prix ? ST.sans_prix + ' carte' + pl(ST.sans_prix) + ' sans prix non comptée' + pl(ST.sans_prix) : 'si tout se vend au prix marché' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Coût du stock', v: eur(ST.cout, 0), sous: ST.estime > 0.5 ? 'dont ' + eur(ST.estime, 0) + ' estimés' : 'prix d’achat réels' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Plus-value latente', v: eurS(ST.latent, 0), cls: ST.latent < -0.5 ? 'pl-neg' : '', sous: ST.gain != null ? 'soit ' + pct(ST.gain) + ' du coût, frais de vente déduits' : null }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'En stock', v: nbr(ST.cartes) + ' carte' + pl(ST.cartes), sous: ST.unites ? '+ ' + nbr(ST.unites) + ' unités (boosters, ex, card sets)' : null }));
+    var sG = PB.parCle(X.stock, 'groupe', PB.totauxStock).sort(function (a, b) { return b.valeur - a.valeur; });
+    var hostSG = h('div');
+    if (sG.length) G.barres(hostSG, { lignes: sG.map(function (x) { return { cle: x.cle, label: F.noms[x.cle] || x.cle, sous: nbr(x.n) + (x.cartes ? ' carte' + pl(x.n) : ' unité' + pl(x.n)) + ' · plus-value ' + eurS(x.latent, 0), v: x.valeur, txt: eur(x.valeur, 0), repere: x.cout }; }),
+      sel: fb.groupe || null, onSelect: function (k) { choisir('groupe', k); }, valeurNom: 'valeur marché', repereNom: 'coût d’achat', aria: 'Valeur du stock par groupe, avec son coût' });
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Valeur du stock par groupe', sous: 'barre : prix marché · trait : ce qu’il t’a coûté',
+      corps: sG.length ? [G.legende([{ nom: 'Valeur marché', cls: 'g-s1' }, { nom: 'Coût d’achat', cls: 'g-repere', forme: 'repere' }]), hostSG] : [vide2('Rien en stock.')],
+      table: sG.length ? function () { return tableauStock(sG, 'Groupe', function (x) { return F.noms[x.cle] || x.cle; }); } : null }));
+    var sP = PB.ORDRE_GAMMES.map(function (k) { var l = X.stock.filter(function (s) { return s.gamme === k; }); return Object.assign({ cle: k }, PB.totauxStock(l)); })
+      .filter(function (x) { return x.n > 0 && x.cle !== 'Sans prix marché'; });
+    var hostSP = h('div');
+    if (sP.length) G.colonnes(hostSP, { cats: sP.map(function (x) { return { cle: x.cle, label: x.cle.replace(' et plus', ' +').replace('Moins de ', '< ').replace(/ €/g, '').replace(' à ', '–') + ' €', long: x.cle }; }),
+      series: [{ nom: 'Valeur marché', cls: 'g-s1', valeurs: sP.map(function (x) { return x.valeur; }) }], hauteur: 220, fmt: function (v) { return eur(v, 0); },
+      sel: fb.gamme || null, onSelect: function (k) { choisir('gamme', k); },
+      detail: function (i) { var x = sP[i]; return [{ v: nbr(x.cartes), l: 'carte' + pl(x.cartes), sous: true }, { v: eur(x.cout, 0), l: 'coût d’achat', sous: true }, { v: eurS(x.latent, 0), l: 'plus-value', sous: true }]; },
+      aria: 'Valeur du stock par gamme de prix' });
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Stock par gamme de prix', sous: 'où dort la valeur · touche une gamme pour filtrer', corps: [sP.length ? hostSP : vide2('Aucune carte avec un prix marché.')],
+      table: sP.length ? function () { return tableauStock(sP, 'Gamme de prix', function (x) { return x.cle; }); } : null }));
+    /* meilleures ventes, plus grosses pièces */
+    var tv = X.ventes.filter(function (v) { return v.type === 'carte'; }).sort(function (a, b) { return b.net - a.net; }).slice(0, 8);
+    g.appendChild(carte({ span: 'pl-c6 pl-m12', titre: 'Meilleures ventes', sous: 'bénéfice net, ' + per.nom.toLowerCase(), corps: [tv.length ? tableau([
+      { t: 'Carte', f: function (v) { return celluleCarte(v.r, [v.date ? dateFR(v.date) : 'sans date', v.canal].join(' · ')); }, v: function (v) { return v.nom; } },
+      { t: 'Vendue', f: function (v) { return eur(v.ca, 0); }, v: function (v) { return v.ca; } },
+      { t: 'Bénéfice', f: function (v) { return eurS(v.net, 0); }, v: function (v) { return v.net; }, barre: true, cls: function (v) { return v.net < -0.005 ? 'pl-neg' : ''; } }
+    ], tv, null, 'Meilleures ventes', { cle: 'bord-top-ventes' }) : vide2('Aucune carte vendue.')] }));
+    var ts = X.stock.filter(function (s) { return s.type === 'carte' && s.valeur != null; }).sort(function (a, b) { return b.valeur - a.valeur; }).slice(0, 8);
+    g.appendChild(carte({ span: 'pl-c6 pl-m12', titre: 'Plus grosses pièces en stock', sous: 'au prix marché', corps: [ts.length ? tableau([
+      { t: 'Carte', f: function (s) { return celluleCarte(s.r, nomGroupe(s.r.c.groupe) + (s.estime ? ' · coût estimé' : '')); }, v: function (s) { return s.nom; } },
+      { t: 'Prix', f: function (s) { return eur(s.valeur, 0); }, v: function (s) { return s.valeur; } },
+      { t: 'Plus-value', f: function (s) { return eurS(s.latent, 0); }, v: function (s) { return s.latent; }, barre: true, cls: function (s) { return s.latent < -0.005 ? 'pl-neg' : ''; } }
+    ], ts, null, 'Plus grosses pièces en stock', { cle: 'bord-top-stock' }) : vide2('Rien en stock.')] }));
+    /* à surveiller, charges */
     var al = alertes();
-    m.appendChild(section('À surveiller', [al.length ? h('ul', { class: 'pl-alertes' }, al.map(function (a) {
-      return h('li', null, h('a', { class: 'pl-alerte', href: '#controles' }, [h('span', { class: 'pl-alerte__n', text: nbr(a[0]) }), h('span', { text: a[1] })]));
-    })) : h('p', { class: 'pl-box', text: 'Rien à signaler.' })], S.site ? null : 'Les contrôles avec le site s’afficheront dès que ses données seront chargées.'));
-    m.appendChild(section('Synthèse comme dans l’Excel', [syntheseTable(), details('Par catégorie', null, [categoriesTable()])]));
+    g.appendChild(carte({ span: 'pl-c5', titre: 'À surveiller', sous: S.site ? 'compta, tickets et site' : 'les contrôles avec le site arrivent dès que ses données sont chargées',
+      corps: [al.length ? h('ul', { class: 'pl-alertes' }, al.map(function (a) {
+        return h('li', null, h('a', { class: 'pl-alerte', href: '#controles' }, [h('span', { class: 'pl-alerte__n' + (a[2] ? ' pl-alerte__n--ko' : ''), text: nbr(a[0]) }), h('span', { text: a[1] })]));
+      })) : vide2('Rien à signaler.')] }));
+    if (w.PRCouts) {
+      var XC = couts('tout'), nCh = (S.doc.charges || []).length;
+      g.appendChild(carte({ span: 'pl-c7', titre: 'Après toutes tes charges', sous: 'depuis le début, sans filtre',
+        corps: nCh ? [h('div', { class: 'pl-kpis pl-kpis--2' }, [
+          tuile('Résultat analytique', eurS(XC.cascade.resultat, 0), 'ventes − achats − toutes les charges', XC.cascade.resultat < 0 ? 'pl-neg' : ''),
+          tuile('Charges payées', eur(XC.totaux.charges, 0), nCh + ' charge' + pl(nCh) + (XC.totaux.stock_frais_voyage > 0.5 ? ' · ' + eur(XC.totaux.stock_frais_voyage, 0) + ' encore en stock' : '')),
+          tuile('Coûts cachés', eur(XC.cascade.caches, 0), 'temps, capital, décote, dépréciation'),
+          tuile('Point mort', XC.seuil.point_mort_date ? (XC.seuil.point_mort_jours <= XC.seuil.duree ? dateFR(XC.seuil.point_mort_date) : 'pas atteint') : '—', XC.seuil.sr != null ? 'seuil ' + eur(XC.seuil.sr, 0) + ' de CA' : null)
+        ])] : [h('p', { class: 'pl-note', text: 'Le bénéfice ci-dessus ne compte que tes achats et tes ventes. Ajoute tes frais (voyage, abonnements, fournitures…) pour voir ton vrai résultat.' }),
+          h('div', { class: 'pl-actions' }, [bouton('+ Ajouter une charge', function () { feuilleCharge(null); }), h('a', { class: 'btn btn--ghost', href: '#voyages', text: 'Mes voyages' })])],
+        pied: nCh ? [h('a', { href: '#couts', text: 'Cascade des marges, seuil de rentabilité, coûts cachés ›' })] : null }));
+    }
+    g.appendChild(carte({ span: 'pl-c12', titre: 'Synthèse comme dans l’Excel', sous: 'par groupe, depuis le début, sans filtre', corps: [syntheseTable()],
+      pied: [details('Par catégorie', null, [categoriesTable()])] }));
   };
+  function celluleCarte(r, meta) {
+    var c = r.c;
+    return h('a', { class: 'pl-t-img', href: '#carte/' + encodeURIComponent(c.ref) }, [vignette(c), h('span', null, [c.nom || c.ref, h('small', { text: meta })])]);
+  }
+  /* vue « Tableau » des graphiques par dimension (ventes) et par regroupement de stock */
+  function tableauDim(l, nom, lib) {
+    return tableau([
+      { t: nom, f: lib, v: lib },
+      { t: 'Articles', f: function (x) { return nbr(x.n); }, v: function (x) { return x.n; } },
+      { t: 'Chiffre d’affaires', f: function (x) { return eur(x.ca, 2); }, v: function (x) { return x.ca; } },
+      { t: 'Bénéfice', f: function (x) { return eurS(x.net, 2); }, v: function (x) { return x.net; }, cls: function (x) { return x.net < -0.005 ? 'pl-neg' : ''; } },
+      { t: 'Taux de marque', f: function (x) { return pct(x.marque); }, v: function (x) { return x.marque; } },
+      { t: 'Rentabilité', f: function (x) { return pct(x.rentab); }, v: function (x) { return x.rentab; } }
+    ], l, null, nom, { cle: 'dim-' + nom });
+  }
+  function tableauStock(l, nom, lib) {
+    return tableau([
+      { t: nom, f: lib, v: lib },
+      { t: 'Articles', f: function (x) { return nbr(x.n); }, v: function (x) { return x.n; } },
+      { t: 'Valeur marché', f: function (x) { return eur(x.valeur, 2); }, v: function (x) { return x.valeur; } },
+      { t: 'Coût', f: function (x) { return eur(x.cout, 2); }, v: function (x) { return x.cout; } },
+      { t: 'Plus-value', f: function (x) { return eurS(x.latent, 2); }, v: function (x) { return x.latent; }, cls: function (x) { return x.latent < -0.005 ? 'pl-neg' : ''; } },
+      { t: 'Gain', f: function (x) { return pct(x.gain); }, v: function (x) { return x.gain; } }
+    ], l, null, nom, { cle: 'stock-' + nom });
+  }
   function alertes() {
     var c = S.R.controles, cs = controlesSite(), out = [];
     if (cs) {
-      if (cs.a_saisir.length) out.push([cs.a_saisir.length, 'vente' + pl(cs.a_saisir.length) + ' faite' + pl(cs.a_saisir.length) + ' sur le site, pas encore saisie' + pl(cs.a_saisir.length) + ' ici']);
-      if (cs.encore.length) out.push([cs.encore.length, 'carte' + pl(cs.encore.length) + ' vendue' + pl(cs.encore.length) + ' ici mais encore en vente sur le site']);
+      if (cs.a_saisir.length) out.push([cs.a_saisir.length, 'vente' + pl(cs.a_saisir.length) + ' faite' + pl(cs.a_saisir.length) + ' sur le site, pas encore saisie' + pl(cs.a_saisir.length) + ' ici', true]);
+      if (cs.encore.length) out.push([cs.encore.length, 'carte' + pl(cs.encore.length) + ' vendue' + pl(cs.encore.length) + ' ici mais encore en vente sur le site', true]);
       if (cs.prix.length) out.push([cs.prix.length, 'prix du site différent' + pl(cs.prix.length) + ' du prix marché']);
       if (cs.absentes.length) out.push([cs.absentes.length, 'fiche' + pl(cs.absentes.length) + ' du site absente' + pl(cs.absentes.length) + ' de la compta']);
     }
@@ -739,7 +990,7 @@
       { t: 'Nb', f: function (l) { return nbr(l.nb); } },
       { t: 'Payé', f: function (l) { return eur(l.paye, 2); } },
       { t: 'Valeur marché', f: function (l) { return eur(l.valeur, 2); } },
-      { t: 'Marge nette', f: function (l) { return eur(l.marge, 2); }, cls: function (l) { return sens(l.marge); } },
+      { t: 'Marge nette', f: function (l) { return eur(l.marge, 2); }, cls: function (l) { return neg(l.marge); } },
       { t: 'Gain', f: function (l) { return pct(l.gain); } }
     ], R.synthese, R.synthTotal, 'Synthèse par groupe');
   }
@@ -750,7 +1001,7 @@
     S.R.categories.forEach(function (g) {
       tb.appendChild(h('tr', { class: 'pl-tot' }, [h('td', { colspan: '6', text: g.groupe.nom || g.groupe.id })]));
       g.lignes.forEach(function (l) {
-        tb.appendChild(h('tr', null, [h('th', { scope: 'row', text: l.cat }), h('td', { text: nbr(l.nb) }), h('td', { text: eur(l.paye, 2) }), h('td', { text: eur(l.valeur, 2) }), h('td', { class: sens(l.marge), text: eur(l.marge, 2) }), h('td', { text: pct(l.gain) })]));
+        tb.appendChild(h('tr', null, [h('th', { scope: 'row', text: l.cat }), h('td', { text: nbr(l.nb) }), h('td', { text: eur(l.paye, 2) }), h('td', { text: eur(l.valeur, 2) }), h('td', { class: neg(l.marge), text: eur(l.marge, 2) }), h('td', { text: pct(l.gain) })]));
       });
     });
     t.appendChild(tb);
@@ -1081,7 +1332,7 @@
       { t: 'Encaissé', f: function (l) { return eur(l.encaisse, 2); } },
       { t: 'Coût', f: function (l) { return eur(l.cout, 2); } },
       { t: 'Envoi', f: function (l) { return eur(l.envoi, 2); } },
-      { t: 'Bénéfice', f: function (l) { return eur(l.net, 2); }, cls: function (l) { return sens(l.net); } },
+      { t: 'Bénéfice', f: function (l) { return eur(l.net, 2); }, cls: function (l) { return neg(l.net); } },
       { t: 'Rentab.', f: function (l) { return pct(l.rentab); } }
     ], R.ventes, vt, 'Ventes par groupe')]));
     var vendues = R.cartes.filter(function (r) { return r.vente; }).sort(function (a, b) {

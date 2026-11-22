@@ -214,6 +214,8 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Pilotage refait visuellement (tableau de bord filtrable façon Qlik, graphiques interactifs, rendu iPad) :
+  voir § Pilotage › Refonte visuelle.
 - (22/11) Noms d'extensions en français sur tout le site FR (filtres, fiches, pages d'extension, vignettes, titres,
   descriptions, pochettes, collection « 30e Anniversaire », images de partage) ; adresses inchangées ; EN inchangé
   (voir section 4).
@@ -356,3 +358,26 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
 - Sorties : comparaison franchise / réel, compte de résultat en SIG, IS, salaire ou dividendes (courbe de ce qui reste
   selon le salaire, optimum), ratios (marge, marque, coefficient, rotation, durée de stockage, BFR, poids des charges
   fixes, rentabilités). Mention « je ne suis ni expert-comptable ni avocat » affichée.
+
+**Refonte visuelle (22/11/2026, demande d'Arthur : « niveau QlikSense », outil pro sur iPad)** :
+- Rendu « application iPad » : police système partout (plus de Caslon dans le Pilotage), cartes blanches à filet fin sur
+  fond neutre, barre latérale à partir de 1000 px, onglets en bas en dessous. Tout est sous `body.pl` dans
+  `assets/css/pilotage.css` (variables `--pl-*` pour l'interface, `--g-*` pour les graphiques) : le site public n'est pas touché.
+  Mise en page par requêtes de conteneur sur `.pl-main` : téléphone (1 colonne, tuiles par 2), 620–979 px (iPad portrait,
+  Split View : 2 colonnes, `pl-m12` = pleine largeur), 980 px et plus (iPad paysage : grille de 12, classes `pl-c3`…`pl-c8`).
+- `assets/js/pilotage-graph.js` (PRGraph) : graphiques maison en SVG/HTML, sans bibliothèque, compatibles CSP (aucun
+  attribut style : CSSOM et attributs SVG) : `colonnes` (+ ligne), `courbe` (réticule), `barres` (classées, divergentes,
+  repère), `nuage`, `cascade`, `tendance`, `jauge`, `parts`, `legende`. Infobulle au survol, au toucher et au clavier ;
+  redessin à la largeur du cadre (ResizeObserver, `PRGraph.nettoyer()` à chaque rendu). Palette validée (script de contrôle
+  daltonisme/contraste) : bleu `#2a78d6` puis orange `#eb6834` ; écart positif/négatif bleu/rouge ; gris = non sélectionné.
+- `assets/js/pilotage-bord.js` (PRBord, testable dans Node) : « faits » (ventes, stock, achats), périodes (30 j, 90 j,
+  12 mois, depuis le début), filtres, séries par jour/semaine/mois. **Sans filtre et sur « Depuis le début », les totaux
+  retombent exactement sur ceux de pilotage-calcul.js** (vérifié sur 3 jeux fictifs, écart < 1e-11). Ventes de produits :
+  lignes datées de leur `historique`, le reste en une ligne « sans date ». Une période ne garde que les ventes datées.
+- Bord : barre de filtres collante (période, groupe, langue, canal) + sélections au toucher des graphiques (groupe, canal,
+  langue, gamme de prix), comme dans Qlik : tout le tableau suit (`S.fb`). Tuiles avec écart vs la période d'avant et
+  tendance ; CA et bénéfice dans le temps (ventes sans date en gris), investissement récupéré, bénéfice par groupe, ventes
+  par canal et par langue, stock par groupe (trait = coût) et par gamme, meilleures ventes, plus grosses pièces.
+  Chaque graphique a sa vue « Tableau » ; tableaux triables (`tableau(..., { cle })`, colonne `v`, mini-barres `barre`).
+- Test sans données réelles : banc local hors dépôt (données fictives tirées du stock public, API simulée, CSP du site,
+  captures Playwright iPad 1376 px / portrait / Split View / iPhone). Ne jamais mettre ces données dans le dépôt.
