@@ -320,6 +320,7 @@
     head.appendChild(b);
     w.appendChild(head);
     var out = el(multi ? 'pre' : 'p', 'annonce__val', value);
+    out.setAttribute('translate', 'no'); /* texte de l'annonce : jamais traduit (assets/js/langue.js) */
     w.appendChild(out);
     b.addEventListener('click', function () { copier(value, b); });
     return w;

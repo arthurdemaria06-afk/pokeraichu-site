@@ -35,13 +35,17 @@ body.pl{
 .pl-top{position:sticky;top:0;z-index:25;display:flex;align-items:center;gap:12px;height:var(--pl-haut);padding:0 16px;padding-left:max(16px,env(safe-area-inset-left));
   background:var(--pl-verre);-webkit-backdrop-filter:saturate(1.6) blur(18px);backdrop-filter:saturate(1.6) blur(18px);border-bottom:1px solid var(--pl-ligne)}
 .pl-top__brand{display:flex;flex:none}
+.pl-top .langue{display:flex;flex:none;gap:2px;padding:2px;background:var(--pl-seg);border-radius:8px}
+.pl-top .langue button{min-width:34px;min-height:28px;padding:0 8px;border:0;border-radius:6px;background:transparent;font:600 .74rem/1 var(--text);letter-spacing:.04em;color:var(--pl-encre-3);cursor:pointer}
+.pl-top .langue button[aria-pressed="true"]{background:var(--pl-seg-on);color:var(--pl-encre);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.pl-top .langue button:focus-visible{outline:2px solid var(--pl-acc-2);outline-offset:1px}
 .pl-top__brand img{display:block;width:26px;height:auto}
 .pl-top__t{flex:1;min-width:0;display:flex;align-items:baseline;gap:10px}
 .pl-top__eyebrow{order:2;margin:0;font:500 .78rem/1.2 var(--text);color:var(--pl-encre-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pl-top__h{order:1;margin:0;font:600 1.06rem/1.2 var(--text);letter-spacing:-.01em;color:var(--pl-encre)}
 .pl-sync{display:flex;align-items:center;gap:7px;margin:0;padding:5px 10px;border-radius:999px;background:var(--pl-carte);border:1px solid var(--pl-ligne);font:500 .76rem/1.2 var(--text);color:var(--pl-encre-2);white-space:nowrap}
 .pl-sync:empty{display:none}
-@media (max-width:520px){.pl-top__eyebrow{display:none}}
+@media (max-width:520px){.pl-top__eyebrow{display:none}.pl-top{gap:8px;padding-right:max(10px,env(safe-area-inset-right))}.pl-top__t{overflow:hidden}.pl-top__h{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.pl-sync{padding:5px 8px}.pl-top .langue button{min-width:28px;padding:0 6px}}
 .pl-sync::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--pl-encre-3)}
 .pl-sync[data-etat="ok"]::before{background:#1E9E4A}
 .pl-sync[data-etat="attente"]::before,.pl-sync[data-etat="envoi"]::before{background:#E39A12}

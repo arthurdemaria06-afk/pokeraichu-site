@@ -613,7 +613,7 @@
     if (opts && opts.extra) meta.push(opts.extra);
     return h('li', null, h('a', { class: 'pl-row', href: '#carte/' + encodeURIComponent(c.ref) }, [
       vignette(c),
-      h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: c.nom || c.ref }), h('span', { class: 'pl-row__meta', text: sansDoublons(meta).join(' · ') })]),
+      h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', translate: 'no', text: c.nom || c.ref }), h('span', { class: 'pl-row__meta', text: sansDoublons(meta).join(' · ') })]),
       h('span', { class: 'pl-row__nums' }, nums)
     ]));
   }
@@ -949,7 +949,7 @@
   };
   function celluleCarte(r, meta) {
     var c = r.c;
-    return h('a', { class: 'pl-t-img', href: '#carte/' + encodeURIComponent(c.ref) }, [vignette(c), h('span', null, [c.nom || c.ref, h('small', { text: meta })])]);
+    return h('a', { class: 'pl-t-img', href: '#carte/' + encodeURIComponent(c.ref) }, [vignette(c), h('span', null, [h('span', { translate: 'no', text: c.nom || c.ref }), h('small', { text: meta })])]);
   }
   /* vue « Tableau » des graphiques par dimension (ventes) et par regroupement de stock */
   function tableauDim(l, nom, lib) {
@@ -1169,7 +1169,7 @@
     if (im) im.el.addEventListener('error', function () { fc.textContent = 'Pas encore de photo'; });
     m.appendChild(h('div', { class: 'pl-fiche' }, [
       im ? h('figure', { class: 'pl-fiche__fig' }, [h('div', { class: 'pl-fiche__img' }, im.el), fc]) : null,
-      h('div', null, [h('h1', { text: c.nom || c.ref }),
+      h('div', null, [h('h1', { translate: 'no', text: c.nom || c.ref }),
         h('p', { class: 'pl-fiche__ref', text: ['N° ' + c.ref, nomGroupe(c.groupe), c.cat, c.langue, c.etat].filter(Boolean).join(' · ') }),
         h('div', { class: 'pl-badges' }, [
           c.vendu ? badge('Vendue' + (r.date_vente ? ' ' + quandVendue(r) : ''), 'vendu') : r.hors ? badge('Hors totaux') : badge('En stock', 'ok'),
@@ -2668,7 +2668,7 @@
         signe: false, valeurNom: '', aria: 'Franchise et réel comparés' });
       g.appendChild(carte({ span: 'pl-c6', titre: 'TVA : franchise ou réel ?', sous: 'sur 12 mois', corps: [h('p', { class: 'pl-big', text: verdict }), G.legende([{ nom: 'En franchise', cls: 'g-s1' }, { nom: 'Au réel', cls: 'g-s2' }]), hostT],
         table: function () { return compact(tableau([{ t: 'Sur 12 mois', f: function (l) { return l[0]; } }, { t: 'Franchise', f: function (l) { return l[1](fr); } }, { t: 'Réel', f: function (l) { return l[1](re); } }], lignesTva, null, 'Franchise ou réel')); },
-        pied: ['Franchise (CA sous 85 000 €, tolérance 93 500 €) : pas de TVA sur tes ventes (« TVA non applicable, art. 293 B du CGI »), mais aucune TVA récupérée, y compris les 20 % payés à l’import de tes cartes japonaises. ' +
+        pied: ['Franchise (CA sous ' + eur(RG.franchise, 0) + ', tolérance ' + eur(RG.franchise_majore, 0) + ') : pas de TVA sur tes ventes (« TVA non applicable, art. 293 B du CGI »), mais aucune TVA récupérée, y compris les 20 % payés à l’import de tes cartes japonaises. ' +
           'Réel : cartes de particuliers au régime de la marge (TVA = marge × 20/120), cartes importées ou achetées à un pro : TVA sur le prix, TVA d’achat récupérée. ' +
           'Sur tes ventes réelles, le réel aurait donné ' + eur(tr.collectee) + ' de TVA facturée (' + eur(tr.collectee_marge) + ' sur la marge, ' + eur(tr.collectee_normale) + ' sur le prix des cartes importées) pour ' + eur(tr.deductible_achats) + ' de TVA d’achat récupérable. Provenance : ' + tr.n.import + ' importées, ' + tr.n.particulier + ' de particuliers' + (tr.n.pro ? ', ' + tr.n.pro + ' de pros' : '') + '.'] }));
       /* compte de résultat */

@@ -121,3 +121,9 @@ p.annonce__val{font-weight:600}
 .client{border-top:1px solid var(--line)}
 .client__sum{min-height:48px;display:flex;align-items:center;cursor:pointer;font-weight:600}
 .client__info{margin:0 0 6px;font-size:.88rem;color:var(--nezumi)}
+/* langue FR | DE (assets/js/langue.js), en haut à droite de l'en-tête de la page */
+#gestion .page-head{position:relative}
+.page-head .langue{position:absolute;top:25px;right:0;display:flex;gap:2px;padding:2px;border:1px solid var(--line);border-radius:999px;background:var(--gofun)}
+.page-head .langue button{min-width:38px;min-height:32px;padding:0 10px;border:0;border-radius:999px;background:transparent;font:600 .78rem/1 var(--text);letter-spacing:.04em;color:var(--sumi);opacity:.62;cursor:pointer}
+.page-head .langue button[aria-pressed="true"]{background:var(--sumi);color:var(--gofun);opacity:1}
+.page-head .langue button:focus-visible{outline:2px solid var(--shu);outline-offset:2px}

@@ -221,6 +221,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Pilotage et Gestion en allemand : bouton FR | DE (`langue.js` + `langue-de.js`), voir § Pilotage › Langue allemande.
 - (22/11) Pilotage : frais de vente par canal (Vinted 0 %).
 - (22/11) Pilotage : dates de vente (chrono à partir du 22/11/2026, ventes passées sans date à l'achat + 7 j) ;
   « À compléter » = cartes sans prix de vente seulement.
@@ -425,3 +426,27 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   carte #1A1A19 ; `pilotage.html` a `color-scheme` et deux `theme-color` (clair/sombre).
 - Test sans données réelles : banc local hors dépôt (données fictives tirées du stock public, API simulée, CSP du site,
   captures Playwright iPad 1376 px / portrait / Split View / iPhone, clair et sombre). Ne jamais mettre ces données dans le dépôt.
+- **Langue allemande (22/11, demande d'Arthur pour sa compagne, allemande et expert-comptable)** : bouton FR | DE dans
+  la barre du haut du Pilotage et en haut à droite de l'en-tête de la page Gestion (l'en-tête du site garde son FR | EN
+  public). Choix mémorisé par appareil (`localStorage` `pr.langue`) ; la page se recharge au changement. En FR, rien ne
+  change.
+  - `assets/js/langue.js` : traduction au vol de la page (textes, `placeholder`, `aria-label`, `title`, `alt`, boutons,
+    `alert/confirm/prompt`, titre de l'onglet), MutationObserver pour ce qui s'affiche ensuite. Les moteurs et les
+    données ne sont pas touchés. Nombres et dates au format allemand (1.348 €, 22.11.2026 um 22:02, 6. Juli).
+  - `assets/js/langue-de.js` (généré) : `PR_DE` = dictionnaire. Clé = texte français dont les nombres et dates sont
+    remplacés par {0}, {1}… ; `[Karte|Karten]` choisit singulier ou pluriel selon le nombre qui précède. `PR_DE_RE` =
+    motifs pour les textes qui contiennent une donnée (« Achats du voyage X », « N° 123 · … », « Frais du voyage « X » ») ;
+    `PR_DE_CTX` = traductions selon l'endroit (« Annuler » dans un toast = « Rückgängig »).
+  - Ordre de recherche : dictionnaire → motif → nombres seuls → phrase par phrase (sans couper après « réf. », « art. »)
+    → séparateurs (` · `, ` : `, `, `…) → parenthèses → guillemets « » rendus „ “.
+  - Restent en français, exprès (`translate="no"`) : noms des cartes et textes d'annonce (eBay, Vinted, Leboncoin).
+    Noms d'extensions, de voyages et de boutiques = données, laissés tels quels.
+  - **Tout nouveau texte français du Pilotage ou de la Gestion doit recevoir sa traduction dans `langue-de.js`**, sinon
+    il reste en français en mode DE (sans rien casser). Le dictionnaire est produit sur le banc local hors dépôt :
+    collecte de tous les textes de toutes les vues, lots traduits à la main, contrôle des restes en français.
+  - Vocabulaire : Pilotage = Controlling ; « du » dans le Pilotage (comme le « tu »), « Sie » dans la Gestion (comme le
+    « vous »). Marge = Handelsspanne, rentabilité = Rendite, bénéfice net = Nettogewinn, CA = Umsatz, charges =
+    Aufwendungen, ticket = Beleg, coût complet = Vollkosten, seuil de rentabilité = Gewinnschwelle, scellé = Sealed,
+    franchise = Kleinunternehmerregelung, réel = Regelbesteuerung, TVA sur la marge = Differenzbesteuerung, TVA = USt.,
+    TVA d'achat = Vorsteuer, TVA import = Einfuhrumsatzsteuer, IS = Körperschaftsteuer, EBE = EBITDA, TMI =
+    Grenzsteuersatz. La mention « TVA non applicable, art. 293 B du CGI » reste en français (c'est le texte de la facture).
