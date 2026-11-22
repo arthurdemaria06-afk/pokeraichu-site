@@ -54,6 +54,9 @@
   function pl(n) { return n > 1 ? 's' : ''; }
   function z(v) { return typeof v === 'number' && isFinite(v) ? v : 0; }
   function vide(v) { return v === null || v === undefined || (typeof v === 'number' && !isFinite(v)); }
+  /* date de vente retenue (moteur : vraie date, sinon règle « achat + 7 jours ») */
+  function quandVendue(r) { return r && r.date_vente ? (r.vente_estimee ? 'vers le ' : 'le ') + dateFR(r.date_vente) : null; }
+  function dateVenteCourte(r) { return r && r.date_vente ? (r.vente_estimee ? '≈ ' : '') + dateFR(r.date_vente) : '—'; }
   function sansDoublons(l) { var vu = {}; return l.filter(function (x) { if (!x) return false; var k = String(x).toLowerCase(); if (vu[k]) return false; vu[k] = 1; return true; }); }
   function uniques(l) { var o = {}; l.forEach(function (x) { if (x) o[x] = 1; }); return Object.keys(o).sort(function (a, b) { return a.localeCompare(b, 'fr'); }); }
   function cmpRef(a, b) {
@@ -598,14 +601,13 @@
   function ligneCarte(r, opts) {
     var c = r.c, nums = [], meta = [c.ref, c.groupe, c.cat, c.langue];
     if (c.vendu) {
-      meta.push(c.vente_date ? 'vendue le ' + dateFR(c.vente_date) : 'vendue', c.canal);
+      meta.push(r.date_vente ? 'vendue ' + quandVendue(r) : 'vendue', c.canal);
       nums.push(h('span', { class: 'pl-row__prix', text: eur(r.encaisse) }));
       if (r.vente) nums.push(h('span', { class: 'pl-row__m ' + sens(r.vente.net), text: fleche(r.vente.net) + eurS(r.vente.net) }));
       else nums.push(badge('Vendue', 'vendu'));
     } else {
       nums.push(h('span', { class: 'pl-row__prix', text: vide(c.prix) ? 'Prix ?' : eur(c.prix) }));
       if (!vide(r.latent)) nums.push(h('span', { class: 'pl-row__m ' + sens(r.latent), text: fleche(r.latent) + eurS(r.latent) + (r.gain != null ? ' · ' + pct(r.gain) : '') }));
-      if (r.source === 'estimé') meta.push('coût estimé');
       if (c.gardee) meta.push('gardée');
     }
     if (opts && opts.extra) meta.push(opts.extra);
@@ -827,7 +829,7 @@
     g.appendChild(kpi({ span: 'pl-c4', label: 'Panier moyen', v: eur(T.panier), sous: 'par article vendu', delta: TP ? ecart(T.panier, TP.panier) : null, deltaL: compar,
       tend: tend(function (s) { return s.panier; }), tendCls: 'g-s2' }));
     /* chiffre d'affaires et bénéfice dans le temps */
-    var aDater = R.cartes.filter(function (r) { return r.c.vendu && !r.hors && (!r.c.vente_date || !dateAchatCarte(r)); }).length;
+    var aDater = R.cartes.filter(function (r) { return r.c.vendu && !r.hors && !r.date_vente; }).length;
     var lienDater = aDater ? lienBtn('Dater mes ventes (' + aDater + ')', feuilleDatesVentes) : null;
     var vides = !SER.some(function (s) { return s.lignes; });
     var hostCA = h('div');
@@ -914,7 +916,7 @@
     /* meilleures ventes, plus grosses pièces */
     var tv = X.ventes.filter(function (v) { return v.type === 'carte'; }).sort(function (a, b) { return b.net - a.net; }).slice(0, 8);
     g.appendChild(carte({ span: 'pl-c6 pl-m12', titre: 'Meilleures ventes', sous: 'bénéfice net, ' + per.nom.toLowerCase(), corps: [tv.length ? tableau([
-      { t: 'Carte', f: function (v) { return celluleCarte(v.r, [v.date ? dateFR(v.date) : 'sans date', v.canal].join(' · ')); }, v: function (v) { return v.nom; } },
+      { t: 'Carte', f: function (v) { return celluleCarte(v.r, [v.date ? (v.date_estimee ? '≈ ' : '') + dateFR(v.date) : 'sans date', v.canal].join(' · ')); }, v: function (v) { return v.nom; } },
       { t: 'Vendue', f: function (v) { return eur(v.ca, 0); }, v: function (v) { return v.ca; } },
       { t: 'Bénéfice', f: function (v) { return eurS(v.net, 0); }, v: function (v) { return v.net; }, barre: true, cls: function (v) { return v.net < -0.005 ? 'pl-neg' : ''; } }
     ], tv, null, 'Meilleures ventes', { cle: 'bord-top-ventes' }) : vide2('Aucune carte vendue.')] }));
@@ -980,7 +982,6 @@
     }
     if (c.tickets_ecart.length) out.push([c.tickets_ecart.length, 'ticket' + pl(c.tickets_ecart.length) + ' dont les cartes ne font pas le total']);
     if (c.sans_prix.length) out.push([c.sans_prix.length, 'carte' + pl(c.sans_prix.length) + ' en stock sans prix marché']);
-    if (c.sans_paye.length) out.push([c.sans_paye.length, 'carte' + pl(c.sans_paye.length) + ' sans prix d’achat (coût estimé)']);
     if (c.a_perte.length) out.push([c.a_perte.length, 'carte' + pl(c.a_perte.length) + ' en stock sous son coût']);
     return out;
   }
@@ -1019,7 +1020,7 @@
       if (f.groupe && c.groupe !== f.groupe) return false;
       if (f.cat && (c.cat || '') !== f.cat) return false;
       if (f.langue && c.langue !== f.langue) return false;
-      if (f.manque && !(vide(c.prix) || r.paye == null)) return false;
+      if (f.manque && (c.vendu || !vide(c.prix))) return false;
       if (mots.length) {
         var t = r._q || (r._q = norm([c.ref, c.nom, c.nom_en, c.set, c.nom_ticket, c.groupe, c.cat, c.etat, c.langue, c.boutique, c.ticket, c.remarque, c.canal].join(' ')));
         for (var i = 0; i < mots.length; i++) if (t.indexOf(mots[i]) === -1) return false;
@@ -1042,7 +1043,7 @@
       return y - x || cmpRef(a.ref, b.ref);
     });
     if (tri === 'nom') return l.sort(function (a, b) { return (a.c.nom || '').localeCompare(b.c.nom || '', 'fr'); });
-    if (tri === 'vente') return l.sort(function (a, b) { return (b.c.vente_date || '').localeCompare(a.c.vente_date || '') || b.i - a.i; });
+    if (tri === 'vente') return l.sort(function (a, b) { return (b.date_vente || '').localeCompare(a.date_vente || '') || b.i - a.i; });
     return l.sort(function (a, b) { return cmpRef(a.ref, b.ref); });
   }
   VUES.stock = function (m) {
@@ -1075,29 +1076,35 @@
     var segV = h('div', { class: 'pl-seg pl-seg--vue', role: 'group', 'aria-label': 'Présentation' }, [['liste', 'Liste'], ['tableau', 'Tableau']].map(function (x) {
       return h('button', { type: 'button', 'aria-pressed': String(vue === x[0]), text: x[1], onclick: function () { S.stockVue = x[0]; rendre(true); } });
     }));
+    var aideM = h('p', { class: 'pl-apercu pl-stock-aide', hidden: true });
     var tuiles = h('div', { class: 'pl-kpis pl-kpis--stock', 'aria-live': 'polite' });
     var resume = h('p', { class: 'pl-resume' });
     var liste = h('div', { class: 'pl-stock-liste' });
     var plus = h('button', { type: 'button', class: 'btn btn--ghost pl-plus', text: 'Afficher la suite' });
     plus.addEventListener('click', function () { limite += 300; maj(); });
-    m.appendChild(tuiles); m.appendChild(h('div', { class: 'pl-stock-barre' }, [resume, segV])); m.appendChild(liste); m.appendChild(plus);
+    m.appendChild(aideM); m.appendChild(tuiles); m.appendChild(h('div', { class: 'pl-stock-barre' }, [resume, segV])); m.appendChild(liste); m.appendChild(plus);
     var auj = PB ? PB.jour(aujourdhui()) : null;
-    function age(r) { var da = dateAchatCarte(r); return da && auj != null ? Math.max(0, auj - PB.jour(da)) : null; }
+    function age(r) { return r.mise_en_vente && auj != null ? Math.max(0, auj - PB.jour(r.mise_en_vente)) : null; }
     function maj() {
-      var l = trier(cartesFiltrees(), f.tri), val = 0, cout = 0, lat = 0, enc = 0, net = 0, nv = 0, ns = 0, sa = 0, na = 0;
-      l.forEach(function (r) { if (r.c.vendu) { nv++; enc += z(r.encaisse); net += r.vente ? r.vente.net : 0; } else { ns++; val += z(r.c.prix); cout += z(r.cout); lat += z(r.latent); var a0 = age(r); if (a0 != null) { sa += a0; na++; } } });
+      var l = trier(cartesFiltrees(), f.tri), val = 0, cout = 0, coutV = 0, np = 0, lat = 0, enc = 0, net = 0, nv = 0, ns = 0, sa = 0, na = 0;
+      l.forEach(function (r) { if (r.c.vendu) { nv++; enc += z(r.encaisse); net += r.vente ? r.vente.net : 0; } else { ns++; val += z(r.c.prix); cout += z(r.cout); lat += z(r.latent); if (!vide(r.c.prix)) { np++; coutV += z(r.cout); } var a0 = age(r); if (a0 != null) { sa += a0; na++; } } });
+      aideM.hidden = !f.manque;
+      if (f.manque) {
+        aideM.textContent = l.length ? 'À compléter : ' + nbr(l.length) + ' carte' + pl(l.length) + ' sans prix de vente. Tant qu’elle' + (l.length > 1 ? 's n’en ont' : ' n’en a') + ' pas, ' + (l.length > 1 ? 'elles ne comptent' : 'elle ne compte') + ' pas dans la valeur du stock : ouvre la carte › Modifier › Prix marché.'
+          : 'À compléter : toutes tes cartes ont un prix de vente.';
+      }
       tuiles.textContent = '';
-      if (f.statut !== 'vendues') ajouter(tuiles, [tuile('Valeur marché', eur(val, 0), nbr(ns) + ' en stock'), tuile('Coût', eur(cout, 0), 'prix d’achat (ou estimé)'),
-        tuile('Plus-value', eurS(lat, 0), cout ? pct(lat / cout) + ' du coût, frais de vente déduits' : 'frais de vente déduits', lat < -0.5 ? 'pl-neg' : ''), f.statut === 'toutes' ? tuile('Vendues', nbr(nv), eur(enc, 0) + ' encaissés') : tuile('Âge moyen', na ? nbr(Math.round(sa / na)) + ' j' : '—', na ? 'en stock, sur ' + nbr(na) + ' carte' + pl(na) + ' datée' + pl(na) : 'aucune date d’achat')]);
+      if (f.statut !== 'vendues') ajouter(tuiles, [tuile('Valeur marché', np ? eur(val, 0) : '—', nbr(ns) + ' en stock' + (np < ns ? ', ' + nbr(ns - np) + ' sans prix' : '')), tuile('Coût', eur(cout, 0), 'prix d’achat (ou estimé)'),
+        tuile('Plus-value', np ? eurS(lat, 0) : '—', np ? (coutV ? pct(lat / coutV) + ' du coût, frais de vente déduits' : 'frais de vente déduits') : 'sans prix de vente', lat < -0.5 ? 'pl-neg' : ''), f.statut === 'toutes' ? tuile('Vendues', nbr(nv), eur(enc, 0) + ' encaissés') : tuile('En vente depuis', na ? nbr(Math.round(sa / na)) + ' j' : '—', 'moyenne · chrono lancé le ' + dateFR(R.dates_ventes ? R.dates_ventes.debut : aujourdhui()))]);
       else ajouter(tuiles, [tuile('Vendues', nbr(nv)), tuile('Encaissé', eur(enc, 0)), tuile('Bénéfice', eurS(net, 0), enc ? pct(net / enc) + ' du prix de vente' : null, net < -0.5 ? 'pl-neg' : ''), tuile('Panier moyen', nv ? eur(enc / nv) : '—')]);
       resume.textContent = nbr(l.length) + ' carte' + pl(l.length) + (l.length > limite ? ' · ' + nbr(limite) + ' affichées' : '');
       liste.textContent = '';
       liste.hidden = !l.length;
       var vis = l.slice(0, limite);
       if (vue === 'tableau') {
-        var cols = [{ t: 'Carte', f: function (r) { return celluleCarte(r, sansDoublons(['N° ' + r.c.ref, nomGroupe(r.c.groupe), r.c.cat, r.c.langue, r.source === 'estimé' ? 'coût estimé' : null]).join(' · ')); }, v: function (r) { return r.c.nom || r.ref; } }];
+        var cols = [{ t: 'Carte', f: function (r) { return celluleCarte(r, sansDoublons(['N° ' + r.c.ref, nomGroupe(r.c.groupe), r.c.cat, r.c.langue]).join(' · ')); }, v: function (r) { return r.c.nom || r.ref; } }];
         if (f.statut === 'vendues') cols = cols.concat([
-          { t: 'Vendue', f: function (r) { return r.c.vente_date ? dateFR(r.c.vente_date) : '—'; }, v: function (r) { return r.c.vente_date || ''; } },
+          { t: 'Vendue', f: function (r) { return dateVenteCourte(r); }, v: function (r) { return r.date_vente || ''; } },
           { t: 'Canal', f: function (r) { return r.c.canal || '—'; }, v: function (r) { return r.c.canal || ''; } },
           { t: 'Encaissé', f: function (r) { return eur(r.encaisse, 2); }, v: function (r) { return r.encaisse; } },
           { t: 'Bénéfice', f: function (r) { return r.vente ? eurS(r.vente.net, 2) : '—'; }, v: function (r) { return r.vente ? r.vente.net : null; }, barre: true, cls: function (r) { return r.vente ? neg(r.vente.net) : ''; } },
@@ -1107,7 +1114,7 @@
           { t: 'Coût', f: function (r) { return eur(r.cout, 0); }, v: function (r) { return r.cout; } },
           { t: 'Plus-value', f: function (r) { return r.c.vendu ? (r.vente ? eurS(r.vente.net, 0) : '—') : eurS(r.latent, 0); }, v: function (r) { return r.c.vendu ? (r.vente ? r.vente.net : null) : r.latent; }, barre: true, cls: function (r) { return neg(r.c.vendu ? (r.vente ? r.vente.net : 0) : r.latent); } },
           { t: 'Rentab.', f: function (r) { return pct(r.c.vendu ? (r.vente ? r.vente.rentab : null) : r.gain); }, v: function (r) { return r.c.vendu ? (r.vente ? r.vente.rentab : null) : r.gain; } },
-          { t: 'En stock depuis', f: function (r) { var a = age(r); return a == null ? '—' : nbr(a) + ' j'; }, v: function (r) { return age(r); } }]);
+          { t: 'En vente depuis', f: function (r) { var a = age(r); return a == null ? '—' : nbr(a) + ' j'; }, v: function (r) { return age(r); } }]);
         liste.appendChild(tableau(cols, vis, null, 'Cartes', { cle: 'stock-' + f.statut }));
       } else {
         var ul = h('ul', { class: 'pl-rows' });
@@ -1151,15 +1158,14 @@
       h('div', null, [h('h1', { text: c.nom || c.ref }),
         h('p', { class: 'pl-fiche__ref', text: ['N° ' + c.ref, nomGroupe(c.groupe), c.cat, c.langue, c.etat].filter(Boolean).join(' · ') }),
         h('div', { class: 'pl-badges' }, [
-          c.vendu ? badge('Vendue' + (c.vente_date ? ' le ' + dateFR(c.vente_date) : ''), 'vendu') : r.hors ? badge('Hors totaux') : badge('En stock', 'ok'),
+          c.vendu ? badge('Vendue' + (r.date_vente ? ' ' + quandVendue(r) : ''), 'vendu') : r.hors ? badge('Hors totaux') : badge('En stock', 'ok'),
           c.gardee ? badge('Gardée', 'garde') : null,
-          r.source === 'estimé' ? badge('Coût estimé', 'estime') : null,
           es ? badge(es === 'vendue' ? 'Vendue sur le site' : es === 'réservée' ? 'Réservée sur le site' : 'En vente sur le site' + (prixSite(sref) ? ' · ' + eur(prixSite(sref)) : ''), es === 'en vente' ? 'ok' : 'vendu') : null
         ])])
     ]));
     if (c.vendu && r.vente) {
       m.appendChild(section('Vente', [h('div', { class: 'pl-kpis' }, [
-        tuile('Prix de vente', eur(r.vente.encaisse, 2), [dateFR(c.vente_date), c.canal].filter(Boolean).join(' · ') || null),
+        tuile('Prix de vente', eur(r.vente.encaisse, 2), [r.date_vente ? dateVenteCourte(r) + (r.vente_estimee ? ' (achat + ' + nbr(S.R.dates_ventes.delai) + ' j)' : '') : null, c.canal].filter(Boolean).join(' · ') || null),
         tuile(r.source === 'estimé' ? 'Coût estimé' : 'Coût d’achat', eur(r.vente.cout, 2), 'frais d’envoi ' + eur(r.vente.envoi, 2)),
         tuile('Bénéfice net', eurS(r.vente.net, 2), null, sens(r.vente.net)),
         tuile('Rentabilité', pct(r.vente.rentab))
@@ -1419,7 +1425,7 @@
     var det = X.ventes.slice().sort(function (a2, b2) { return (b2.date || '').localeCompare(a2.date || '') || (b2.r && a2.r ? b2.r.i - a2.r.i : 0); });
     var limite = S.ventesTout ? det.length : 60;
     g.appendChild(carte({ span: 'pl-c12', titre: 'Détail des ventes · ' + nbr(det.length), sous: 'les ventes venues de l’Excel n’ont pas de date : elles sont à la fin', corps: [det.length ? tableau([
-      { t: 'Article', f: function (v) { return v.r ? celluleCarte(v.r, [nomGroupe(v.r.c.groupe), v.r.c.langue, v.estime ? 'coût estimé' : null].filter(Boolean).join(' · ')) : h('span', null, [v.nom, h('small', { class: 'pl-t-note', text: nbr(v.n) + ' vendu' + pl(v.n) + ' au nombre' })]); }, v: function (v) { return v.nom; } },
+      { t: 'Article', f: function (v) { return v.r ? celluleCarte(v.r, [nomGroupe(v.r.c.groupe), v.r.c.langue].filter(Boolean).join(' · ')) : h('span', null, [v.nom, h('small', { class: 'pl-t-note', text: nbr(v.n) + ' vendu' + pl(v.n) + ' au nombre' })]); }, v: function (v) { return v.nom; } },
       { t: 'Date', f: function (v) { return v.date ? dateFR(v.date) : '—'; }, v: function (v) { return v.date || ''; } },
       { t: 'Canal', f: function (v) { return v.canal; }, v: function (v) { return v.canal; } },
       { t: 'Prix marché', f: function (v) { return v.marche ? eur(v.marche) : '—'; }, v: function (v) { return v.marche; } },
@@ -1752,8 +1758,6 @@
         h('span', { class: 'pl-row__meta', text: x.t.note || '' })]), h('span', { class: 'pl-row__nums' }, h('span', { class: 'pl-row__prix', text: yen(x.t.total_yen) }))]));
     }))], false));
     m.appendChild(details('Cartes en stock sans prix marché', c.sans_prix.length, [h('ul', { class: 'pl-rows' }, c.sans_prix.map(function (r) { return ligneCarte(r); }))], false));
-    m.appendChild(details('Cartes sans prix d’achat (coût estimé)', c.sans_paye.length, [h('p', { class: 'pl-note', text: 'Leur coût est estimé avec la rentabilité retenue (' + pct(R.params.rent) + ') : renseigne le vrai prix quand tu l’as.' }),
-      h('ul', { class: 'pl-rows' }, c.sans_paye.slice().sort(function (a, b) { return z(b.c.prix) - z(a.c.prix); }).map(function (r) { return ligneCarte(r); }))], false));
     m.appendChild(details('Cartes en stock sous leur coût', c.a_perte.length, [h('ul', { class: 'pl-rows' }, c.a_perte.map(function (r) { return ligneCarte(r); }))], false));
     m.appendChild(details('Ventes à perte', c.ventes_a_perte.length, [h('ul', { class: 'pl-rows' }, c.ventes_a_perte.map(function (r) { return ligneCarte(r); }))], false));
   };
@@ -1802,18 +1806,19 @@
     var A = An.segments(R, fa.dim), Pf = fa.dim === 'type' ? A : An.segments(R, 'type'), T = Pf.total;
     if (fa.sel && !A.lignes.some(function (s) { return s.cle === fa.sel; })) fa.sel = null;
     /* qualité des données (portefeuille complet : cartes et scellé) */
-    var aDater = R.cartes.filter(function (r) { return r.c.vendu && !r.hors && (!r.c.vente_date || !dateAchatCarte(r)); }).length;
+    var aDater = R.cartes.filter(function (r) { return r.c.vendu && !r.hors && !r.date_vente; }).length;
     var mesures = T.n_delais;
     var nbCartes = R.cartes.filter(function (r) { return r.compte && !r.hors; }).length;
     var base = 'Base : ' + nbr(T.nv) + ' vente' + pl(T.nv) + ' pour ' + nbr(nbCartes) + ' cartes et ' + nbr(T.n - nbCartes) + ' articles scellés ; ' + pct(T.part_estimee) + ' du coût total est estimé (cartes sans prix d’achat). ';
-    base += mesures ? 'Délai de vente mesuré sur ' + mesures + ' vente' + pl(mesures) + '.' : 'Aucune vente n’a encore ses deux dates (achat et vente) : le délai de vente apparaîtra dès que tu les renseignes.';
+    var DVt = R.dates_ventes || { debut: aujourdhui(), delai: 7 };
+    base += mesures ? 'Délai de vente sur ' + mesures + ' vente' + pl(mesures) + (T.n_delais_est ? ', dont ' + T.n_delais_est + ' estimée' + pl(T.n_delais_est) + ' faute de date d’achat ou de vente (' + DVt.delai + ' jours par défaut)' : '') + ' ; le stock est en vente depuis le ' + dateFR(DVt.debut) + '.' : 'Aucune vente n’a encore de délai mesurable.';
     m.appendChild(h('p', { class: 'pl-note pl-base' }, [base, aDater ? h('span', null, [' ', lienBtn('Dater mes ventes (' + aDater + ')', feuilleDatesVentes)]) : null]));
     var g = h('div', { class: 'pl-grille' });
     m.appendChild(g);
     g.appendChild(kpi({ span: 'pl-c3', label: 'Rentabilité réalisée', v: pct(T.rentab_real), cls: T.rentab_real < 0 ? 'pl-neg' : '', sous: 'bénéfice net ÷ coût des ventes' }));
     g.appendChild(kpi({ span: 'pl-c3', label: 'Rentabilité attendue', v: pct(T.rentab_att), sous: 'stock revendu au prix que tu obtiens d’habitude' }));
     g.appendChild(kpi({ span: 'pl-c3', label: 'Écoulement', v: pct(T.ecoul), sous: 'part du capital déjà vendue' }));
-    g.appendChild(kpi({ span: 'pl-c3', label: mesures ? 'Délai médian' : 'Prix obtenu', v: mesures ? NF0.format(T.delai_median) + ' jours' : pct(Pf.realisation), sous: mesures ? 'entre achat et vente' : 'prix de vente ÷ prix marché' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: mesures ? 'Délai médian' : 'Prix obtenu', v: mesures ? NF0.format(T.delai_median) + ' jours' : pct(Pf.realisation), sous: mesures ? 'de la mise en vente à la vente' : 'prix de vente ÷ prix marché' }));
     /* découpage */
     var chips = h('div', { class: 'pl-seg pl-seg--dims', role: 'group', 'aria-label': 'Découper par' });
     An.DIMENSIONS.forEach(function (dm) {
@@ -1973,13 +1978,13 @@
       if (!ach) ia = h('input', { class: 'input', type: 'date', 'aria-label': 'Date d’achat : ' + (c.nom || c.ref) });
       champs[c.ref] = { v: iv, a: ia };
       return h('li', null, [vignette(c), h('div', { class: 'pl-dates__m' }, [
-        h('p', { class: 'pl-dates__n', text: c.nom || c.ref }), h('p', { class: 'pl-row__meta', text: 'N° ' + c.ref + ' · ' + eur(r.encaisse) + (ach ? ' · achetée le ' + dateFR(ach) : '') + (c.vente_date ? ' · vendue le ' + dateFR(c.vente_date) : '') }),
+        h('p', { class: 'pl-dates__n', text: c.nom || c.ref }), h('p', { class: 'pl-row__meta', text: 'N° ' + c.ref + ' · ' + eur(r.encaisse) + (ach ? ' · achetée le ' + dateFR(ach) : '') + (r.date_vente ? ' · vendue ' + quandVendue(r) : ' · sans date') }),
         h('div', { class: 'pl-dates__c' }, [ia ? h('label', null, [h('span', { text: 'Achat' }), ia]) : null, iv ? h('label', null, [h('span', { text: 'Vente' }), iv]) : null])
       ])]);
     }));
     var tout = h('input', { class: 'input', type: 'date', id: 'pl-dates-tout' });
     tout.addEventListener('change', function () { Object.keys(champs).forEach(function (k) { var iv = champs[k].v; if (iv && !iv.value) iv.value = tout.value; }); });
-    var fs = feuille('Dater mes ventes', [h('p', { class: 'pl-note', text: 'Ces dates mesurent la vitesse de vente. Laisse vide ce que tu ne sais pas.' }),
+    var fs = feuille('Dater mes ventes', [h('p', { class: 'pl-note', text: 'Sans vraie date, une vente passée compte ' + S.R.dates_ventes.delai + ' jours après l’achat (« vers le »). Mets la vraie date si tu la connais, sinon laisse vide.' }),
       h('div', { class: 'field' }, [h('label', { for: 'pl-dates-tout', text: 'Mettre cette date de vente aux cases vides' }), tout]), liste],
       [bouton('Annuler', fermer, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: 'Enregistrer' })]);
     fs.form.addEventListener('submit', function (e) {
@@ -2421,7 +2426,7 @@
     g.appendChild(carte({ span: 'pl-c6', titre: 'Achats rattachés', sous: 'un ticket ou une date d’achat dans les dates du voyage suffit', corps: corpsA }));
     var vendues = cartesV.filter(function (a) { return a.vendu; }).sort(function (a, b) { return b.resultat - a.resultat; });
     g.appendChild(carte({ span: 'pl-c12', titre: 'Ventes de ce voyage · ' + vendues.length, sous: 'résultat = encaissé − frais de vente − coût complet (achat + part des frais du voyage)', corps: [vendues.length ? tableau([
-      { t: 'Carte', f: function (a) { return celluleCarte(a.r, sansDoublons(['N° ' + a.ref, a.r.c.vente_date ? 'vendue le ' + dateFR(a.r.c.vente_date) : null, a.r.c.canal]).join(' · ')); }, v: function (a) { return a.r.c.nom || a.ref; } },
+      { t: 'Carte', f: function (a) { return celluleCarte(a.r, sansDoublons(['N° ' + a.ref, a.r.date_vente ? 'vendue ' + quandVendue(a.r) : null, a.r.c.canal]).join(' · ')); }, v: function (a) { return a.r.c.nom || a.ref; } },
       { t: 'Encaissé', f: function (a) { return eur(a.ca, 2); }, v: function (a) { return a.ca; } },
       { t: 'Coût complet', f: function (a) { return eur(a.cout_complet, 2); }, v: function (a) { return a.cout_complet; } },
       { t: 'Résultat', f: function (a) { return eurS(a.resultat, 2); }, v: function (a) { return a.resultat; }, barre: true, cls: function (a) { return neg(a.resultat); } }
@@ -2790,6 +2795,24 @@
       });
     });
     m.appendChild(section('Coûts cachés et répartition', [f2], 'Servent à l’onglet Analyse › Coûts et au coût complet de chaque carte.'));
+    var DVr = S.R.dates_ventes || { debut: aujourdhui(), delai: 7 };
+    var form3 = formulaire([
+      { k: 'debut_ventes', label: 'Début des ventes actives', type: 'date', demi: true, aide: 'Le chrono des cartes en stock part de cette date (ou de leur achat, s’il est plus tard).' },
+      { k: 'delai_vente_passee', label: 'Vente passée sans date : jours après l’achat', type: 'num', demi: true, aide: 'La place dans le temps et compte ce délai dans les stats. Une vraie date saisie l’emporte.' }
+    ], { debut_ventes: DVr.debut, delai_vente_passee: DVr.delai });
+    var f3 = h('form', { class: 'pl-box', novalidate: true }, [form3.el, h('div', { class: 'pl-actions' }, [h('button', { type: 'submit', class: 'btn', text: 'Enregistrer' }),
+      bouton('Corriger des dates une par une', feuilleDatesVentes, 'btn--ghost')])]);
+    f3.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var x = form3.lire();
+      if (!x) return;
+      if (!x.debut_ventes || !/^\d{4}-\d{2}-\d{2}$/.test(x.debut_ventes)) { form3.erreur('debut_ventes', 'Choisis une date.'); return; }
+      if (x.delai_vente_passee == null || x.delai_vente_passee < 0 || x.delai_vente_passee > 365) { form3.erreur('delai_vente_passee', 'Entre 0 et 365 jours.'); return; }
+      modifier('Dates de vente · début le ' + dateFR(x.debut_ventes) + ', ventes passées à ' + nbr(Math.round(x.delai_vente_passee)) + ' j', function (doc) {
+        doc.params.debut_ventes = x.debut_ventes; doc.params.delai_vente_passee = Math.round(x.delai_vente_passee);
+      });
+    });
+    m.appendChild(section('Dates de vente', [f3], DVr.estimees + ' vente' + pl(DVr.estimees) + ' passée' + pl(DVr.estimees) + ' datée' + pl(DVr.estimees) + ' par la règle' + (DVr.sans_date ? ', ' + DVr.sans_date + ' sans date d’achat ni voyage (comptée' + pl(DVr.sans_date) + ' à ' + DVr.delai + ' jours dans les délais, hors périodes)' : '') + '.'));
     var fichier = h('input', { type: 'file', accept: 'application/json,.json', class: 'pl-file', 'aria-label': 'Choisir une sauvegarde .json' });
     fichier.addEventListener('change', function () { if (fichier.files && fichier.files[0]) importerFichier(fichier.files[0]); });
     m.appendChild(section('Tes données', [h('ul', { class: 'pl-menu' }, [
@@ -2883,12 +2906,12 @@
           a.mode || '', a.lot || '', c.verif, c.remarque, c.gardee ? 'Oui' : 'Non', c.vendu ? 'Oui' : 'Non', c.vendu ? r.encaisse : null, c.vente_date, c.canal, r.benef, r.encaisse];
       }) };
     var ventes = { nom: 'Ventes', colonnes: [{ titre: 'N°', largeur: 8 }, { titre: 'Article', largeur: 40 }, { titre: 'Groupe', largeur: 14 }, { titre: 'Date', format: 'date', largeur: 12 }, { titre: 'Canal', largeur: 12 },
-      { titre: 'Prix vendu (€)', format: 'euro' }, { titre: 'Frais de vente (€)', format: 'euro' }, { titre: 'Coût (€)', format: 'euro' }, { titre: 'Frais d’envoi (€)', format: 'euro' }, { titre: 'Bénéfice net (€)', format: 'euro' }, { titre: 'Rentabilité', format: 'pct', largeur: 11 }, { titre: 'Coût', largeur: 9 }],
+      { titre: 'Prix vendu (€)', format: 'euro' }, { titre: 'Frais de vente (€)', format: 'euro' }, { titre: 'Coût (€)', format: 'euro' }, { titre: 'Frais d’envoi (€)', format: 'euro' }, { titre: 'Bénéfice net (€)', format: 'euro' }, { titre: 'Rentabilité', format: 'pct', largeur: 11 }, { titre: 'Coût', largeur: 9 }, { titre: 'Origine de la date', largeur: 16 }],
       lignes: R.cartes.filter(function (r) { return r.vente; }).map(function (r) {
-        return [r.c.ref, r.c.nom, r.c.groupe, r.c.vente_date, r.c.canal, r.vente.encaisse, r.vente.frais, r.vente.cout, r.vente.envoi, r.vente.net, r.vente.rentab, r.source];
+        return [r.c.ref, r.c.nom, r.c.groupe, r.date_vente, r.c.canal, r.vente.encaisse, r.vente.frais, r.vente.cout, r.vente.envoi, r.vente.net, r.vente.rentab, r.source, r.vente_estimee ? 'achat + ' + S.R.dates_ventes.delai + ' j' : r.date_vente ? 'réelle' : ''];
       }).concat(R.produits.filter(function (x) { return x.vente.vendus > 0; }).map(function (x) {
-        return ['', x.p.nom + ' (× ' + x.vente.vendus + ')', 'Produits', null, null, x.vente.encaisse, x.vente.frais, x.vente.cout, x.vente.envoi, x.vente.net, x.vente.cout ? x.vente.net / x.vente.cout : null, 'réel'];
-      })).concat([['', 'Total', '', null, null, vt.encaisse, vt.frais, vt.cout, vt.envoi, vt.net, vt.rentab, '']]) };
+        return ['', x.p.nom + ' (× ' + x.vente.vendus + ')', 'Produits', null, null, x.vente.encaisse, x.vente.frais, x.vente.cout, x.vente.envoi, x.vente.net, x.vente.cout ? x.vente.net / x.vente.cout : null, 'réel', ''];
+      })).concat([['', 'Total', '', null, null, vt.encaisse, vt.frais, vt.cout, vt.envoi, vt.net, vt.rentab, '', '']]) };
     ventes.gras = [ventes.lignes.length - 1];
     var tickets = { nom: 'Tickets', colonnes: [{ titre: 'Ticket', largeur: 8 }, { titre: 'Boutique', largeur: 30 }, { titre: 'Date', format: 'date', largeur: 12 }, { titre: 'Total (¥)', format: 'yen' }, { titre: 'Détaxe (¥)', format: 'yen' },
       { titre: 'Payé (¥)', format: 'yen' }, { titre: 'Payé (€)', format: 'euro' }, { titre: 'Nb cartes', largeur: 10 }, { titre: 'Cartes (¥)', format: 'yen' }, { titre: 'Contrôle', largeur: 10 }, { titre: 'Note', largeur: 60 }],

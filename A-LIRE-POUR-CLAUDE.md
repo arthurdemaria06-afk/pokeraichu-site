@@ -221,6 +221,8 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Pilotage : dates de vente (chrono à partir du 22/11/2026, ventes passées sans date à l'achat + 7 j) ;
+  « À compléter » = cartes sans prix de vente seulement.
 - (22/11) Pilotage : mode sombre automatique (suit le réglage de l'iPad ou de l'iPhone).
 - (22/11) Pilotage, étape 2 : Analyse, Coûts, SASU, Ventes, Stock, Achats et Voyages au format du nouveau tableau de bord.
 - (22/11) Gestion › Annonce : titres eBay français + anglais, cadre Poké-Raichu sur les photos enregistrées.
@@ -398,6 +400,16 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   seuil d'achats en jauge, ventes triables). Options PRGraph ajoutées : `nuage` log/diagonale/etiquettes/rayon,
   `cls` par catégorie dans `colonnes`, `signe` forcé dans `barres` (repère négatif pris dans l'échelle).
   Formats : estimations à l'euro, ventes réelles au centime ; métadonnées sans doublon (`sansDoublons`).
+- Dates de vente (22/11, règle demandée par Arthur, `pilotage-calcul.js`) : les ventes actives commencent le 22/11/2026
+  (`params.debut_ventes`, Réglages › Dates de vente) : le chrono des cartes en stock part de là (ou de leur achat, s'il
+  est plus tard) → Stock « En vente depuis », délais d'Analyse « de la mise en vente à la vente ». Vente passée sans
+  date : placée 7 jours après l'achat (`params.delai_vente_passee`), au plus tard le 22/11 ; sans date d'achat, la fin
+  du voyage rattaché sert d'achat ; sans rien, délai de 7 jours compté mais vente « sans date » dans le temps.
+  **`c.vente_date` n'est jamais écrit par la règle** : les moteurs lisent `r.date_vente` (retenue), `r.vente_estimee`,
+  `r.mise_en_vente`, `r.delai_vente`, `r.delai_estime` ; affichage « vers le » / « ≈ ». Une vraie date saisie l'emporte.
+- « À compléter » (Stock) = cartes en stock **sans prix de vente** seulement (demande d'Arthur, 22/11 : il n'aura pas
+  d'autres infos). Les cartes à coût estimé sont des cartes normales : plus de mention « coût estimé » dans les listes,
+  plus d'alerte ni de section Contrôles pour elles (le libellé « Coût estimé » reste sur la fiche).
 - Mode sombre (22/11) : suit le réglage de l'appareil (`prefers-color-scheme`), bloc à la fin de `pilotage.css` qui ne
   redéfinit que les jetons (`--pl-*`, `--g-*`) et quelques détails (flèche des listes, ombres). Plus aucune couleur en dur
   ailleurs : toute nouvelle couleur passe par un jeton avec ses deux valeurs. Palette sombre des graphiques validée sur la

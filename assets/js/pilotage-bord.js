@@ -39,7 +39,7 @@
       var c = r.c, compte = !!c.groupe && noms[c.groupe] != null;
       var base = { r: r, ref: c.ref, nom: c.nom || c.ref, groupe: c.groupe || 'Sans groupe', cat: c.cat || 'Sans catégorie',
         langue: c.langue || 'Non renseignée', gamme: gamme(c.prix), prix: nb(c.prix) };
-      if (r.vente && compte) ventes.push(assign({ type: 'carte', date: dateOk(c.vente_date), canal: c.canal || 'Non renseigné', n: 1,
+      if (r.vente && compte) ventes.push(assign({ type: 'carte', date: dateOk(r.date_vente !== undefined ? r.date_vente : c.vente_date), date_estimee: !!r.vente_estimee, canal: c.canal || 'Non renseigné', n: 1,
         ca: r.vente.encaisse, net: r.vente.net, cout: r.vente.cout, frais: r.vente.frais, envoi: r.vente.envoi, marche: nb(c.prix), estime: r.source === 'estimé' }, base));
       if (r.stock) stock.push(assign({ type: 'carte', n: 1, valeur: nb(c.prix), cout: z(r.cout), latent: r.latent, sans_prix: nb(c.prix) == null, estime: r.source === 'estimé',
         date_achat: dateOk(c.date_achat) }, base));

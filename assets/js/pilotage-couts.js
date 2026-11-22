@@ -171,7 +171,7 @@
         if (r.vente) {
           a.ca = r.vente.encaisse; a.frais_vente = r.vente.frais + r.vente.envoi + a.directs_vente;
           a.resultat = a.ca - a.frais_vente - a.cout_complet;
-          a.date_vente = r.c.vente_date || null;
+          a.date_vente = (r.date_vente !== undefined ? r.date_vente : r.c.vente_date) || null;
         } else {
           var prix = nb(r.c.prix);
           a.valeur = prix; a.latent = prix != null ? prix * (1 - P.fv) - P.envoi - a.cout_complet : null;
@@ -346,7 +346,7 @@
   function annees(doc, R) {
     var s = {};
     (doc.charges || []).forEach(function (c) { if (c.date) s[c.date.slice(0, 4)] = 1; });
-    R.cartes.forEach(function (r) { if (r.c.vente_date) s[r.c.vente_date.slice(0, 4)] = 1; if (r.c.date_achat) s[r.c.date_achat.slice(0, 4)] = 1; });
+    R.cartes.forEach(function (r) { var dv = r.date_vente !== undefined ? r.date_vente : r.c.vente_date; if (dv) s[dv.slice(0, 4)] = 1; if (r.c.date_achat) s[r.c.date_achat.slice(0, 4)] = 1; });
     (doc.tickets || []).forEach(function (t) { if (t.date) s[t.date.slice(0, 4)] = 1; });
     return Object.keys(s).sort().reverse();
   }

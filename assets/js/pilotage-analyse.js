@@ -107,9 +107,15 @@
       cout_stock: vendu ? 0 : cout, valeur_stock: !vendu && prix != null ? prix : 0, cout_stock_val: !vendu && prix != null ? cout : 0,
       n_stock_val: !vendu && prix != null ? 1 : 0, latent: !vendu ? z(r.latent) : 0,
       marche_vendu: vendu && prix != null ? prix : 0, enc_vendu_prix: vendu && prix != null ? z(r.encaisse) : 0, nv_prix: vendu && prix != null ? 1 : 0,
-      delais: [], ages: [] };
-    if (vendu && da && c.vente_date) { var dj = jours(da, c.vente_date); if (dj != null && dj >= 0) e.delais.push(dj); }
-    if (!vendu && da) { var ag = jours(da, aujourdhui); if (ag != null && ag >= 0) e.ages.push(ag); }
+      delais: [], ages: [], n_delais_est: 0 };
+    /* délai et âge : règle des dates de vente du moteur (r.delai_vente, r.mise_en_vente), sinon achat → vente */
+    if (vendu) {
+      var dj = r.delai_vente !== undefined ? r.delai_vente : (da && c.vente_date ? jours(da, c.vente_date) : null);
+      if (dj != null && dj >= 0) { e.delais.push(dj); if (r.delai_estime) e.n_delais_est = 1; }
+    } else {
+      var mv = r.mise_en_vente !== undefined ? r.mise_en_vente : da;
+      if (mv) { var ag = jours(mv, aujourdhui); if (ag != null && ag >= 0) e.ages.push(ag); }
+    }
     return e;
   }
   function elementProduit(x, P) {
@@ -125,13 +131,13 @@
   /* ---------------------------------------------------------------- segments */
   function vide() {
     return { n: 0, nv: 0, cout: 0, estime: 0, inconnus: 0, cout_vendu: 0, ca: 0, benef: 0, cout_stock: 0, valeur_stock: 0, cout_stock_val: 0,
-      n_stock_val: 0, latent: 0, marche_vendu: 0, enc_vendu_prix: 0, nv_prix: 0, delais: [], ages: [], produit: false };
+      n_stock_val: 0, latent: 0, marche_vendu: 0, enc_vendu_prix: 0, nv_prix: 0, delais: [], ages: [], n_delais_est: 0, produit: false };
   }
   function ajouter(s, e) {
     ['n', 'nv', 'cout', 'estime', 'cout_vendu', 'ca', 'benef', 'cout_stock', 'valeur_stock', 'cout_stock_val', 'n_stock_val', 'latent', 'marche_vendu', 'enc_vendu_prix', 'nv_prix']
       .forEach(function (k) { s[k] += e[k]; });
     if (e.inconnu) s.inconnus++;
-    s.delais = s.delais.concat(e.delais); s.ages = s.ages.concat(e.ages);
+    s.delais = s.delais.concat(e.delais); s.ages = s.ages.concat(e.ages); s.n_delais_est += e.n_delais_est || 0;
     if (e.produit) s.produit = true;
   }
   function moyenne(l) { return l.length ? l.reduce(function (a, b) { return a + b; }, 0) / l.length : null; }

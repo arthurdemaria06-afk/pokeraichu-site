@@ -5,6 +5,12 @@
    - payé estimé (cartes sans prix d'achat) : prix ÷ ((1 + TVA import) + rentabilité retenue), après frais de vente ;
    - marge nette = prix marché × (1 − frais de vente) − payé × (1 + TVA import) ;
    - ventes : encaissé − frais de vente − coût (réel + estimé) − frais d'envoi.
+   Dates de vente (règle d'Arthur, 22/11/2026) : les ventes actives commencent le 22/11/2026 (params.debut_ventes).
+   - carte encore à vendre : son chrono de vente part du début des ventes (ou de son achat, s'il est plus tard) ;
+   - carte vendue sans date : vendue une semaine après l'achat (params.delai_vente_passee, 7 j), au plus tard au
+     début des ventes ; sans date d'achat, la fin du voyage rattaché sert d'achat ; sans rien, délai d'une semaine
+     compté dans les délais mais la vente reste « sans date » dans le temps ;
+   - une vraie date saisie l'emporte toujours (c.vente_date n'est jamais modifié : r.date_vente est la date retenue).
    Aucune donnée ici : le document vient de /api/pilotage. Utilisable aussi dans Node (tests). */
 (function (racine, fabrique) {
   var api = fabrique();
@@ -16,11 +22,19 @@
   function nb(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
   function z(v) { return nb(v) || 0; }
   function somme(liste, f) { var s = 0; for (var i = 0; i < liste.length; i++) s += z(f(liste[i])); return s; }
+  var DEBUT_VENTES = '2026-11-22', DELAI_VENTE_PASSEE = 7;
+  function dateOk(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null; }
+  function jour(v) { return Math.floor(Date.parse(v + 'T00:00:00Z') / 864e5); }
+  function iso(j) { return new Date(j * 864e5).toISOString().slice(0, 10); }
 
   function calcul(doc) {
     var P = doc.params || {};
     var taux = nb(P.taux_jpy) || 0, fv = z(P.frais_vente), tva = z(P.tva_import), rent = z(P.rentabilite_estimee),
       envoi = z(P.frais_envoi), gardees = P.gardees_dans_totaux !== false;
+    var debutV = dateOk(P.debut_ventes) || DEBUT_VENTES, jDebut = jour(debutV),
+      delaiV = nb(P.delai_vente_passee) != null && P.delai_vente_passee >= 0 ? Math.round(P.delai_vente_passee) : DELAI_VENTE_PASSEE;
+    var finVoyage = {};
+    (doc.voyages || []).forEach(function (V) { if (V && V.id) finVoyage[V.id] = dateOk(V.fin) || dateOk(V.debut); });
     function estime(base) { return base == null ? null : base * (1 - fv) / ((1 + tva) + rent); }
 
     /* groupes : ceux du document, puis ceux qu'une carte utiliserait sans qu'ils soient déclarés */
@@ -72,11 +86,30 @@
       var g = gid[c.groupe];
       var hors = !!(g && g.hors_totaux);
       var compte = gardees || !c.gardee;
+      /* dates : achat réel, repère (achat ou fin du voyage), vente retenue, début du chrono de vente, délai */
+      var idT = (a.mode === 'ticket' && a.ticket) || c.ticket, TT = idT ? tickets[idT] : null;
+      var achat = dateOk(c.date_achat) || (TT && dateOk(TT.t.date)) || null;
+      var ancre = achat || finVoyage[c.voyage] || (a.mode === 'lot' && lots[a.lot] && finVoyage[lots[a.lot].l.voyage]) || (TT && finVoyage[TT.t.voyage]) || null;
+      var dv = null, dvEst = false, mev = null, delai = null, delaiEst = false;
+      if (c.vendu) {
+        var reelle = dateOk(c.vente_date);
+        if (reelle) {
+          dv = reelle;
+          mev = dv >= debutV ? (achat && achat > debutV ? achat : debutV) : ancre;
+          if (mev) { delai = Math.max(0, jour(dv) - jour(mev)); delaiEst = dv < debutV && !achat; }
+          else { delai = delaiV; delaiEst = true; }
+        } else if (ancre) {
+          var j0 = jour(ancre), j1 = j0 + delaiV;
+          if (j0 <= jDebut && j1 > jDebut) j1 = jDebut;
+          dv = iso(j1); dvEst = true; mev = ancre; delai = j1 - j0; delaiEst = true;
+        } else { delai = delaiV; delaiEst = true; }
+      } else mev = achat && achat > debutV ? achat : debutV;
       var r = {
         c: c, i: i, ref: c.ref, paye: paye, estime: est, cout: paye != null ? paye : est, source: paye != null ? 'réel' : (est != null ? 'estimé' : null),
         marge: marge, gain: marge != null && paye ? marge / paye : null,
         encaisse: enc, benef: c.vendu ? z(enc) * (1 - fv) - (z(paye) + z(est)) * (1 + tva) : null,
-        compte: compte, hors: hors, stock: !c.vendu && !hors && compte
+        compte: compte, hors: hors, stock: !c.vendu && !hors && compte,
+        date_achat: achat, date_vente: dv, vente_estimee: dvEst, mise_en_vente: mev, delai_vente: delai, delai_estime: delaiEst
       };
       if (c.vendu && !hors) {
         var frais = z(enc) * fv, cout = (z(paye) + z(est)) * (1 + tva);
@@ -239,12 +272,18 @@
     };
 
     return {
-      params: { taux: taux, fv: fv, tva: tva, rent: rent, envoi: envoi, gardees: gardees },
+      params: { taux: taux, fv: fv, tva: tva, rent: rent, envoi: envoi, gardees: gardees, debut_ventes: debutV, delai_vente_passee: delaiV },
+      dates_ventes: {
+        debut: debutV, delai: delaiV,
+        estimees: cartes.filter(function (r) { return r.vente && r.vente_estimee; }).length,
+        sans_date: cartes.filter(function (r) { return r.vente && !r.date_vente; }).length,
+        delais_estimes: cartes.filter(function (r) { return r.vente && r.delai_estime; }).length
+      },
       groupes: groupes, cartes: cartes, parRef: parRef, tickets: listeTickets, ticketsParId: tickets, lots: listeLots, lotsParId: lots,
       produits: produits, synthese: lignes, synthTotal: synthTotal, categories: categories, ventes: ventes, ventesTotal: vt,
       stock: stock, k: k, controles: ctl
     };
   }
 
-  return { calcul: calcul, nb: nb };
+  return { calcul: calcul, nb: nb, DEBUT_VENTES: DEBUT_VENTES, DELAI_VENTE_PASSEE: DELAI_VENTE_PASSEE };
 });

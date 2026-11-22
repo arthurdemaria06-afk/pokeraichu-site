@@ -569,6 +569,7 @@ a.pl-ibtn{text-decoration:none}
 .pl-kpis--stock{margin:2px 0 12px}
 .pl-kpis--stock .pl-kpi{padding:11px 13px}
 .pl-kpis--stock .pl-kpi__v{font-size:1.2rem}
+.pl-stock-aide{margin:0 0 12px}
 .pl-stock-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
 .pl-stock-barre .pl-resume{margin:0}
 .pl-stock-liste .pl-scroll{max-height:none}
