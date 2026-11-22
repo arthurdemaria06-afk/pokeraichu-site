@@ -11,7 +11,7 @@
 (function () {
   'use strict';
   var d = document, w = window, C = w.PR_CONFIG || {}, K = w.PRCalcul, G = w.PRGraph, PB = w.PRBord;
-  var CLE_JETON = 'pr.gestion.jeton', CLE_ATTENTE = 'pr.pilotage.attente', CLE_CANAL = 'pr.pilotage.canal';
+  var CLE_JETON = 'pr.gestion.jeton', CLE_ATTENTE = 'pr.pilotage.attente', CLE_CANAL = 'pr.pilotage.canal', CLE_UNITE = 'pr.pilotage.unite';
   var CANAUX = ['WhatsApp', 'Instagram', 'eBay', 'Vinted', 'Leboncoin', 'Whatnot', 'Cardmarket', 'Salon', 'Dépôt-vente', 'Autre'];
   var MODES = [['', 'Pas de prix d’achat (coût estimé)'], ['ticket', 'Ticket japonais (¥, détaxe du ticket)'], ['yen', 'Prix en ¥ sans ticket'],
     ['eur', 'Montant payé en €'], ['lot', 'Part d’un lot (au prorata du prix marché)']];
@@ -87,6 +87,7 @@
     return moins(Math.abs(p) < 10 && Math.round(p) !== p ? NF1.format(p) : NF0.format(p)) + ' %';
   }
   function yen(v) { return vide(v) ? '—' : NF0.format(v) + ' ¥'; }
+  function pctS(v) { return vide(v) ? '—' : (v * 100 >= 0.5 ? '+' : '') + pct(v); }
   function nbr(v) { return vide(v) ? '—' : moins(NF0.format(v)); }
   function dateFR(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
   function heure(iso) { var t = new Date(iso); return isNaN(t) ? '' : String(t.getHours()).padStart(2, '0') + 'h' + String(t.getMinutes()).padStart(2, '0'); }
@@ -599,15 +600,17 @@
     return h('span', { class: 'pl-row__img' }, im ? im.el : h('b', { text: c.ref }));
   }
   function ligneCarte(r, opts) {
-    var c = r.c, nums = [], meta = [c.ref, c.groupe, c.cat, c.langue];
+    var c = r.c, nums = [], meta = [c.ref, c.groupe, c.cat, c.langue], enPct = opts && opts.unite === '%';
     if (c.vendu) {
       meta.push(r.date_vente ? 'vendue ' + quandVendue(r) : 'vendue', c.canal);
       nums.push(h('span', { class: 'pl-row__prix', text: eur(r.encaisse) }));
-      if (r.vente) nums.push(h('span', { class: 'pl-row__m ' + sens(r.vente.net), text: fleche(r.vente.net) + eurS(r.vente.net) }));
+      if (r.vente && enPct && r.vente.rentab != null) nums.push(h('span', { class: 'pl-row__m ' + sens(r.vente.rentab), text: fleche(r.vente.rentab) + pctS(r.vente.rentab) }));
+      else if (r.vente) nums.push(h('span', { class: 'pl-row__m ' + sens(r.vente.net), text: fleche(r.vente.net) + eurS(r.vente.net) }));
       else nums.push(badge('Vendue', 'vendu'));
     } else {
       nums.push(h('span', { class: 'pl-row__prix', text: vide(c.prix) ? 'Prix ?' : eur(c.prix) }));
-      if (!vide(r.latent)) nums.push(h('span', { class: 'pl-row__m ' + sens(r.latent), text: fleche(r.latent) + eurS(r.latent) + (r.gain != null ? ' · ' + pct(r.gain) : '') }));
+      if (!vide(r.latent) && enPct && r.gain != null) nums.push(h('span', { class: 'pl-row__m ' + sens(r.gain), text: fleche(r.gain) + pctS(r.gain) }));
+      else if (!vide(r.latent)) nums.push(h('span', { class: 'pl-row__m ' + sens(r.latent), text: fleche(r.latent) + eurS(r.latent) + (r.gain != null ? ' · ' + pct(r.gain) : '') }));
       if (c.gardee) meta.push('gardée');
     }
     if (opts && opts.extra) meta.push(opts.extra);
@@ -1078,13 +1081,18 @@
     var segV = h('div', { class: 'pl-seg pl-seg--vue', role: 'group', 'aria-label': 'Présentation' }, [['liste', 'Liste'], ['tableau', 'Tableau']].map(function (x) {
       return h('button', { type: 'button', 'aria-pressed': String(vue === x[0]), text: x[1], onclick: function () { S.stockVue = x[0]; rendre(true); } });
     }));
+    /* bénéfice de chaque ligne en € ou en % du coût (demande d'Arthur, 23/11/2026) ; le tableau montre déjà les deux */
+    var unite = lire(CLE_UNITE) === '%' ? '%' : '€';
+    var segU = h('div', { class: 'pl-seg pl-seg--unite', role: 'group', 'aria-label': 'Bénéfice en', hidden: vue === 'tableau' }, [['€', 'Bénéfice en euros'], ['%', 'Bénéfice en pourcentage du coût']].map(function (x) {
+      return h('button', { type: 'button', 'aria-pressed': String(unite === x[0]), 'aria-label': x[1], text: x[0], onclick: function () { ecrire(CLE_UNITE, x[0]); rendre(true); } });
+    }));
     var aideM = h('p', { class: 'pl-apercu pl-stock-aide', hidden: true });
     var tuiles = h('div', { class: 'pl-kpis pl-kpis--stock', 'aria-live': 'polite' });
     var resume = h('p', { class: 'pl-resume' });
     var liste = h('div', { class: 'pl-stock-liste' });
     var plus = h('button', { type: 'button', class: 'btn btn--ghost pl-plus', text: 'Afficher la suite' });
     plus.addEventListener('click', function () { limite += 300; maj(); });
-    m.appendChild(aideM); m.appendChild(tuiles); m.appendChild(h('div', { class: 'pl-stock-barre' }, [resume, segV])); m.appendChild(liste); m.appendChild(plus);
+    m.appendChild(aideM); m.appendChild(tuiles); m.appendChild(h('div', { class: 'pl-stock-barre' }, [resume, h('div', { class: 'pl-stock-segs' }, [segU, segV])])); m.appendChild(liste); m.appendChild(plus);
     var auj = PB ? PB.jour(aujourdhui()) : null;
     function age(r) { return r.mise_en_vente && auj != null ? Math.max(0, auj - PB.jour(r.mise_en_vente)) : null; }
     function produitsFiltres() {
@@ -1098,8 +1106,8 @@
       }).sort(function (a, b) { return z(b.stock_valeur) - z(a.stock_valeur); });
     }
     function maj() {
-      var l = trier(cartesFiltrees(), f.tri), val = 0, cout = 0, coutV = 0, np = 0, lat = 0, enc = 0, net = 0, nv = 0, ns = 0, sa = 0, na = 0;
-      l.forEach(function (r) { if (r.c.vendu) { nv++; enc += z(r.encaisse); net += r.vente ? r.vente.net : 0; } else { ns++; val += z(r.c.prix); cout += z(r.cout); lat += z(r.latent); if (!vide(r.c.prix)) { np++; coutV += z(r.cout); } var a0 = age(r); if (a0 != null) { sa += a0; na++; } } });
+      var l = trier(cartesFiltrees(), f.tri), val = 0, cout = 0, coutV = 0, np = 0, lat = 0, enc = 0, net = 0, cvd = 0, nv = 0, ns = 0, sa = 0, na = 0;
+      l.forEach(function (r) { if (r.c.vendu) { nv++; enc += z(r.encaisse); net += r.vente ? r.vente.net : 0; cvd += r.vente ? z(r.vente.cout) : 0; } else { ns++; val += z(r.c.prix); cout += z(r.cout); lat += z(r.latent); if (!vide(r.c.prix)) { np++; coutV += z(r.cout); } var a0 = age(r); if (a0 != null) { sa += a0; na++; } } });
       var prods = produitsFiltres(), valS = 0, coutS = 0, latS = 0, nS = 0;
       prods.forEach(function (x) { valS += z(x.stock_valeur); coutS += z(x.stock_reel) + z(x.stock_estime); latS += z(x.latent); nS += x.reste; });
       aideM.hidden = !f.manque;
@@ -1113,8 +1121,11 @@
         tuile('Valeur marché', np || nS ? eur(val + valS, 0) : '—', nS ? 'cartes ' + eur(val, 0) + ' · scellé ' + eur(valS, 0) + (sansPx ? ' · ' + sansPx : '') : nbr(ns) + ' en stock' + (sansPx ? ', ' + sansPx : '')),
         tuile('Coût', eur(cout + coutS, 0), nS ? 'cartes ' + eur(cout, 0) + ' · scellé ' + eur(coutS, 0) : 'prix d’achat (ou estimé)'),
         tuile('Plus-value', np || nS ? eurS(lat + latS, 0) : '—', np || nS ? (coutV + coutS ? pct((lat + latS) / (coutV + coutS)) + ' du coût, frais de vente déduits' : 'frais de vente déduits') : 'sans prix de vente', lat + latS < -0.5 ? 'pl-neg' : ''),
-        f.statut === 'toutes' ? tuile('Vendues', nbr(nv), eur(enc, 0) + ' encaissés') : tuile('En vente depuis', na ? nbr(Math.round(sa / na)) + ' j' : '—', 'moyenne des cartes · chrono lancé le ' + dateFR(R.dates_ventes ? R.dates_ventes.debut : aujourdhui()))]);
-      else ajouter(tuiles, [tuile('Vendues', nbr(nv)), tuile('Encaissé', eur(enc, 0)), tuile('Bénéfice', eurS(net, 0), enc ? pct(net / enc) + ' du prix de vente' : null, net < -0.5 ? 'pl-neg' : ''), tuile('Panier moyen', nv ? eur(enc / nv) : '—')]);
+        f.statut === 'toutes' ? tuile('Vendues', nbr(nv), eur(enc, 0) + ' encaissés' + (cvd ? ' · rentab. ' + pctS(net / cvd) : '')) : tuile('En vente depuis', na ? nbr(Math.round(sa / na)) + ' j' : '—', 'moyenne des cartes · chrono lancé le ' + dateFR(R.dates_ventes ? R.dates_ventes.debut : aujourdhui()))]);
+      /* rentabilité pondérée : bénéfice total ÷ coût total des cartes vendues (une grosse vente pèse plus qu'une petite) */
+      else ajouter(tuiles, [tuile('Vendues', nbr(nv), nv ? 'panier moyen ' + eur(enc / nv) : null), tuile('Encaissé', eur(enc, 0)),
+        tuile('Bénéfice', eurS(net, 0), enc ? pct(net / enc) + ' du prix de vente' : null, net < -0.5 ? 'pl-neg' : ''),
+        tuile('Rentabilité', cvd ? pctS(net / cvd) : '—', 'pondérée : bénéfice ÷ coût d’achat', net < -0.5 ? 'pl-neg' : '')]);
       resume.textContent = nbr(l.length) + ' carte' + pl(l.length) + (prods.length ? ' · ' + nbr(prods.length) + ' produit' + pl(prods.length) + ' scellé' + pl(prods.length) : '') + (l.length > limite ? ' · ' + nbr(limite) + ' affichées' : '');
       liste.textContent = '';
       liste.hidden = !l.length && !prods.length;
@@ -1150,7 +1161,7 @@
         liste.appendChild(tableau(cols, vis, null, 'Cartes', { cle: 'stock-' + f.statut }));
       } else {
         var ul = h('ul', { class: 'pl-rows' });
-        vis.forEach(function (r) { ul.appendChild(ligneCarte(r)); });
+        vis.forEach(function (r) { ul.appendChild(ligneCarte(r, { unite: unite })); });
         liste.appendChild(ul);
       }
       plus.hidden = l.length <= limite;

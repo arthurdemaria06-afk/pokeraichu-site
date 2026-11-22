@@ -579,8 +579,10 @@ a.pl-ibtn{text-decoration:none}
 .pl-kpis--stock .pl-kpi{padding:11px 13px}
 .pl-kpis--stock .pl-kpi__v{font-size:1.2rem}
 .pl-stock-aide{margin:0 0 12px}
-.pl-stock-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
-.pl-stock-barre .pl-resume{flex:1;min-width:0;margin:0}
+.pl-stock-barre{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 10px;margin:0 0 10px}
+.pl-stock-barre .pl-resume{flex:1 1 220px;min-width:0;margin:0}
+.pl-stock-segs{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-left:auto}
+.pl-seg--unite button{min-width:40px;padding:0 12px;font-variant-numeric:tabular-nums}
 .pl-stock-barre .pl-seg{flex:none}
 .pl-stock-liste .pl-scroll{max-height:none}
 
