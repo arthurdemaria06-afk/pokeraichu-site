@@ -56,8 +56,8 @@
 window.PR_CONFIG = {
   whatsapp: "33659379881",
   reservees: [],
-  vendues: ["010", "012", "027", "031", "032", "077", "088", "094", "113", "117", "125", "234", "281", "350", "G1633", "L04"],
-  vendues_le: "2026-11-20T02:58:00Z",
+  vendues: ["010", "012", "027", "031", "032", "077", "088", "094", "097", "113", "117", "125", "234", "281", "350", "G1633", "L04"],
+  vendues_le: "2026-11-22T10:28:00Z",
   google_client_id: "353695117013-jmqarchqnv5tn8stoklm7rdgkebdueuu.apps.googleusercontent.com",
   instagram: "",
   email: "",
