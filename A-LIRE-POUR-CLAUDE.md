@@ -221,6 +221,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Pilotage : mode sombre automatique (suit le réglage de l'iPad ou de l'iPhone).
 - (22/11) Pilotage, étape 2 : Analyse, Coûts, SASU, Ventes, Stock, Achats et Voyages au format du nouveau tableau de bord.
 - (22/11) Gestion › Annonce : titres eBay français + anglais, cadre Poké-Raichu sur les photos enregistrées.
 - (22/11) Pilotage refait visuellement (tableau de bord filtrable façon Qlik, graphiques interactifs, rendu iPad) :
@@ -397,5 +398,9 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   seuil d'achats en jauge, ventes triables). Options PRGraph ajoutées : `nuage` log/diagonale/etiquettes/rayon,
   `cls` par catégorie dans `colonnes`, `signe` forcé dans `barres` (repère négatif pris dans l'échelle).
   Formats : estimations à l'euro, ventes réelles au centime ; métadonnées sans doublon (`sansDoublons`).
+- Mode sombre (22/11) : suit le réglage de l'appareil (`prefers-color-scheme`), bloc à la fin de `pilotage.css` qui ne
+  redéfinit que les jetons (`--pl-*`, `--g-*`) et quelques détails (flèche des listes, ombres). Plus aucune couleur en dur
+  ailleurs : toute nouvelle couleur passe par un jeton avec ses deux valeurs. Palette sombre des graphiques validée sur la
+  carte #1A1A19 ; `pilotage.html` a `color-scheme` et deux `theme-color` (clair/sombre).
 - Test sans données réelles : banc local hors dépôt (données fictives tirées du stock public, API simulée, CSP du site,
-  captures Playwright iPad 1376 px / portrait / Split View / iPhone). Ne jamais mettre ces données dans le dépôt.
+  captures Playwright iPad 1376 px / portrait / Split View / iPhone, clair et sombre). Ne jamais mettre ces données dans le dépôt.

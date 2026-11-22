@@ -2227,7 +2227,7 @@
     ].filter(Boolean);
     var hostC = h('div');
     G.cascade(hostC, { etapes: L.map(function (l) { return { label: l[0], v: l[1], type: l[2] || 'delta', note: l[3] }; }), base: ca || null, fmt: function (v) { return eur(v, 0); }, aria: 'Cascade du chiffre d’affaires au résultat' });
-    g.appendChild(carte({ span: 'pl-c7', titre: 'Cascade des marges', sous: 'du chiffre d’affaires au résultat · bleu : ce qui reste, rouge : ce qui part', corps: [hostC],
+    g.appendChild(carte({ span: 'pl-c7', titre: 'Cascade des marges', sous: 'du chiffre d’affaires au résultat · gris : les soldes, rouge : ce qui part', corps: [hostC],
       table: function () {
         var tb = h('table', { class: 'pl-table pl-cascade' }, [h('caption', { class: 'sr-only', text: 'Cascade des marges' }),
           h('thead', null, h('tr', null, [h('th', { scope: 'col', text: 'Du chiffre d’affaires au résultat' }), h('th', { scope: 'col', text: 'Montant' }), h('th', { scope: 'col', text: '% du CA' })])),
