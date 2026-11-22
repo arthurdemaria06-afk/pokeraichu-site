@@ -104,7 +104,7 @@ def check(r):
     rar = clean_text(r.get('rarete'), 30) or None
     cat = r.get('categorie') if r.get('categorie') in ('vintage', 'ar', 'sar', 'sr', 'fur', 'promos', 'autres', 'reeditions-30') else None
     return {'ref': ref, 'nom_fr': nom, 'nom_en': clean_text(r.get('nom_en')) or nom, 'numero': numero or None, 'prix_eur': prix, 'quantite': q,
-            'langue': lang, 'extension': {'code': code, 'nom': enom}, 'etat': etat, 'photos': n, 'pokemons': pks, 'pokemons_en': pks_en,
+            'langue': lang, 'extension': ext_fr({'code': code, 'nom': enom}), 'etat': etat, 'photos': n, 'pokemons': pks, 'pokemons_en': pks_en,
             'rarete': rar, 'ajoute_le': str(r.get('ajoute_le') or TODAY.isoformat())[:10], 'prix_sur_demande': ask,
             'variante': variante, 'variante_en': clean_text(r.get('variante_en'), 60) or variante,
             'edition': clean_text(r.get('edition'), 30) or None, 'edition_en': clean_text(r.get('edition_en'), 30) or None,
@@ -219,7 +219,8 @@ def related(c, lang, pool, attrs, lqips):
     raichu = 'Raichu' in c['pokemons']
     picks = same_pk[:4]
     if len(picks) < 4:
-        ext = [x for x in pool if x['ref'] != c['ref'] and x not in picks and x['extension'] == c['extension']]
+        ext = [x for x in pool if x['ref'] != c['ref'] and x not in picks
+               and (x['extension']['code'], x['extension']['nom']) == (c['extension']['code'], c['extension']['nom'])]
         ext.sort(key=lambda x: -float(x['prix_eur'] or 0))
         picks += ext[:4 - len(picks)]
     if not picks:
@@ -273,6 +274,15 @@ def en_twin(rel_fr):
     s = rd(rel_fr)
     m = re.search(r'hreflang="en" href="https://pokeraichu\.com/([^"]+)"', s)
     return m.group(1) if m else None
+
+
+def ext_fr(e):
+    """Ajoute le nom francais de l'extension (nom_fr) quand il differe du nom d'origine."""
+    fr = fiche.EXT_FR.get((e['code'], e['nom']))
+    if fr and fr != e['nom']:
+        e = dict(e)
+        e['nom_fr'] = fr
+    return e
 
 
 def bump_option(page, sel_id, value, label):
@@ -433,7 +443,7 @@ def ajouter():
             fr = lang == 'fr'
             bump_option(page, 'f-lang', c['langue'], fiche.LANG[c['langue']][0 if fr else 2])
             bump_option(page, 'f-grade', fiche.grade_slug(c), fiche.grade_label(c) if fiche.is_slab(c) else ('Non gradées' if fr else 'Raw'))
-            bump_option(page, 'f-ext', fiche.ext_slug(c), fiche.ext_label(c))
+            bump_option(page, 'f-ext', fiche.ext_slug(c), fiche.ext_label(c, lang))
             for p in (c['pokemons'] if fr else c['en']['pokemons']):
                 bump_option(page, 'f-pk', p, p)
     # 4. donnees
@@ -457,7 +467,7 @@ def ajouter():
         if hit:
             hit[0]['fiches'] += 1
         elif 'extensions' in tx:
-            tx['extensions'].append({'code': c['extension']['code'], 'nom': c['extension']['nom'], 'langue': c['langue'], 'fiches': 1})
+            tx['extensions'].append(ext_fr({'code': c['extension']['code'], 'nom': c['extension']['nom'], 'langue': c['langue'], 'fiches': 1}))
         for p in c['pokemons']:
             hit = [t for t in tx.get('pokemons', []) if t['nom'] == p]
             if hit:

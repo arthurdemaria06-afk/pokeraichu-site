@@ -20,6 +20,76 @@ LANG = {
 GRADERS = {'PSA': 'https://www.psacard.com/cert/%s', 'CGC': 'https://www.cgccards.com/certlookup/%s/',
            'BGS': 'https://www.beckett.com/grading/card-lookup?item_type=BGS&item_id=%s'}
 
+# Nom francais des extensions (pages FR). Le nom anglais/japonais `extension.nom` reste la cle : il fait l'adresse
+# des pages d'extension (slug), les pages EN et la recherche. Regle (22/11/2026, demande d'Arthur) : nom officiel de
+# l'extension francaise equivalente ; produit japonais sans equivalent : nom traduit ; sinon le nom d'origine.
+EXT_FR = {
+    ('M6a', '30th Celebration'): '30e Anniversaire',
+    ('M-P', 'Promo 30th Celebration'): 'Promos 30e Anniversaire',
+    ('MF', '30th Premium Deck Espeon & Umbreon'): 'Deck Premium 30e Anniversaire Mentali et Noctali',
+    ('M6', 'Storm Emeralda'): 'Règne Delta',
+    ('M5', 'Abyss Eye'): 'Nuit Noire',
+    ('M4', 'Ninja Spinner'): 'Chaos Ascendant',
+    ('M3', 'Nihil Zero'): 'Équilibre Parfait',
+    ('M2a', 'MEGA Dream ex'): 'Héros Transcendants',
+    ('M2', 'Inferno X'): 'Flammes Fantasmagoriques',
+    ('M1S', 'Mega Symphonia'): 'Méga-Évolution',
+    ('M1L', 'Mega Brave'): 'Méga-Évolution',
+    ('MEE', 'MEGA Starter Set ex Eevee ex'): 'Set de démarrage Méga ex Évoli-ex',
+    ('SV11B', 'Black Bolt'): 'Foudre Noire',
+    ('SV10', 'The Glory of Team Rocket'): 'Rivalités Destinées',
+    ('SV9', 'Battle Partners'): 'Aventures Ensemble',
+    ('SV8a', 'Terastal Festival ex'): 'Évolutions Prismatiques',
+    ('SV7a', 'Paradise Dragona'): 'Étincelles Déferlantes',
+    ('SV7', 'Stellar Miracle'): 'Couronne Stellaire',
+    ('SV6', 'Mask of Change'): 'Mascarade Crépusculaire',
+    ('SV5a', 'Crimson Haze'): 'Mascarade Crépusculaire',
+    ('SV5M', 'Cyber Judge'): 'Forces Temporelles',
+    ('SV4a', 'Shiny Treasure ex'): 'Destinées de Paldea',
+    ('SV4K', 'Ancient Roar'): 'Faille Paradoxe',
+    ('SV2a', 'Pokémon Card 151'): '151',
+    ('SV2D', 'Clay Burst'): 'Évolutions à Paldea',
+    ('SV2P', 'Snow Hazard'): 'Évolutions à Paldea',
+    ('SV1a', 'Triplet Beat'): 'Évolutions à Paldea',
+    ('SV1S', 'Scarlet ex'): 'Écarlate et Violet',
+    ('SV1V', 'Violet ex'): 'Écarlate et Violet',
+    ('SV-P', 'Promo'): 'Promo Écarlate et Violet',
+    ('SVM', 'Start Deck Generations'): 'Deck de démarrage Générations',
+    ('s12a', 'VSTAR Universe'): 'Zénith Suprême',
+    ('s10a', 'Dark Phantasma'): 'Origine Perdue',
+    ('s9a', 'Battle Region'): 'Astres Radieux',
+    ('s9', 'Star Birth'): 'Stars Étincelantes',
+    ('s8a', '25th Anniversary Collection'): 'Célébrations',
+    ('s8a-G', '25th Anniversary Golden Box'): 'Coffret doré 25e Anniversaire',
+    ('s8a-P', '25th Anniversary promo'): 'Promos 25e Anniversaire',
+    ('s7R', 'Blue Sky Stream'): 'Évolution Céleste',
+    ('S6K', 'Jet-Black Spirit'): 'Règne de Glace',
+    ('sm11b', 'Dream League'): 'Éclipse Cosmique',
+    ('SM3N', 'Darkness that Consumes Light'): 'Ombres Ardentes',
+    ('SPZ', 'High-Class Deck Zeraora'): 'Deck High Class Zeraora',
+    ('XY1', 'Collection X'): 'XY',
+    ('CLL', 'Pokémon Card Game Classic'): 'JCC Pokémon Classic',
+    ('PCG3', 'Golden Sky, Silvery Ocean (2005)'): 'EX Forces Cachées',
+    ('PCG2', 'Rocket Gang Strikes Back (2004)'): 'EX Team Rocket Returns',
+    ('e3', 'Wind from the Sea (Pokémon Card e)'): 'Aquapolis',
+    ('e1', 'Base Expansion Pack (Pokémon Card e, 2001)'): 'Expedition',
+    ('neo4', 'Darkness, and to Light... (Neo Destiny)'): 'Neo Destiny',
+    ('neo3', 'Awakening Legends (Neo Revelation)'): 'Neo Revelation',
+    ('neo2', 'Crossing the Ruins... (Neo Discovery)'): 'Neo Discovery',
+    ('neo1', 'Gold, Silver, to a New World (Neo Genesis)'): 'Neo Genesis',
+    ('Gym', "Leaders' Stadium & Challenge from the Darkness"): 'Gym Heroes et Gym Challenge',
+    ('PMCG4', 'Rocket Gang (Team Rocket)'): 'Team Rocket',
+    ('PMCG3', 'Mystery of the Fossils (Fossil)'): 'Fossile',
+}
+
+
+def ext_nom(c, lang='en'):
+    """Nom de l'extension a afficher : francais sur les pages FR, nom d'origine ailleurs."""
+    e = c['extension']
+    if lang == 'fr':
+        return e.get('nom_fr') or EXT_FR.get((e['code'], e['nom'])) or e['nom']
+    return e['nom']
+
 
 def esc(s):
     return html.escape(str(s), quote=True)
@@ -106,8 +176,8 @@ def ext_slug(c):
     return slugify(c['extension']['code'] + ' ' + c['extension']['nom'])
 
 
-def ext_label(c):
-    return c['extension']['code'] + ' · ' + c['extension']['nom']
+def ext_label(c, lang='en'):
+    return c['extension']['code'] + ' · ' + ext_nom(c, lang)
 
 
 def qty_text(c, lang):
@@ -188,7 +258,7 @@ def msg_lines(c, lang, kind):
         head = {'res': 'Bonjour, je souhaite réserver cette carte vue sur Poké-Raichu :',
                 'resv': 'Bonjour, cette carte est indiquée réservée sur Poké-Raichu. Pouvez-vous me prévenir si elle se libère ?',
                 'photos': 'Bonjour, pourriez-vous m’envoyer des photos de cette carte ?'}[kind]
-        L = [head, title_short(c, 'fr'), 'Extension : %s, version %s' % (ext_label(c), LANG[c['langue']][1])]
+        L = [head, title_short(c, 'fr'), 'Extension : %s, version %s' % (ext_label(c, 'fr'), LANG[c['langue']][1])]
         L.append('Grade : ' + grade_nb(c) if is_slab(c) else 'État : %s (non gradée)' % c['etat']['libelle'])
         if kind == 'res':
             L.append('Prix : ' + (eur_fr(c['prix_eur']) if c['prix_eur'] is not None else 'sur demande'))
@@ -220,7 +290,7 @@ def specs_html(root, c, lang):
         D.append(('Nom anglais', '<span lang="en">%s</span>' % esc_text(c['en']['nom'])))
     es = ext_slug(c)
     ext_rel = ('extensions/%s.html' if fr else 'en/sets/%s.html') % es
-    lab = esc_text(ext_label(c))
+    lab = esc_text(ext_label(c, lang))
     D.append(('Extension' if fr else 'Set', '<a href="../%s">%s</a>' % (('extensions/' if fr else 'sets/') + es + '.html', lab) if page_exists(root, ext_rel) else lab))
     var = c.get('variante') if fr else c['en'].get('variante')
     if var and c['numero'] in ('(%s)' % var, var, ''):  # carte ancienne sans numero de collection
@@ -269,7 +339,7 @@ def descr(c, lang):
     if lang == 'fr':
         etat = 'gradée ' + grade_nb(c) if is_slab(c) else 'état ' + c['etat']['libelle']
         return '%s, carte Pokémon %s de l’extension %s, %s. %s, prix %s. Réservation sur le site, paiement sur eBay.' % (
-            full_name(c, 'fr'), LANG[c['langue']][1], c['extension']['nom'], etat, qty_text(c, 'fr'), eur_fr(c['prix_eur']) if c['prix_eur'] is not None else 'sur demande')
+            full_name(c, 'fr'), LANG[c['langue']][1], ext_nom(c, 'fr'), etat, qty_text(c, 'fr'), eur_fr(c['prix_eur']) if c['prix_eur'] is not None else 'sur demande')
     etat = 'graded ' + grade_nb(c) if is_slab(c) else c['en']['etat'] + ' condition'
     return '%s, %s Pokémon card from the %s set, %s. %s, price %s. Reserve on the site, pay on eBay.' % (
         full_name(c, 'en'), LANG[c['langue']][2], c['extension']['nom'], etat, qty_text(c, 'en'), eur_en(c['prix_eur']) if c['prix_eur'] is not None else 'on request')
@@ -277,7 +347,7 @@ def descr(c, lang):
 
 def page_title(c, lang):
     if lang == 'fr':
-        return '%s · carte Pokémon %s, %s | Poké-Raichu' % (full_name(c, 'fr'), LANG[c['langue']][1], c['extension']['nom'])
+        return '%s · carte Pokémon %s, %s | Poké-Raichu' % (full_name(c, 'fr'), LANG[c['langue']][1], ext_nom(c, 'fr'))
     return '%s · %s Pokémon card, %s | Poké-Raichu' % (full_name(c, 'en'), LANG[c['langue']][2], c['extension']['nom'])
 
 
@@ -370,7 +440,7 @@ def render_product(root, c, lang, shell, ship_block, ship_ld, valid_until, relat
            '<h1 class="product__title">%s <span class="product__num">%s</span></h1>\n<p class="product__en">%s</p>\n'
            '<p class="product__price-wrap"><span class="product__price%s">%s</span></p>\n'
            '<p class="product__stock"><span class="status" data-status-text>%s</span> · %s</p>\n%s%s%s\n\n</div>\n</article>\n') % (
-        ref, media_html(root, c, lang, up), BOLT if 'Raichu' in c['pokemons'] else '', esc_text(eyebrow), name, esc_text(c['numero']), esc_text(ext_label(c)), ask_cls(c), price,
+        ref, media_html(root, c, lang, up), BOLT if 'Raichu' in c['pokemons'] else '', esc_text(eyebrow), name, esc_text(c['numero']), esc_text(ext_label(c, lang)), ask_cls(c), price,
         L['avail'], esc_text(stock), cta, ship_block, specs_html(root, c, lang))
     buybar = ('<div class="buybar" data-buybar><span class="price%s">%s</span><a class="btn" href="%s" data-contact data-ref="%s" data-msg="%s" '
               'data-msg-reserved="%s" data-label-reserved="%s">%s</a></div>\n') % (ask_cls(c), price, contact, ref, m_res, m_resv, L['lres'], L['res'])
@@ -425,7 +495,7 @@ def search_string(c):
     e = c['etat']
     nf, ne = c['nom_fr'], c['en']['nom']
     w = [nf + ' ' + c['numero'], ne + ' ' + c['numero'], nf, ne, c['numero'],
-         c['extension']['code'] + ' ' + c['extension']['nom']]
+         c['extension']['code'] + ' ' + c['extension']['nom'] + ('' if ext_nom(c, 'fr') == c['extension']['nom'] else ' ' + ext_nom(c, 'fr'))]
     if c.get('rarete'):
         w += [c['rarete'], RAR_EN.get(c['rarete'], c['en'].get('rarete') or c['rarete'])]
     if is_slab(c):

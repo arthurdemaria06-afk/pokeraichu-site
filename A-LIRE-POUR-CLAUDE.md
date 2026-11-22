@@ -130,6 +130,17 @@ modifiées directement, et les nouvelles cartes sont produites par :
   - numérotation des promos ;
   - apostrophe → « - » dans les slugs ;
   - bloc « cartes liées » vide = "\n".
+- **Noms d'extensions en français côté FR (depuis le 22/11)** : `extension.nom` reste le nom anglais d'origine
+  (les adresses `extensions/<code-nom>.html` et `en/sets/` en dépendent : ne jamais le traduire). Le nom français est
+  dans `extension.nom_fr` (stock.json, cartes et taxonomie) et dans le dictionnaire `EXT_FR` de `fiche.py`
+  (clé `(code, nom anglais)`) ; `fiche.ext_nom(c, 'fr')` / `ext_label(c, 'fr')` l'utilisent pour les pages FR,
+  `construire.py` remplit `nom_fr` tout seul pour les nouvelles cartes. **Nouvelle extension japonaise** : ajouter sa
+  paire dans `EXT_FR` (nom officiel de l'équivalent français), sinon le nom anglais s'affiche aussi côté FR.
+  Restent en anglais exprès : VMAX Climax, Pokémon GO, Pokémon VS (2001), Promo McDonald's 2025 ; les cartes FR
+  (30C, DRI, ME04) ont déjà un nom français. La recherche accepte les deux noms (FR et EN). Les pages EN, les outils
+  de gestion et le texte des annonces gardent le nom anglais. Images de partage (`assets/partage/`) des pages
+  d'extension FR et de la collection 30e Anniversaire refaites avec le nom FR (même gabarit : Libre Caslon Display
+  74 px, x 404, ligne de base 294, interligne 80 ; lignes compteurs et prix recopiées de l'ancienne image).
 - `_outils/modifier.py` : **modifie une fiche déjà en ligne sans la régénérer**. Il calcule ce que `fiche.py` produit
   pour l'ancienne et la nouvelle version de la carte, puis reporte seulement les différences dans les vraies pages
   (fusion à trois voies : tout ce qui a été ajouté à la main dans une page est conservé). Il met à jour la fiche FR et EN,
@@ -203,6 +214,9 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Noms d'extensions en français sur tout le site FR (filtres, fiches, pages d'extension, vignettes, titres,
+  descriptions, pochettes, collection « 30e Anniversaire », images de partage) ; adresses inchangées ; EN inchangé
+  (voir section 4).
 - (20/11) 350 Rondoudou d'Érika 139/103 JP (5 €, vendue : liste `vendues` de config.js, `vendues_le` avancé) ;
   Darkrai & Cresselia LÉGENDE : une seule fiche, 038 (la paire en photo), à 2 exemplaires, 116 et 280 (moitiés)
   retirées et redirigées vers 038 (Shopify : PKR-38-210 à 2, PKR-116 et PKR-280 archivés) ; nouvelle photo du lot
