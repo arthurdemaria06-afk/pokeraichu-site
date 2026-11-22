@@ -212,7 +212,7 @@
         barres.forEach(function (s, j) {
           var v = s.valeurs[i];
           if (!ok(v)) return;
-          var cls = 'g-col ' + (s.cls || 'g-s1');
+          var cls = 'g-col ' + (c.cls || s.cls || 'g-s1');
           if (c.special) cls += ' g-special';
           if (o.sel != null && o.sel !== c.cle) cls += ' g-mute';
           if (s.signe) cls += v < 0 ? ' g-neg' : ' g-pos';
@@ -424,9 +424,9 @@
      barres divergentes (bleu / rouge) dès qu'une valeur est négative ; repère = trait fin (ex. le coût sous la valeur). */
   function barres(host, o) {
     var B = cadre(host, null, 'g-barres-host');
-    var L = o.lignes, neg = L.some(function (l) { return l.v < 0; }), signe = o.signe || neg;
+    var L = o.lignes, neg = L.some(function (l) { return l.v < 0 || (l.repere != null && ok(l.repere) && l.repere < 0); }), signe = o.signe != null ? o.signe : L.some(function (l) { return l.v < 0; });
     var mx = o.max != null ? o.max : Math.max.apply(null, L.map(function (l) { return Math.max(l.v, l.repere || 0, 0); }).concat([0]));
-    var mn = Math.min.apply(null, L.map(function (l) { return Math.min(l.v, 0); }).concat([0]));
+    var mn = Math.min.apply(null, L.map(function (l) { return Math.min(l.v, l.repere != null && ok(l.repere) ? l.repere : 0, 0); }).concat([0]));
     var span = mx - mn || 1, z = -mn / span * 100;
     var ul = h('ul', { class: 'g-barres' + (o.sel != null ? ' g-barres--sel' : ''), 'aria-label': o.aria || null });
     L.forEach(function (l) {
@@ -466,15 +466,25 @@
   function nuage(host, o) {
     var B = cadre(host, null, 'g-nuage-host');
     monter(host, function (W) {
-      var H = Math.round(Math.max(260, Math.min(460, W * (W < 520 ? 0.95 : 0.56))));
+      var H = Math.round(Math.max(260, Math.min(480, W * (W < 520 ? 0.95 : 0.68))));
       host.style.height = H + 'px';
-      var P = o.points, fx = o.fmtX || pctAxe, fy = o.fmtY || pctAxe;
-      var bx = bornes([P.map(function (p) { return p.x; }), [o.moyX]], true), by = bornes([P.map(function (p) { return p.y; }), [o.moyY]], true);
-      var EX = echelle(bx[0], bx[1] * 1.08, Math.max(3, Math.floor(W / 130))), EY = echelle(by[0] < 0 ? by[0] * 1.1 : 0, by[1] * 1.1, 4);
+      var P = o.log ? o.points.filter(function (p) { return p.x > 0 && p.y > 0; }) : o.points, fx = o.fmtX || pctAxe, fy = o.fmtY || pctAxe;
+      var EX, EY;
+      if (o.log) {
+        var lo = Math.min.apply(null, P.map(function (p) { return Math.min(p.x, p.y); })), hi = Math.max.apply(null, P.map(function (p) { return Math.max(p.x, p.y); }));
+        var a0 = Math.pow(10, Math.floor(Math.log(lo) / Math.LN10)), b0 = Math.pow(10, Math.ceil(Math.log(hi) / Math.LN10)), tk = [];
+        for (var dd = a0; dd <= b0 * 1.001; dd *= 10) [1, 2, 5].forEach(function (f) { var v = dd * f; if (v >= a0 && v <= b0 * 1.001) tk.push(v); });
+        if (tk.length > 9) tk = tk.filter(function (v) { return Math.abs(Math.log(v) / Math.LN10 % 1) < 1e-9; });
+        EX = EY = { min: a0, max: b0, ticks: tk };
+      } else {
+        var bx = bornes([P.map(function (p) { return p.x; }), [o.moyX]], true), by = bornes([P.map(function (p) { return p.y; }), [o.moyY]], true);
+        EX = echelle(bx[0], bx[1] * 1.08, Math.max(3, Math.floor(W / 130))); EY = echelle(by[0] < 0 ? by[0] * 1.1 : 0, by[1] * 1.1, 4);
+      }
       var gl = Math.ceil(Math.max.apply(null, EY.ticks.map(function (t) { return largeur(fy(t), 11); }))) + 10;
-      var m = { l: gl, r: 12, t: 20, b: 40 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
-      function X(v) { return m.l + pw * (v - EX.min) / (EX.max - EX.min); }
-      function Y(v) { return m.t + ph * (1 - (v - EY.min) / (EY.max - EY.min)); }
+      var m = { l: gl, r: 12, t: 26, b: 40 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
+      function ech(v, E) { return o.log ? (Math.log(v) - Math.log(E.min)) / (Math.log(E.max) - Math.log(E.min)) : (v - E.min) / (E.max - E.min); }
+      function X(v) { return m.l + pw * ech(v, EX); }
+      function Y(v) { return m.t + ph * (1 - ech(v, EY)); }
       var svg = sv('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, class: 'g-svg', role: 'img', 'aria-label': o.aria || '' });
       EY.ticks.forEach(function (t) {
         svg.appendChild(sv('line', { x1: m.l, x2: W - m.r, y1: r1(Y(t)), y2: r1(Y(t)), class: t === 0 ? 'g-zero' : 'g-grille' }));
@@ -484,29 +494,34 @@
         svg.appendChild(sv('line', { x1: r1(X(t)), x2: r1(X(t)), y1: m.t, y2: H - m.b, class: 'g-grille' }));
         svg.appendChild(sv('text', { x: r1(X(t)), y: H - m.b + 15, 'text-anchor': 'middle', class: 'g-tick' }, fx(t)));
       });
+      if (o.diagonale) { var da = Math.max(EX.min, EY.min), db = Math.min(EX.max, EY.max); svg.appendChild(sv('line', { x1: r1(X(da)), y1: r1(Y(da)), x2: r1(X(db)), y2: r1(Y(db)), class: 'g-ref' })); }
       if (ok(o.moyX)) svg.appendChild(sv('line', { x1: r1(X(o.moyX)), x2: r1(X(o.moyX)), y1: m.t, y2: H - m.b, class: 'g-ref' }));
       if (ok(o.moyY)) svg.appendChild(sv('line', { x1: m.l, x2: W - m.r, y1: r1(Y(o.moyY)), y2: r1(Y(o.moyY)), class: 'g-ref' }));
-      if (o.quadrants) [[o.quadrants[0], m.l + 6, m.t - 6, 'start'], [o.quadrants[1], W - m.r - 2, m.t - 6, 'end'], [o.quadrants[2], m.l + 6, H - m.b - 8, 'start'], [o.quadrants[3], W - m.r - 2, H - m.b - 8, 'end']]
+      if (o.quadrants) [[o.quadrants[0], m.l + 8, m.t + 14, 'start'], [o.quadrants[1], W - m.r - 6, m.t + 14, 'end'], [o.quadrants[2], m.l + 8, H - m.b - 8, 'start'], [o.quadrants[3], W - m.r - 6, H - m.b - 8, 'end']]
         .forEach(function (q) { if (q[0]) svg.appendChild(sv('text', { x: q[1], y: q[2], 'text-anchor': q[3], class: 'g-quad' }, q[0])); });
-      if (o.yNom) svg.appendChild(sv('text', { x: 2, y: 10, class: 'g-axe-t' }, o.yNom));
+      if (o.yNom) svg.appendChild(sv('text', { x: 2, y: 12, class: 'g-axe-t' }, o.yNom));
       if (o.xNom) svg.appendChild(sv('text', { x: W - m.r, y: H - 6, 'text-anchor': 'end', class: 'g-axe-t' }, o.xNom));
       var tmax = Math.max.apply(null, P.map(function (p) { return p.taille || 0; })) || 1, rmax = Math.max(14, Math.min(26, W / 30));
       var places = P.slice().sort(function (a, b) { return (b.taille || 0) - (a.taille || 0); }).map(function (p) {
-        return { p: p, cx: X(p.x), cy: Y(p.y), r: 4 + (rmax - 4) * Math.sqrt(Math.max(0, p.taille || 0) / tmax) };
+        return { p: p, cx: X(p.x), cy: Y(p.y), r: o.rayon || 4 + (rmax - 4) * Math.sqrt(Math.max(0, p.taille || 0) / tmax) };
       });
       places.forEach(function (q) {
         var muet = o.sel != null && o.sel !== q.p.cle;
         svg.appendChild(sv('circle', { cx: r1(q.cx), cy: r1(q.cy), r: r1(q.r), class: 'g-bulle-pt ' + (q.p.cls || 'g-s1') + (muet ? ' g-mute' : '') + (o.sel === q.p.cle ? ' g-bulle-pt--sel' : '') }));
       });
-      /* étiquettes : à droite du point (à gauche près du bord), décalées si elles se chevauchent */
+      /* étiquettes : à droite du point (à gauche près du bord), décalées si elles touchent une autre étiquette ou une bulle */
       var poses = [];
-      places.forEach(function (q) {
+      if (o.etiquettes !== false) places.forEach(function (q) {
+        var autres = places.filter(function (x) { return x !== q; }).map(function (x) { return [x.cx - x.r, x.cy - x.r, x.cx + x.r, x.cy + x.r]; });
         var lab = q.p.label.length > (W < 520 ? 18 : 28) ? q.p.label.slice(0, W < 520 ? 17 : 27) + '…' : q.p.label, lw = largeur(lab, 11, true);
         var gauche = q.cx + q.r + 4 + lw > W - m.r, tx = gauche ? q.cx - q.r - 4 : q.cx + q.r + 4, ty;
         function boite() { return gauche ? [tx - lw, ty - 10, tx, ty + 3] : [tx, ty - 10, tx + lw, ty + 3]; }
-        function heurte(b) { return poses.some(function (o2) { return b[0] < o2[2] && b[2] > o2[0] && b[1] < o2[3] && b[3] > o2[1]; }); }
+        function heurte(b) { return poses.concat(autres).some(function (o2) { return b[0] < o2[2] && b[2] > o2[0] && b[1] < o2[3] && b[3] > o2[1]; }); }
         var trouve = false;
-        for (var k = 0, dy = [0, 13, -13, 26, -26]; k < dy.length; k++) { ty = q.cy + 4 + dy[k]; if (!heurte(boite())) { trouve = true; break; } }
+        for (var essai = 0; essai < 2 && !trouve; essai++) {
+          if (essai) { gauche = !gauche; tx = gauche ? q.cx - q.r - 4 : q.cx + q.r + 4; if (gauche ? tx - lw < m.l : tx + lw > W - m.r) break; }
+          for (var k = 0, dy = [0, 13, -13, 26, -26]; k < dy.length; k++) { ty = q.cy + 4 + dy[k]; if (!heurte(boite())) { trouve = true; break; } }
+        }
         if (!trouve) return;
         poses.push(boite());
         var muet = o.sel != null && o.sel !== q.p.cle;

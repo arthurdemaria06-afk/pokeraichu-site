@@ -221,6 +221,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Pilotage, étape 2 : Analyse, Coûts, SASU, Ventes, Stock, Achats et Voyages au format du nouveau tableau de bord.
 - (22/11) Gestion › Annonce : titres eBay français + anglais, cadre Poké-Raichu sur les photos enregistrées.
 - (22/11) Pilotage refait visuellement (tableau de bord filtrable façon Qlik, graphiques interactifs, rendu iPad) :
   voir § Pilotage › Refonte visuelle.
@@ -387,5 +388,14 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   tendance ; CA et bénéfice dans le temps (ventes sans date en gris), investissement récupéré, bénéfice par groupe, ventes
   par canal et par langue, stock par groupe (trait = coût) et par gamme, meilleures ventes, plus grosses pièces.
   Chaque graphique a sa vue « Tableau » ; tableaux triables (`tableau(..., { cle })`, colonne `v`, mini-barres `barre`).
+- Étape 2 (22/11) : toutes les vues au même format (grille, tuiles `kpi()`, `carte()` avec bouton « Tableau »).
+  Analyse › Segments (nuage, tableau par segment, budget), Coûts (cascade des marges, seuil de rentabilité, parts),
+  SASU (cascade, courbe « ce qui te reste »), Ventes (mêmes filtres partagés `S.fb` que le Bord), Stock (tuiles qui
+  suivent les filtres, bascule Liste/Tableau `S.stockVue`, colonne « En stock depuis »), Achats (origine de
+  l'investissement, dépenses par boutique, achats dans le temps, tickets triables), Voyages (une carte par voyage :
+  retour potentiel, coût récupéré ; comparaison des retours et du poids des frais) et fiche voyage (frais en barres,
+  seuil d'achats en jauge, ventes triables). Options PRGraph ajoutées : `nuage` log/diagonale/etiquettes/rayon,
+  `cls` par catégorie dans `colonnes`, `signe` forcé dans `barres` (repère négatif pris dans l'échelle).
+  Formats : estimations à l'euro, ventes réelles au centime ; métadonnées sans doublon (`sansDoublons`).
 - Test sans données réelles : banc local hors dépôt (données fictives tirées du stock public, API simulée, CSP du site,
   captures Playwright iPad 1376 px / portrait / Split View / iPhone). Ne jamais mettre ces données dans le dépôt.

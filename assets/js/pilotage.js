@@ -54,6 +54,7 @@
   function pl(n) { return n > 1 ? 's' : ''; }
   function z(v) { return typeof v === 'number' && isFinite(v) ? v : 0; }
   function vide(v) { return v === null || v === undefined || (typeof v === 'number' && !isFinite(v)); }
+  function sansDoublons(l) { var vu = {}; return l.filter(function (x) { if (!x) return false; var k = String(x).toLowerCase(); if (vu[k]) return false; vu[k] = 1; return true; }); }
   function uniques(l) { var o = {}; l.forEach(function (x) { if (x) o[x] = 1; }); return Object.keys(o).sort(function (a, b) { return a.localeCompare(b, 'fr'); }); }
   function cmpRef(a, b) {
     var na = /^\d+$/.test(a), nb = /^\d+$/.test(b);
@@ -468,7 +469,7 @@
           } }));
       }))));
       t.appendChild(h('tbody', null, L.map(function (l) {
-        return h('tr', null, cols.map(function (c, i) {
+        return h('tr', opts.trCls ? { class: opts.trCls(l) || null } : null, cols.map(function (c, i) {
           var contenu = c.f(l);
           if (c.barre && c.v && max[i]) {
             var v = z(c.v(l)), b = h('i');
@@ -610,7 +611,7 @@
     if (opts && opts.extra) meta.push(opts.extra);
     return h('li', null, h('a', { class: 'pl-row', href: '#carte/' + encodeURIComponent(c.ref) }, [
       vignette(c),
-      h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: c.nom || c.ref }), h('span', { class: 'pl-row__meta', text: meta.filter(Boolean).join(' · ') })]),
+      h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: c.nom || c.ref }), h('span', { class: 'pl-row__meta', text: sansDoublons(meta).join(' · ') })]),
       h('span', { class: 'pl-row__nums' }, nums)
     ]));
   }
@@ -1046,7 +1047,8 @@
   }
   VUES.stock = function (m) {
     var R = S.R, f = S.f, limite = 120;
-    m.appendChild(entete('Stock', nbr(R.stock.cartes) + ' cartes en stock · ' + eur(R.stock.valeur) + ' au prix marché',
+    var scelle = R.produits.reduce(function (a, x) { return a + (x.reste > 0 ? z(x.stock_valeur) : 0); }, 0);
+    m.appendChild(entete('Stock', nbr(R.stock.cartes) + ' cartes en stock' + (scelle >= 0.5 ? ' · scellé à part : ' + eur(scelle, 0) + ' (Plus › Scellé)' : ''),
       [h('button', { type: 'button', class: 'btn pl-btn-s', onclick: function () { feuilleCarte(null); }, text: '+ Ajouter' })]));
     var champ = h('input', { class: 'input', type: 'search', placeholder: 'Nom, n°, set, nom japonais…', 'aria-label': 'Chercher une carte',
       autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'search', 'data-focus': 'q' });
@@ -1069,21 +1071,49 @@
     var cats = [['', 'Toutes catégories']].concat(uniques(R.cartes.map(function (r) { return r.c.cat; })).map(function (c) { return [c, c]; }));
     var langues = [['', 'Toutes langues']].concat(uniques(R.cartes.map(function (r) { return r.c.langue; })).map(function (l) { return [l, l]; }));
     m.appendChild(h('div', { class: 'pl-filtres' }, [sel('groupe', 'Groupe', groupes), sel('cat', 'Catégorie', cats), sel('langue', 'Langue', langues), sel('tri', 'Trier', TRIS)]));
-    var resume = h('p', { class: 'pl-resume', 'aria-live': 'polite' });
-    var liste = h('ul', { class: 'pl-rows' });
+    var vue = S.stockVue || 'liste';
+    var segV = h('div', { class: 'pl-seg pl-seg--vue', role: 'group', 'aria-label': 'Présentation' }, [['liste', 'Liste'], ['tableau', 'Tableau']].map(function (x) {
+      return h('button', { type: 'button', 'aria-pressed': String(vue === x[0]), text: x[1], onclick: function () { S.stockVue = x[0]; rendre(true); } });
+    }));
+    var tuiles = h('div', { class: 'pl-kpis pl-kpis--stock', 'aria-live': 'polite' });
+    var resume = h('p', { class: 'pl-resume' });
+    var liste = h('div', { class: 'pl-stock-liste' });
     var plus = h('button', { type: 'button', class: 'btn btn--ghost pl-plus', text: 'Afficher la suite' });
     plus.addEventListener('click', function () { limite += 300; maj(); });
-    m.appendChild(resume); m.appendChild(liste); m.appendChild(plus);
+    m.appendChild(tuiles); m.appendChild(h('div', { class: 'pl-stock-barre' }, [resume, segV])); m.appendChild(liste); m.appendChild(plus);
+    var auj = PB ? PB.jour(aujourdhui()) : null;
+    function age(r) { var da = dateAchatCarte(r); return da && auj != null ? Math.max(0, auj - PB.jour(da)) : null; }
     function maj() {
-      var l = trier(cartesFiltrees(), f.tri), val = 0, cout = 0, lat = 0, enc = 0, net = 0;
-      l.forEach(function (r) { if (r.c.vendu) { enc += z(r.encaisse); net += r.vente ? r.vente.net : 0; } else { val += z(r.c.prix); cout += z(r.cout); lat += z(r.latent); } });
-      var t = nbr(l.length) + ' carte' + pl(l.length);
-      if (f.statut === 'vendues') t += ' · ' + eur(enc) + ' encaissés · bénéfice ' + eurS(net);
-      else t += ' · valeur ' + eur(val) + ' · coût ' + eur(cout) + ' · plus-value ' + eurS(lat);
-      resume.textContent = t;
+      var l = trier(cartesFiltrees(), f.tri), val = 0, cout = 0, lat = 0, enc = 0, net = 0, nv = 0, ns = 0, sa = 0, na = 0;
+      l.forEach(function (r) { if (r.c.vendu) { nv++; enc += z(r.encaisse); net += r.vente ? r.vente.net : 0; } else { ns++; val += z(r.c.prix); cout += z(r.cout); lat += z(r.latent); var a0 = age(r); if (a0 != null) { sa += a0; na++; } } });
+      tuiles.textContent = '';
+      if (f.statut !== 'vendues') ajouter(tuiles, [tuile('Valeur marché', eur(val, 0), nbr(ns) + ' en stock'), tuile('Coût', eur(cout, 0), 'prix d’achat (ou estimé)'),
+        tuile('Plus-value', eurS(lat, 0), cout ? pct(lat / cout) + ' du coût, frais de vente déduits' : 'frais de vente déduits', lat < -0.5 ? 'pl-neg' : ''), f.statut === 'toutes' ? tuile('Vendues', nbr(nv), eur(enc, 0) + ' encaissés') : tuile('Âge moyen', na ? nbr(Math.round(sa / na)) + ' j' : '—', na ? 'en stock, sur ' + nbr(na) + ' carte' + pl(na) + ' datée' + pl(na) : 'aucune date d’achat')]);
+      else ajouter(tuiles, [tuile('Vendues', nbr(nv)), tuile('Encaissé', eur(enc, 0)), tuile('Bénéfice', eurS(net, 0), enc ? pct(net / enc) + ' du prix de vente' : null, net < -0.5 ? 'pl-neg' : ''), tuile('Panier moyen', nv ? eur(enc / nv) : '—')]);
+      resume.textContent = nbr(l.length) + ' carte' + pl(l.length) + (l.length > limite ? ' · ' + nbr(limite) + ' affichées' : '');
       liste.textContent = '';
       liste.hidden = !l.length;
-      l.slice(0, limite).forEach(function (r) { liste.appendChild(ligneCarte(r)); });
+      var vis = l.slice(0, limite);
+      if (vue === 'tableau') {
+        var cols = [{ t: 'Carte', f: function (r) { return celluleCarte(r, sansDoublons(['N° ' + r.c.ref, nomGroupe(r.c.groupe), r.c.cat, r.c.langue, r.source === 'estimé' ? 'coût estimé' : null]).join(' · ')); }, v: function (r) { return r.c.nom || r.ref; } }];
+        if (f.statut === 'vendues') cols = cols.concat([
+          { t: 'Vendue', f: function (r) { return r.c.vente_date ? dateFR(r.c.vente_date) : '—'; }, v: function (r) { return r.c.vente_date || ''; } },
+          { t: 'Canal', f: function (r) { return r.c.canal || '—'; }, v: function (r) { return r.c.canal || ''; } },
+          { t: 'Encaissé', f: function (r) { return eur(r.encaisse, 2); }, v: function (r) { return r.encaisse; } },
+          { t: 'Bénéfice', f: function (r) { return r.vente ? eurS(r.vente.net, 2) : '—'; }, v: function (r) { return r.vente ? r.vente.net : null; }, barre: true, cls: function (r) { return r.vente ? neg(r.vente.net) : ''; } },
+          { t: 'Rentab.', f: function (r) { return r.vente ? pct(r.vente.rentab) : '—'; }, v: function (r) { return r.vente ? r.vente.rentab : null; } }]);
+        else cols = cols.concat([
+          { t: 'Prix marché', f: function (r) { return r.c.vendu ? 'vendue' : eur(r.c.prix, 0); }, v: function (r) { return r.c.vendu ? null : r.c.prix; } },
+          { t: 'Coût', f: function (r) { return eur(r.cout, 0); }, v: function (r) { return r.cout; } },
+          { t: 'Plus-value', f: function (r) { return r.c.vendu ? (r.vente ? eurS(r.vente.net, 0) : '—') : eurS(r.latent, 0); }, v: function (r) { return r.c.vendu ? (r.vente ? r.vente.net : null) : r.latent; }, barre: true, cls: function (r) { return neg(r.c.vendu ? (r.vente ? r.vente.net : 0) : r.latent); } },
+          { t: 'Rentab.', f: function (r) { return pct(r.c.vendu ? (r.vente ? r.vente.rentab : null) : r.gain); }, v: function (r) { return r.c.vendu ? (r.vente ? r.vente.rentab : null) : r.gain; } },
+          { t: 'En stock depuis', f: function (r) { var a = age(r); return a == null ? '—' : nbr(a) + ' j'; }, v: function (r) { return age(r); } }]);
+        liste.appendChild(tableau(cols, vis, null, 'Cartes', { cle: 'stock-' + f.statut }));
+      } else {
+        var ul = h('ul', { class: 'pl-rows' });
+        vis.forEach(function (r) { ul.appendChild(ligneCarte(r)); });
+        liste.appendChild(ul);
+      }
       plus.hidden = l.length <= limite;
     }
     S.majListe = maj;
@@ -1317,37 +1347,87 @@
 
   /* ---------------------------------------------------------------- ventes */
   VUES.ventes = function (m) {
-    var R = S.R, k = R.k, vt = R.ventesTotal;
-    m.appendChild(entete('Ventes', nbr(k.vendus) + ' article' + pl(k.vendus) + ' vendu' + pl(k.vendus), [h('button', { type: 'button', class: 'btn pl-btn-s', onclick: feuilleChoixVente, text: '+ Vente' })]));
-    m.appendChild(h('div', { class: 'pl-kpis' }, [
-      tuile('Encaissé', eur(vt.encaisse, 2), 'prix moyen ' + eur(k.prix_moyen)),
-      tuile('Coût d’achat', eur(vt.cout, 2), vt.estime ? 'dont ' + eur(vt.estime, 2) + ' estimés' : 'prix réels'),
-      tuile('Frais', eur(vt.envoi + vt.frais, 2), 'envoi ' + eur(vt.envoi, 2) + (vt.frais ? ' · vente ' + eur(vt.frais, 2) : '')),
-      tuile('Bénéfice net', eurS(vt.net, 2), 'rentabilité ' + pct(vt.rentab) + ' · marque ' + pct(k.taux_marque), sens(vt.net))
-    ]));
-    m.appendChild(section('Par groupe', [tableau([
-      { t: 'Groupe', f: function (l) { return l.libelle; } },
-      { t: 'Vendus', f: function (l) { return nbr(l.vendus); } },
-      { t: 'En stock', f: function (l) { return nbr(l.stock); } },
-      { t: 'Encaissé', f: function (l) { return eur(l.encaisse, 2); } },
-      { t: 'Coût', f: function (l) { return eur(l.cout, 2); } },
-      { t: 'Envoi', f: function (l) { return eur(l.envoi, 2); } },
-      { t: 'Bénéfice', f: function (l) { return eur(l.net, 2); }, cls: function (l) { return neg(l.net); } },
-      { t: 'Rentab.', f: function (l) { return pct(l.rentab); } }
-    ], R.ventes, vt, 'Ventes par groupe')]));
-    var vendues = R.cartes.filter(function (r) { return r.vente; }).sort(function (a, b) {
-      return (b.c.vente_date || '').localeCompare(a.c.vente_date || '') || b.i - a.i;
-    });
-    var prod = R.produits.filter(function (x) { return x.vente.vendus > 0; });
-    m.appendChild(section('Détail', [
-      vendues.length ? h('ul', { class: 'pl-rows' }, vendues.map(function (r) { return ligneCarte(r, { extra: r.source === 'estimé' ? 'coût estimé' : null }); })) : h('p', { class: 'pl-box', text: 'Aucune vente pour l’instant.' }),
-      prod.length ? h('ul', { class: 'pl-rows' }, prod.map(function (x) {
-        return h('li', null, h('a', { class: 'pl-row pl-row--sans', href: '#scelle' }, [
-          h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: x.p.nom }), h('span', { class: 'pl-row__meta', text: nbr(x.vente.vendus) + ' vendu' + pl(x.vente.vendus) + ' au nombre' })]),
-          h('span', { class: 'pl-row__nums' }, [h('span', { class: 'pl-row__prix', text: eur(x.vente.encaisse) }), h('span', { class: 'pl-row__m ' + sens(x.vente.net), text: fleche(x.vente.net) + eurS(x.vente.net) })])
-        ]));
-      })) : null
-    ], 'Les ventes enregistrées ici ont une date ; celles venues de l’Excel suivent son ordre.'));
+    var R = S.R, fb = S.fb;
+    m.appendChild(entete('Ventes', 'Mêmes filtres que le tableau de bord', [h('button', { type: 'button', class: 'btn pl-btn-s', onclick: feuilleChoixVente, text: '+ Vente' })]));
+    if (!G || !PB) { m.appendChild(h('p', { class: 'pl-box', text: 'La page ne s’est pas chargée entièrement : recharge-la.' })); return; }
+    var F = faitsBord(), per = PB.periode(fb.periode, aujourdhui(), F), X = PB.filtrer(F, fb, per);
+    var T = PB.totaux(X.ventes), TP = X.prec ? PB.totaux(X.prec) : null, pas = PB.pasDe(per), SER = PB.serie(X.ventes, per, pas);
+    var datees = SER.filter(function (s2) { return !s2.special; }), compar = TP ? 'vs ' + per.precNom : null;
+    function tend(f) { return datees.length > 1 ? datees.map(f) : null; }
+    barreFiltres(F, per, X).forEach(function (e) { m.appendChild(e); });
+    var g = h('div', { class: 'pl-grille' });
+    m.appendChild(g);
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Encaissé', v: eur(T.ca, 0), sous: 'panier moyen ' + eur(T.panier), delta: TP ? ecart(T.ca, TP.ca) : null, deltaL: compar, tend: tend(function (x) { return x.ca; }) }));
+    var estimes = X.ventes.filter(function (v) { return v.estime; }).reduce(function (a2, v) { return a2 + v.cout; }, 0);
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Coût d’achat', v: eur(T.cout, 0), sous: estimes > 0.5 ? 'dont ' + eur(estimes, 0) + ' estimés' : 'prix d’achat réels', tend: tend(function (x) { return x.cout; }), tendCls: 'g-s2' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Frais', v: eur(T.envoi + T.frais, 0), sous: 'envoi ' + eur(T.envoi, 0) + ' · vente ' + eur(T.frais, 0), tend: tend(function (x) { return x.envoi + x.frais; }), tendCls: 'g-s2' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Bénéfice net', v: eurS(T.net, 0), cls: T.net < -0.5 ? 'pl-neg' : '', sous: 'rentabilité ' + pct(T.rentab) + ' · marque ' + pct(T.marque),
+      delta: TP ? ecart(T.net, TP.net) : null, deltaL: compar, tend: tend(function (x) { return x.net; }) }));
+    /* rythme */
+    var vides = !SER.some(function (s2) { return s2.lignes; }), hostR = h('div');
+    if (!vides) G.colonnes(hostR, { cats: SER.map(function (s2) { return { cle: s2.cle, label: s2.label, long: s2.long, special: s2.special }; }),
+      series: [{ nom: 'Articles vendus', cls: 'g-s1', valeurs: SER.map(function (s2) { return s2.lignes ? s2.n : null; }) }], hauteur: 230, fmt: function (v) { return nbr(v); }, fmtAxe: function (v) { return nbr(v); },
+      etiquettes: SER.length <= 8, detail: function (i) { var s2 = SER[i]; return s2.lignes ? [{ v: eur(s2.ca, 0), l: 'encaissés', sous: true }, { v: eurS(s2.net, 0), l: 'de bénéfice', sous: true }] : []; },
+      aria: 'Nombre d’articles vendus ' + NOM_PAS[pas] });
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Rythme des ventes', sous: 'articles vendus ' + NOM_PAS[pas] + ' · ' + per.nom.toLowerCase(), corps: [vides ? vide2('Aucune vente sur cette période.') : hostR],
+      table: vides ? null : function () { return tableau([{ t: 'Période', f: function (x) { return x.long; } }, { t: 'Articles', f: function (x) { return nbr(x.n); } }, { t: 'Encaissé', f: function (x) { return eur(x.ca, 2); } }, { t: 'Bénéfice', f: function (x) { return eurS(x.net, 2); }, cls: function (x) { return neg(x.net); } }], SER.filter(function (x) { return x.lignes; }).slice().reverse(), null, 'Rythme des ventes'); } }));
+    /* bénéfice par vente */
+    var BINS = [['Perte', -Infinity, 0, 'g-neg'], ['0–5 €', 0, 5], ['5–10 €', 5, 10], ['10–25 €', 10, 25], ['25–50 €', 25, 50], ['50 € +', 50, Infinity]];
+    var cv = X.ventes.filter(function (v) { return v.type === 'carte'; }), hostB = h('div');
+    var nb = BINS.map(function (b0) { var l = cv.filter(function (v) { return v.net >= b0[1] && v.net < b0[2] && !(b0[1] === 0 && v.net < 0); }); return { b: b0, n: l.length, ca: l.reduce(function (a2, v) { return a2 + v.ca; }, 0), net: l.reduce(function (a2, v) { return a2 + v.net; }, 0) }; });
+    if (cv.length) G.colonnes(hostB, { cats: nb.map(function (x) { return { cle: x.b[0], label: x.b[0], long: 'Bénéfice ' + (x.b[0] === 'Perte' ? 'négatif' : 'de ' + x.b[0]), cls: x.b[3] }; }),
+      series: [{ nom: 'Ventes', cls: 'g-s1', valeurs: nb.map(function (x) { return x.n; }) }], hauteur: 220, fmt: function (v) { return nbr(v); }, fmtAxe: function (v) { return nbr(v); },
+      detail: function (i) { return [{ v: eurS(nb[i].net, 0), l: 'de bénéfice au total', sous: true }]; }, aria: 'Nombre de ventes selon leur bénéfice' });
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Bénéfice par vente', sous: 'combien de cartes te rapportent peu, ou te coûtent', corps: [cv.length ? hostB : vide2('Aucune carte vendue.')],
+      pied: cv.length ? [nbr(nb[0].n) + ' vente' + pl(nb[0].n) + ' à perte (' + eurS(nb[0].net, 0) + ') · ' + nbr(nb[1].n) + ' à moins de 5 € de bénéfice.'] : null }));
+    /* prix obtenu / prix marché */
+    var pv = X.ventes.filter(function (v) { return v.type === 'carte' && v.marche > 0 && v.ca > 0; }), hostP = h('div');
+    if (pv.length >= 3) G.nuage(hostP, { points: pv.map(function (v) { return { cle: v.ref, label: v.nom, x: v.marche, y: v.ca, cls: v.ca < v.marche * 0.95 ? 'g-s2' : 'g-s1' }; }), log: true, diagonale: true, etiquettes: false, rayon: 4.5,
+      fmtX: function (v) { return eur(v, 0); }, fmtY: function (v) { return eur(v, 0); }, xNom: 'Prix marché →', yNom: '↑ Prix de vente', xLib: 'prix marché', yLib: 'vendu',
+      detail: function (p) { return [{ v: pct(p.y / p.x), l: 'du prix marché', sous: true }]; },
+      onSelect: function (ref) { location.hash = '#carte/' + encodeURIComponent(ref); }, aria: 'Prix de vente face au prix marché, une carte par point' });
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Prix obtenu face au prix marché', sous: pv.length >= 3 ? 'une carte par point · sur la diagonale : vendue au prix marché · orange : plus de 5 % en dessous' : 'cartes avec un prix marché',
+      corps: [pv.length >= 3 ? G.legende([{ nom: 'Au prix marché ou mieux', cls: 'g-s1' }, { nom: 'Plus de 5 % en dessous', cls: 'g-s2' }]) : null, pv.length >= 3 ? hostP : vide2('Pas assez de ventes avec un prix marché.')],
+      pied: pv.length >= 3 ? ['En moyenne, tu vends à ' + pct(T.realisation) + ' du prix marché. Échelle logarithmique : chaque graduation multiplie le prix. Touche un point pour ouvrir la carte.'] : null }));
+    /* par canal */
+    var parC = PB.parCle(X.ventes, 'canal', PB.totaux).sort(function (a2, b2) { return b2.ca - a2.ca; });
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Par canal', sous: 'touche un en-tête pour trier', corps: [parC.length ? tableau([
+      { t: 'Canal', f: function (x) { return x.cle; }, v: function (x) { return x.cle; } },
+      { t: 'Ventes', f: function (x) { return nbr(x.n); }, v: function (x) { return x.n; } },
+      { t: 'Encaissé', f: function (x) { return eur(x.ca, 0); }, v: function (x) { return x.ca; } },
+      { t: 'Bénéfice', f: function (x) { return eurS(x.net, 0); }, v: function (x) { return x.net; }, cls: function (x) { return neg(x.net); } },
+      { t: 'Marque', f: function (x) { return pct(x.marque); }, v: function (x) { return x.marque; } },
+      { t: 'Panier', f: function (x) { return eur(x.panier, 0); }, v: function (x) { return x.panier; } }
+    ], parC, null, 'Ventes par canal', { cle: 'ventes-canal', trCls: function (x) { return fb.canal === x.cle ? 'pl-tr-sel' : null; } }) : vide2('Aucune vente.')] }));
+    /* par groupe */
+    var stockG = {};
+    X.stock.forEach(function (x) { stockG[x.groupe] = (stockG[x.groupe] || 0) + x.n; });
+    var parG = PB.parCle(X.ventes, 'groupe', PB.totaux).sort(function (a2, b2) { return b2.net - a2.net; });
+    var totG = Object.assign({ cle: 'Total' }, T);
+    g.appendChild(carte({ span: 'pl-c12', titre: 'Par groupe', sous: per.nom + (Object.keys(LIB_FILTRE).some(function (k) { return fb[k]; }) ? ' · filtres appliqués' : ''), corps: [parG.length ? tableau([
+      { t: 'Groupe', f: function (x) { return x.cle === 'Total' ? 'Total' : F.noms[x.cle] || x.cle; }, v: function (x) { return F.noms[x.cle] || x.cle; } },
+      { t: 'Vendus', f: function (x) { return nbr(x.n); }, v: function (x) { return x.n; } },
+      { t: 'En stock', f: function (x) { return x.cle === 'Total' ? nbr(Object.keys(stockG).reduce(function (a2, k) { return a2 + stockG[k]; }, 0)) : nbr(stockG[x.cle] || 0); }, v: function (x) { return stockG[x.cle] || 0; } },
+      { t: 'Encaissé', f: function (x) { return eur(x.ca, 2); }, v: function (x) { return x.ca; }, barre: true },
+      { t: 'Coût', f: function (x) { return eur(x.cout, 2); }, v: function (x) { return x.cout; } },
+      { t: 'Frais', f: function (x) { return eur(x.envoi + x.frais, 2); }, v: function (x) { return x.envoi + x.frais; } },
+      { t: 'Bénéfice', f: function (x) { return eurS(x.net, 2); }, v: function (x) { return x.net; }, cls: function (x) { return neg(x.net); } },
+      { t: 'Rentab.', f: function (x) { return pct(x.rentab); }, v: function (x) { return x.rentab; } },
+      { t: 'Marque', f: function (x) { return pct(x.marque); }, v: function (x) { return x.marque; } }
+    ], parG, totG, 'Ventes par groupe', { cle: 'ventes-groupe' }) : vide2('Aucune vente.')] }));
+    /* détail */
+    var det = X.ventes.slice().sort(function (a2, b2) { return (b2.date || '').localeCompare(a2.date || '') || (b2.r && a2.r ? b2.r.i - a2.r.i : 0); });
+    var limite = S.ventesTout ? det.length : 60;
+    g.appendChild(carte({ span: 'pl-c12', titre: 'Détail des ventes · ' + nbr(det.length), sous: 'les ventes venues de l’Excel n’ont pas de date : elles sont à la fin', corps: [det.length ? tableau([
+      { t: 'Article', f: function (v) { return v.r ? celluleCarte(v.r, [nomGroupe(v.r.c.groupe), v.r.c.langue, v.estime ? 'coût estimé' : null].filter(Boolean).join(' · ')) : h('span', null, [v.nom, h('small', { class: 'pl-t-note', text: nbr(v.n) + ' vendu' + pl(v.n) + ' au nombre' })]); }, v: function (v) { return v.nom; } },
+      { t: 'Date', f: function (v) { return v.date ? dateFR(v.date) : '—'; }, v: function (v) { return v.date || ''; } },
+      { t: 'Canal', f: function (v) { return v.canal; }, v: function (v) { return v.canal; } },
+      { t: 'Prix marché', f: function (v) { return v.marche ? eur(v.marche) : '—'; }, v: function (v) { return v.marche; } },
+      { t: 'Vendu', f: function (v) { return eur(v.ca); }, v: function (v) { return v.ca; } },
+      { t: 'Bénéfice', f: function (v) { return eurS(v.net); }, v: function (v) { return v.net; }, barre: true, cls: function (v) { return neg(v.net); } },
+      { t: 'Rentab.', f: function (v) { return pct(v.cout ? v.net / v.cout : null); }, v: function (v) { return v.cout ? v.net / v.cout : null; } }
+    ], det.slice(0, limite), null, 'Détail des ventes', { cle: 'ventes-detail' }) : vide2('Aucune vente sur cette période.')].concat(det.length > limite
+      ? [h('button', { type: 'button', class: 'btn btn--ghost pl-plus', text: 'Afficher les ' + nbr(det.length - limite) + ' autres', onclick: function () { S.ventesTout = true; rendre(true); } })] : []) }));
   };
   function feuilleChoixVente() {
     var champ = h('input', { class: 'input', type: 'search', placeholder: 'Chercher la carte vendue…', 'aria-label': 'Chercher la carte vendue', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
@@ -1386,40 +1466,55 @@
     R.cartes.forEach(function (r) { var md = (r.c.achat || {}).mode; if (!r.hors && r.compte && md && r.paye != null) modes[md] += r.paye; });
     R.produits.forEach(function (x) { produits += z(x.paye); });
     m.appendChild(entete('Achats', R.tickets.length + ' tickets · 1 € = ' + nbr(P.taux) + ' ¥', [h('button', { type: 'button', class: 'btn pl-btn-s', onclick: function () { feuilleTicket(null); }, text: '+ Ticket' })]));
-    m.appendChild(h('div', { class: 'pl-kpis' }, [
-      tuile('Investi au total', eur(R.k.investi, 2), 'prix d’achat réels'),
-      tuile('Tickets japonais', eur(tot.eur, 2), yen(tot.yen) + ' · détaxe ' + yen(tot.det)),
-      tuile('Lots PSA 10', eur(modes.lot, 2), R.lots.length + ' lots'),
-      tuile('Cartes sans ticket', eur(modes.yen + modes.eur, 2), 'prix en ¥ ou en €, hors lots')
-    ]));
+    var g = h('div', { class: 'pl-grille' });
+    m.appendChild(g);
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Investi au total', v: eur(R.k.investi, 0), sous: 'prix d’achat réels' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Tickets japonais', v: eur(tot.eur, 0), sous: yen(tot.yen) + ' · détaxe ' + yen(tot.det) }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Lots PSA 10', v: eur(modes.lot, 0), sous: R.lots.length + ' lot' + pl(R.lots.length) }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Cartes sans ticket', v: eur(modes.yen + modes.eur, 0), sous: 'prix en ¥ ou en €, hors lots' }));
+    /* d'où vient l'investissement */
     var ratt = modes.ticket, nonRatt = tot.eur - ratt;
-    m.appendChild(section('D’où vient l’investissement', [barres([
-      { l: 'Cartes achetées sur ticket', v: modes.ticket, txt: eur(modes.ticket) },
-      { l: 'Lots PSA 10', v: modes.lot, txt: eur(modes.lot) },
-      { l: 'Produits (card sets, ex, boosters)', v: produits, txt: eur(produits) },
-      { l: 'Cartes sans ticket (¥ ou €)', v: modes.yen + modes.eur, txt: eur(modes.yen + modes.eur) }
-    ].filter(function (x) { return x.v > 0; }).sort(function (a, b) { return b.v - a.v; }), 'Répartition de l’investissement'),
-    h('p', { class: 'pl-note', text: 'Sur ' + eur(tot.eur, 2) + ' payés aux boutiques japonaises, ' + eur(ratt, 2) + ' sont rattachés à des cartes. ' +
-      (Math.abs(nonRatt) >= 0.5 ? 'Les ' + eur(nonRatt, 2) + ' restants viennent des tickets sans carte ou en écart (voir Contrôles).' : 'Tout est rattaché.') })]));
+    var origine = [['Cartes achetées sur ticket', modes.ticket, 'g-s1'], ['Lots PSA 10', modes.lot, 'g-s2'], ['Produits (card sets, ex, boosters)', produits, 'g-s3'], ['Cartes sans ticket (¥ ou €)', modes.yen + modes.eur, 'g-s4']].filter(function (x) { return x[1] > 0; });
+    g.appendChild(carte({ span: 'pl-c5', titre: 'D’où vient l’investissement', sous: 'prix d’achat réels, ' + eur(R.k.investi, 0) + ' au total',
+      corps: [G.parts(h('div'), { parts: origine.map(function (x) { return { label: x[0], v: x[1], txt: eur(x[1], 0), cls: x[2] }; }), haute: true, legende: false, aria: 'Répartition de l’investissement' }),
+        h('dl', { class: 'pl-dl pl-dl--parts' }, [].concat.apply([], origine.map(function (x) { return [h('dt', null, [h('i', { class: 'g-cle ' + x[2], 'aria-hidden': 'true' }), x[0]]), h('dd', { text: eur(x[1], 0) }), h('dd', { text: pct(x[1] / (R.k.investi || 1)) })]; })))],
+      pied: ['Sur ' + eur(tot.eur, 2) + ' payés aux boutiques japonaises, ' + eur(ratt, 2) + ' sont rattachés à des cartes. ' + (Math.abs(nonRatt) >= 0.5 ? 'Les ' + eur(nonRatt, 2) + ' restants viennent des tickets sans carte ou en écart (voir Contrôles).' : 'Tout est rattaché.')] }));
+    /* dépenses par boutique */
     var parBoutique = {};
-    R.tickets.forEach(function (x) { var b = (x.t.boutique || 'Non indiquée').replace(/\s*\(.*\)$/, ''); parBoutique[b] = (parBoutique[b] || 0) + z(x.paye_eur); });
-    var pb = Object.keys(parBoutique).map(function (b) { return { l: b, v: parBoutique[b], txt: eur(parBoutique[b]) }; }).sort(function (a, b) { return b.v - a.v; });
-    if (pb.length > 10) {
-      var autres = pb.slice(9), s9 = autres.reduce(function (s, x) { return s + x.v; }, 0);
-      pb = pb.slice(0, 9).concat([{ l: 'Autres boutiques', s: autres.length + ' boutiques', v: s9, txt: eur(s9) }]);
+    R.tickets.forEach(function (x) { var b0 = (x.t.boutique || 'Non indiquée').replace(/\s*\(.*\)$/, ''); (parBoutique[b0] = parBoutique[b0] || { v: 0, n: 0 }); parBoutique[b0].v += z(x.paye_eur); parBoutique[b0].n++; });
+    var pb = Object.keys(parBoutique).map(function (b0) { return { cle: b0, label: b0, sous: parBoutique[b0].n + ' ticket' + pl(parBoutique[b0].n), v: parBoutique[b0].v, txt: eur(parBoutique[b0].v, 0) }; }).sort(function (x, y) { return y.v - x.v; });
+    if (pb.length > 10) { var autres = pb.slice(9), s9 = autres.reduce(function (a2, x) { return a2 + x.v; }, 0); pb = pb.slice(0, 9).concat([{ cle: 'autres', label: 'Autres boutiques', sous: autres.length + ' boutiques', v: s9, txt: eur(s9, 0) }]); }
+    var hostB = h('div');
+    if (pb.length) G.barres(hostB, { lignes: pb, valeurNom: 'payé après détaxe', aria: 'Dépenses par boutique' });
+    g.appendChild(carte({ span: 'pl-c7', titre: 'Dépenses par boutique', sous: 'payé après détaxe, au taux de ' + nbr(P.taux) + ' ¥ par €', corps: [pb.length ? hostB : vide2('Aucun ticket.')] }));
+    /* achats dans le temps */
+    var datees = [];
+    R.tickets.forEach(function (x) { if (x.t.date && x.paye_eur) datees.push({ date: x.t.date, v: x.paye_eur, t: 'ticket' }); });
+    R.cartes.forEach(function (r) { var md = (r.c.achat || {}).mode; if ((md === 'yen' || md === 'eur') && r.c.date_achat && r.paye && r.compte && !r.hors) datees.push({ date: r.c.date_achat, v: r.paye, t: 'carte' }); });
+    if (datees.length >= 2 && PB) {
+      datees.sort(function (x, y) { return x.date.localeCompare(y.date); });
+      var perA = { debut: datees[0].date, fin: datees[datees.length - 1].date, jours: PB.jour(datees[datees.length - 1].date) - PB.jour(datees[0].date) + 1 };
+      var pasA = perA.jours <= 31 ? 'jour' : perA.jours <= 120 ? 'semaine' : 'mois';
+      var BA = PB.bacs(perA, pasA).map(function (x) { var l = datees.filter(function (y) { return y.date >= x.debut && y.date <= x.fin; }); return Object.assign(x, { tk: l.filter(function (y) { return y.t === 'ticket'; }).reduce(function (a2, y) { return a2 + y.v; }, 0), ct: l.filter(function (y) { return y.t === 'carte'; }).reduce(function (a2, y) { return a2 + y.v; }, 0) }); });
+      var hostA = h('div');
+      G.colonnes(hostA, { cats: BA.map(function (x) { return { cle: x.cle, label: x.label, long: x.long }; }), series: [{ nom: 'Tickets japonais', cls: 'g-s1', valeurs: BA.map(function (x) { return x.tk || null; }) }, { nom: 'Cartes sans ticket', cls: 'g-s4', valeurs: BA.map(function (x) { return x.ct || null; }) }],
+        hauteur: 220, fmt: function (v) { return eur(v, 0); }, etiquettes: false, aria: 'Achats ' + NOM_PAS[pasA] });
+      g.appendChild(carte({ span: 'pl-c12', titre: 'Achats dans le temps', sous: NOM_PAS[pasA] + ' · tickets datés et cartes avec une date d’achat (les lots et le scellé n’ont pas de date)',
+        corps: [G.legende([{ nom: 'Tickets japonais', cls: 'g-s1' }, { nom: 'Cartes sans ticket', cls: 'g-s4' }]), hostA],
+        table: function () { return tableau([{ t: 'Période', f: function (x) { return x.long; } }, { t: 'Tickets', f: function (x) { return eur(x.tk, 2); } }, { t: 'Sans ticket', f: function (x) { return eur(x.ct, 2); } }], BA.filter(function (x) { return x.tk || x.ct; }).reverse(), null, 'Achats dans le temps'); } }));
     }
-    if (pb.length) m.appendChild(section('Dépenses par boutique', [barres(pb, 'Dépenses par boutique')], 'Montants payés après détaxe, au taux de ' + nbr(P.taux) + ' ¥ par €.'));
-    m.appendChild(section('Tickets', [h('ul', { class: 'pl-rows' }, R.tickets.slice().reverse().map(function (x) {
-      var etat = x.nb === 0 ? badge('Sans carte', 'estime') : x.ok ? badge('OK', 'ok') : badge('Écart ' + (x.ecart_yen > 0 ? '+' : '−') + yen(Math.abs(x.ecart_yen)), 'ecart');
-      return h('li', null, h('a', { class: 'pl-row pl-row--sans', href: '#ticket/' + encodeURIComponent(x.id) }, [
-        h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: x.id + ' · ' + (x.t.boutique || 'Boutique non indiquée') }),
-          h('span', { class: 'pl-row__meta', text: [x.t.date ? dateFR(x.t.date) : null, yen(x.t.total_yen), x.nb + ' carte' + pl(x.nb)].filter(Boolean).join(' · ') })]),
-        h('span', { class: 'pl-row__nums' }, [h('span', { class: 'pl-row__prix', text: eur(x.paye_eur, 2) }), etat])
-      ]));
-    }))]));
-    if (S.doc.tickets_ecartes.length) m.appendChild(section('Tickets écartés', [h('ul', { class: 'pl-rows' }, S.doc.tickets_ecartes.map(function (t) {
+    /* tickets */
+    g.appendChild(carte({ span: 'pl-c12', titre: 'Tickets · ' + R.tickets.length, sous: 'touche un ticket pour voir ses cartes', corps: [R.tickets.length ? tableau([
+      { t: 'Ticket', f: function (x) { return h('a', { href: '#ticket/' + encodeURIComponent(x.id), text: x.id + ' · ' + (x.t.boutique || 'Boutique non indiquée') }); }, v: function (x) { return x.id; } },
+      { t: 'Date', f: function (x) { return x.t.date ? dateFR(x.t.date) : '—'; }, v: function (x) { return x.t.date || ''; } },
+      { t: 'Total', f: function (x) { return yen(x.t.total_yen); }, v: function (x) { return z(x.t.total_yen); } },
+      { t: 'Payé', f: function (x) { return eur(x.paye_eur, 2); }, v: function (x) { return z(x.paye_eur); }, barre: true },
+      { t: 'Cartes', f: function (x) { return nbr(x.nb); }, v: function (x) { return x.nb; } },
+      { t: 'Contrôle', f: function (x) { return x.nb === 0 ? badge('Sans carte', 'estime') : x.ok ? badge('OK', 'ok') : badge('Écart ' + (x.ecart_yen > 0 ? '+' : '−') + yen(Math.abs(x.ecart_yen)), 'ecart'); }, v: function (x) { return x.nb === 0 ? 1 : x.ok ? 0 : 2; } }
+    ], R.tickets.slice().reverse(), null, 'Tickets', { cle: 'tickets' }) : vide2('Aucun ticket.')] }));
+    if (S.doc.tickets_ecartes.length) g.appendChild(carte({ span: 'pl-c12', titre: 'Tickets écartés', sous: 'dépenses du voyage qui ne sont pas des cartes : non comptées', corps: [h('ul', { class: 'pl-rows' }, S.doc.tickets_ecartes.map(function (t) {
       return h('li', null, h('div', { class: 'pl-row pl-row--sans' }, [h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: t.libelle }), h('span', { class: 'pl-row__meta', text: [dateFR(t.date), t.note].filter(Boolean).join(' · ') })]), h('span', { class: 'pl-row__nums' }, h('span', { class: 'pl-row__prix', text: yen(t.total_yen) }))]));
-    }))], 'Dépenses du voyage qui ne sont pas des cartes : non comptées.'));
+    }))] }));
   };
   VUES.ticket = function (m, id) {
     var x = S.R.ticketsParId[id];
@@ -1698,114 +1793,65 @@
     if (kids != null) ajouter(e, kids);
     return e;
   }
-  /* matrice rentabilité × écoulement : un point par segment, aire ∝ capital encore en stock */
-  function matrice(A, largeur) {
-    var pts = A.lignes.filter(function (s) { return s.rentab != null && s.ecoul != null && s.cout >= 20 && !/compléter|Sans données/.test(s.reco); })
-      .sort(function (a, b) { return b.cout - a.cout; }).slice(0, 12);
-    if (pts.length < 2) return null;
-    var W = Math.round(Math.max(300, Math.min(largeur, 760))), H = Math.round(W * (W < 500 ? 0.9 : 0.62));
-    var g = { l: 44, r: 12, t: 26, b: 42 };
-    var xMax = Math.max(0.2, Math.max.apply(null, pts.map(function (s) { return s.ecoul; })) * 1.12);
-    var yMin = Math.min(0, Math.min.apply(null, pts.map(function (s) { return s.rentab; })) * 1.15);
-    var yMax = Math.max(0.3, Math.max.apply(null, pts.map(function (s) { return s.rentab; })) * 1.12);
-    function X(v) { return g.l + (W - g.l - g.r) * v / xMax; }
-    function Y(v) { return g.t + (H - g.t - g.b) * (1 - (v - yMin) / (yMax - yMin)); }
-    function pas(e) { var b = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10]; for (var i = 0; i < b.length; i++) if (e / b[i] <= 5) return b[i]; return 20; }
-    var capMax = Math.max.apply(null, pts.map(function (s) { return s.cout_stock; })) || 1;
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, class: 'pl-matrice', role: 'img',
-      'aria-label': 'Rentabilité retenue (vertical) selon l’écoulement (horizontal) de chaque segment. Valeurs dans le tableau qui suit.' });
-    var px = pas(xMax), py = pas(yMax - yMin), v;
-    for (v = 0; v <= xMax + 1e-9; v += px) {
-      svg.appendChild(sv('line', { x1: X(v), x2: X(v), y1: g.t, y2: H - g.b, class: 'pl-m-grille' }));
-      svg.appendChild(sv('text', { x: X(v), y: H - g.b + 15, 'text-anchor': 'middle', class: 'pl-m-tick' }, pct(v)));
-    }
-    for (v = Math.ceil(yMin / py - 1e-9) * py; v <= yMax + 1e-9; v += py) {
-      svg.appendChild(sv('line', { x1: g.l, x2: W - g.r, y1: Y(v), y2: Y(v), class: 'pl-m-grille' + (Math.abs(v) < 1e-9 ? ' pl-m-zero' : '') }));
-      svg.appendChild(sv('text', { x: g.l - 6, y: Y(v) + 4, 'text-anchor': 'end', class: 'pl-m-tick' }, pct(Math.abs(v) < 1e-9 ? 0 : v)));
-    }
-    if (A.ecoul_moy != null && A.ecoul_moy <= xMax) svg.appendChild(sv('line', { x1: X(A.ecoul_moy), x2: X(A.ecoul_moy), y1: g.t, y2: H - g.b, class: 'pl-m-moy' }));
-    if (A.rentab_moy != null && A.rentab_moy >= yMin && A.rentab_moy <= yMax) svg.appendChild(sv('line', { x1: g.l, x2: W - g.r, y1: Y(A.rentab_moy), y2: Y(A.rentab_moy), class: 'pl-m-moy' }));
-    [['Sélectif', g.l + 6, g.t + 13, 'start'], ['Renforcer', W - g.r - 6, g.t + 13, 'end'], ['Alléger', g.l + 6, H - g.b - 7, 'start'], ['Rotation', W - g.r - 6, H - g.b - 7, 'end']]
-      .forEach(function (q4) { svg.appendChild(sv('text', { x: q4[1], y: q4[2], 'text-anchor': q4[3], class: 'pl-m-quad' }, q4[0])); });
-    svg.appendChild(sv('text', { x: 4, y: 12, class: 'pl-m-axe' }, '↑ Rentabilité'));
-    svg.appendChild(sv('text', { x: W - g.r, y: H - 6, 'text-anchor': 'end', class: 'pl-m-axe' }, 'Écoulement (part du capital déjà vendue) →'));
-    var places = [];
-    pts.slice().sort(function (a, b) { return b.cout_stock - a.cout_stock; }).forEach(function (s) {
-      var cx = X(s.ecoul), cy = Y(s.rentab), r = 4 + 16 * Math.sqrt(Math.max(0, s.cout_stock) / capMax);
-      var c = sv('circle', { cx: cx, cy: cy, r: r, class: 'pl-m-pt' });
-      c.appendChild(sv('title', null, s.cle + ' : rentabilité ' + pct(s.rentab) + ', écoulement ' + pct(s.ecoul) + ', ' + eur(s.cout_stock) + ' en stock'));
-      svg.appendChild(c);
-      places.push({ cx: cx, cy: cy, r: r, s: s });
-    });
-    /* étiquettes : à droite du point (à gauche s'il est près du bord), décalées si elles se chevauchent */
-    var poses = [];
-    places.forEach(function (p) {
-      var lab = nomCourt(p.s.cle, W < 500 ? 16 : 24), lg = lab.length * 6.1;
-      var gauche = p.cx + p.r + 4 + lg > W - g.r, tx = gauche ? p.cx - p.r - 4 : p.cx + p.r + 4, ty = p.cy + 4;
-      function boite() { return gauche ? [tx - lg, ty - 10, tx, ty + 2] : [tx, ty - 10, tx + lg, ty + 2]; }
-      function chevauche(b) { return poses.some(function (o) { return b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]; }); }
-      for (var k = 0, dy = [0, 12, -12, 24, -24, 36]; k < dy.length; k++) { ty = p.cy + 4 + dy[k]; if (!chevauche(boite())) break; }
-      ty = Math.max(g.t + 10, Math.min(H - g.b - 2, ty));
-      poses.push(boite());
-      svg.appendChild(sv('text', { x: tx, y: ty, 'text-anchor': gauche ? 'end' : 'start', class: 'pl-m-lab' }, lab));
-    });
-    return svg;
-  }
   VUES.analyse = function (m) {
     var R = S.R, An = w.PRAnalyse;
     m.appendChild(entete('Analyse', 'Ce qui se vend, ce qui rapporte, où placer tes capitaux'));
     m.appendChild(sousOnglets('analyse'));
-    if (!An) { m.appendChild(h('p', { class: 'pl-box', text: 'Le module d’analyse ne s’est pas chargé : recharge la page.' })); return; }
-    var fa = S.fa || (S.fa = { dim: 'rarete', budget: +(lire('pr.pilotage.budget') || 0) || 2000, dimBudget: 'rarete', tout: false });
+    if (!An || !G) { m.appendChild(h('p', { class: 'pl-box', text: 'Le module d’analyse ne s’est pas chargé : recharge la page.' })); return; }
+    var fa = S.fa || (S.fa = { dim: 'rarete', budget: +(lire('pr.pilotage.budget') || 0) || 2000, dimBudget: 'rarete', tout: false, sel: null });
     var A = An.segments(R, fa.dim), Pf = fa.dim === 'type' ? A : An.segments(R, 'type'), T = Pf.total;
+    if (fa.sel && !A.lignes.some(function (s) { return s.cle === fa.sel; })) fa.sel = null;
     /* qualité des données (portefeuille complet : cartes et scellé) */
     var aDater = R.cartes.filter(function (r) { return r.c.vendu && !r.hors && (!r.c.vente_date || !dateAchatCarte(r)); }).length;
     var mesures = T.n_delais;
     var nbCartes = R.cartes.filter(function (r) { return r.compte && !r.hors; }).length;
     var base = 'Base : ' + nbr(T.nv) + ' vente' + pl(T.nv) + ' pour ' + nbr(nbCartes) + ' cartes et ' + nbr(T.n - nbCartes) + ' articles scellés ; ' + pct(T.part_estimee) + ' du coût total est estimé (cartes sans prix d’achat). ';
     base += mesures ? 'Délai de vente mesuré sur ' + mesures + ' vente' + pl(mesures) + '.' : 'Aucune vente n’a encore ses deux dates (achat et vente) : le délai de vente apparaîtra dès que tu les renseignes.';
-    m.appendChild(h('div', { class: 'pl-apercu' }, [base, aDater ? h('span', null, [' ', lienBtn('Dater mes ventes (' + aDater + ')', feuilleDatesVentes)]) : null]));
-    m.appendChild(h('div', { class: 'pl-kpis pl-sec' }, [
-      tuile('Rentabilité réalisée', pct(T.rentab_real), 'bénéfice net ÷ coût des ventes', T.rentab_real < 0 ? 'pl-neg' : ''),
-      tuile('Rentabilité attendue', pct(T.rentab_att), 'stock revendu au prix habituel'),
-      tuile('Écoulement', pct(T.ecoul), 'part du capital déjà vendue'),
-      tuile(mesures ? 'Délai médian' : 'Prix obtenu', mesures ? NF0.format(T.delai_median) + ' jours' : pct(Pf.realisation), mesures ? 'entre achat et vente' : 'prix de vente ÷ prix marché')
-    ]));
-    var chips = h('div', { class: 'pl-chips pl-chips--dims', role: 'group', 'aria-label': 'Découper par' });
+    m.appendChild(h('p', { class: 'pl-note pl-base' }, [base, aDater ? h('span', null, [' ', lienBtn('Dater mes ventes (' + aDater + ')', feuilleDatesVentes)]) : null]));
+    var g = h('div', { class: 'pl-grille' });
+    m.appendChild(g);
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Rentabilité réalisée', v: pct(T.rentab_real), cls: T.rentab_real < 0 ? 'pl-neg' : '', sous: 'bénéfice net ÷ coût des ventes' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Rentabilité attendue', v: pct(T.rentab_att), sous: 'stock revendu au prix que tu obtiens d’habitude' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: 'Écoulement', v: pct(T.ecoul), sous: 'part du capital déjà vendue' }));
+    g.appendChild(kpi({ span: 'pl-c3', label: mesures ? 'Délai médian' : 'Prix obtenu', v: mesures ? NF0.format(T.delai_median) + ' jours' : pct(Pf.realisation), sous: mesures ? 'entre achat et vente' : 'prix de vente ÷ prix marché' }));
+    /* découpage */
+    var chips = h('div', { class: 'pl-seg pl-seg--dims', role: 'group', 'aria-label': 'Découper par' });
     An.DIMENSIONS.forEach(function (dm) {
-      chips.appendChild(h('button', { type: 'button', class: 'chip', 'data-focus': 'dim-' + dm.id, 'aria-pressed': String(fa.dim === dm.id), text: dm.nom,
-        onclick: function () { if (fa.dim !== dm.id) { fa.dim = dm.id; fa.tout = false; rendre(true); } } }));
+      chips.appendChild(h('button', { type: 'button', 'data-focus': 'dim-' + dm.id, 'aria-pressed': String(fa.dim === dm.id), text: dm.nom,
+        onclick: function () { if (fa.dim !== dm.id) { fa.dim = dm.id; fa.tout = false; fa.sel = null; rendre(true); } } }));
     });
-    m.appendChild(chips);
-    var actif = chips.querySelector('[aria-pressed="true"]');
-    if (actif) chips.scrollLeft = Math.max(0, actif.offsetLeft - chips.offsetLeft - 16);
-    var mat = matrice(A, Math.min(m.clientWidth || 360, 792) - 34);
-    m.appendChild(section('Rentabilité × écoulement', [mat ? h('div', { class: 'pl-box pl-matrice-box' }, mat) : h('p', { class: 'pl-box', text: 'Pas assez de segments mesurables pour ce découpage : choisis-en un autre.' })],
-      'Un point par segment ; plus il est gros, plus il garde de capital en stock. Les pointillés sont tes moyennes : en haut à droite, ce qui rapporte et part vite.'));
+    g.appendChild(h('div', { class: 'pl-titre-groupe pl-titre-groupe--seg' }, [h('h2', { text: 'Découper par' }), chips]));
+    function choisirSeg(k) { fa.sel = fa.sel === k ? null : k; rendre(true); }
+    /* matrice rentabilité × écoulement */
+    var pts = A.lignes.filter(function (s) { return s.rentab != null && s.ecoul != null && s.cout >= 20 && !/compléter|Sans données/.test(s.reco); })
+      .sort(function (a, b) { return b.cout - a.cout; }).slice(0, 14);
+    var hostM = h('div');
+    if (pts.length >= 2) G.nuage(hostM, {
+      points: pts.map(function (s) { return { cle: s.cle, label: s.cle, x: s.ecoul, y: s.rentab, taille: s.cout_stock }; }),
+      xNom: 'Écoulement →', yNom: '↑ Rentabilité retenue', xLib: 'écoulement', yLib: 'rentabilité retenue', moyX: A.ecoul_moy, moyY: A.rentab_moy,
+      quadrants: ['Sélectif', 'Renforcer', 'Alléger', 'Rotation'], sel: fa.sel, onSelect: choisirSeg,
+      detail: function (p) { var s = pts.filter(function (x) { return x.cle === p.cle; })[0]; return [{ v: eur(s.cout_stock, 0), l: 'encore en stock', sous: true }, { v: nbr(s.nv) + ' / ' + nbr(s.n), l: 'vendus', sous: true }, { v: s.reco, l: 'avis', sous: true }]; },
+      aria: 'Rentabilité retenue selon l’écoulement de chaque segment ; chiffres dans la vue Tableau.'
+    });
+    g.appendChild(carte({ span: 'pl-c7', titre: 'Rentabilité × écoulement', sous: 'un point par ' + A.dim.nom.toLowerCase() + ' ; taille = capital encore en stock ; pointillés = tes moyennes',
+      corps: [pts.length >= 2 ? hostM : vide2('Pas assez de segments mesurables pour ce découpage : choisis-en un autre.')],
+      table: pts.length >= 2 ? function () { return tableauSegments(pts, A, fa); } : null,
+      pied: ['En haut à droite : ce qui rapporte et part vite. Touche un point pour le retrouver dans le détail.'] }));
+    var cap = A.lignes.filter(function (s) { return s.cout_stock > 0.5; }).sort(function (a, b) { return b.cout_stock - a.cout_stock; }).slice(0, 10);
+    var hostK = h('div');
+    if (cap.length) G.barres(hostK, { lignes: cap.map(function (s) { return { cle: s.cle, label: s.cle, sous: nbr(s.n - s.nv) + ' en stock · ' + pct(s.part_capital) + ' du stock', v: s.cout_stock, txt: eur(s.cout_stock, 0) }; }),
+      sel: fa.sel, onSelect: choisirSeg, valeurNom: 'coût d’achat du stock', aria: 'Capital immobilisé par segment' });
+    g.appendChild(carte({ span: 'pl-c5', titre: 'Où dort ton capital', sous: 'coût d’achat du stock encore à vendre', corps: [cap.length ? hostK : vide2('Plus rien en stock pour ce découpage.')] }));
+    /* détail */
     var lignes = A.lignes, limite = fa.tout || lignes.length <= 14 ? lignes.length : 12;
-    var tot = Object.assign({}, A.total, { cle: fa.dim === 'type' ? 'Ensemble' : 'Toutes les cartes', reco: null });
-    m.appendChild(section('Détail par ' + A.dim.nom.toLowerCase(), [tableau([
-      { t: A.dim.nom, f: function (s) { return h('span', null, [s.cle, s.part_estimee > 0.5 ? h('small', { class: 'pl-t-note', text: 'coût estimé à ' + pct(s.part_estimee) }) : null]); } },
-      { t: 'Avis', f: function (s) { return s.reco ? avis(s.reco) : ''; } },
-      { t: 'Rentab. retenue', f: function (s) { return pct(s.rentab); } },
-      { t: 'Écoulement', f: function (s) { return pct(s.ecoul); } },
-      { t: 'Vendus', f: function (s) { return nbr(s.nv) + ' / ' + nbr(s.n); } },
-      { t: 'Investi', f: function (s) { return eur(s.cout); } },
-      { t: 'En stock', f: function (s) { return eur(s.cout_stock); } },
-      { t: 'Réalisée', f: function (s) { return pct(s.rentab_real); }, cls: function (s) { return s.rentab_real < 0 ? 'pl-neg' : ''; } },
-      { t: 'Attendue', f: function (s) { return pct(s.rentab_att); } },
-      { t: 'Délai médian', f: function (s) { return s.n_delais ? NF0.format(s.delai_median) + ' j' : '—'; } }
-    ], lignes.slice(0, limite), tot, 'Analyse par ' + A.dim.nom)].concat(lignes.length > limite
-      ? [h('button', { type: 'button', class: 'btn btn--ghost pl-plus', text: 'Afficher les ' + (lignes.length - limite) + ' suivantes', onclick: function () { fa.tout = true; rendre(true); } })] : []),
-      (fa.dim === 'type' ? '' : 'Cartes seulement : le scellé n’a ni rareté ni extension (il est dans « Type de produit »). ') + 'Rentabilité = bénéfice net ÷ coût d’achat. Réalisée : sur ce qui est vendu. Attendue : sur le stock, revendu au prix que tu obtiens d’habitude par rapport au prix marché. Retenue : les deux mêlées, d’autant plus vers la réalisée qu’il y a de ventes.'));
-    var cap = lignes.filter(function (s) { return s.cout_stock > 0.5; }).sort(function (a, b) { return b.cout_stock - a.cout_stock; }).slice(0, 10);
-    if (cap.length) m.appendChild(section('Où dort ton capital', [barres(cap.map(function (s) {
-      return { l: s.cle, s: nbr(s.n - s.nv) + ' en stock · ' + pct(s.part_capital) + ' du stock', v: s.cout_stock, txt: eur(s.cout_stock) };
-    }), 'Capital immobilisé par segment')], 'Coût d’achat du stock encore à vendre.'));
-    m.appendChild(blocBudget());
+    g.appendChild(carte({ span: 'pl-c12', titre: 'Détail par ' + A.dim.nom.toLowerCase(), sous: (fa.dim === 'type' ? '' : 'cartes seulement (le scellé est dans « Type de produit ») · ') + 'touche un en-tête pour trier',
+      corps: [tableauSegments(lignes.slice(0, limite), A, fa, true)].concat(lignes.length > limite
+        ? [h('button', { type: 'button', class: 'btn btn--ghost pl-plus', text: 'Afficher les ' + (lignes.length - limite) + ' suivantes', onclick: function () { fa.tout = true; rendre(true); } })] : []),
+      pied: ['Rentabilité = bénéfice net ÷ coût d’achat. Réalisée : sur ce qui est vendu. Attendue : sur le stock, revendu au prix que tu obtiens d’habitude par rapport au prix marché. Retenue : les deux mêlées, d’autant plus vers la réalisée qu’il y a de ventes.'] }));
+    g.appendChild(blocBudget());
     /* PSA ou brute */
-    var G = fa.dim === 'gradation' ? A : An.segments(R, 'gradation');
-    var psa = G.lignes.filter(function (s) { return s.cle === 'PSA 10'; })[0], brute = G.lignes.filter(function (s) { return s.cle === 'Brute'; })[0];
+    var Gd = fa.dim === 'gradation' ? A : An.segments(R, 'gradation');
+    var psa = Gd.lignes.filter(function (s) { return s.cle === 'PSA 10'; })[0], brute = Gd.lignes.filter(function (s) { return s.cle === 'Brute'; })[0];
     var comp = psa && brute ? tableau([
       { t: '', f: function (l) { return l[0]; } },
       { t: 'PSA 10', f: function (l) { return l[1](psa); } },
@@ -1819,8 +1865,25 @@
       ['Rentabilité retenue', function (s) { return pct(s.rentab); }],
       ['Capital en stock', function (s) { return eur(s.cout_stock); }]
     ], null, 'PSA 10 et cartes brutes') : null;
-    m.appendChild(section('PSA ou brute', [comp, simulateurGradation()], comp ? 'Tes PSA 10 face à tes cartes brutes, puis le calcul pour une carte précise.' : null));
+    if (comp) g.appendChild(carte({ span: 'pl-c5', titre: 'PSA 10 ou brutes', sous: 'tes PSA 10 face à tes cartes brutes', corps: [comp] }));
+    g.appendChild(carte({ span: comp ? 'pl-c7' : 'pl-c12', titre: 'Faire grader une carte brute ?', sous: 'le calcul pour une carte précise', corps: [simulateurGradation()] }));
   };
+  function tableauSegments(L, A, fa, avecTri) {
+    var maxI = Math.max.apply(null, L.map(function (s) { return s.cout; }).concat([0]));
+    return tableau([
+      { t: A.dim.nom, f: function (s) { return h('span', null, [s.cle, s.part_estimee > 0.5 ? h('small', { class: 'pl-t-note', text: 'coût estimé à ' + pct(s.part_estimee) }) : null]); }, v: function (s) { return s.cle; } },
+      { t: 'Avis', f: function (s) { return s.reco ? avis(s.reco) : ''; }, v: function (s) { return s.reco || ''; } },
+      { t: 'Rentab. retenue', f: function (s) { return pct(s.rentab); }, v: function (s) { return s.rentab; }, cls: function (s) { return neg(s.rentab); } },
+      { t: 'Écoulement', f: function (s) { return pct(s.ecoul); }, v: function (s) { return s.ecoul; } },
+      { t: 'Vendus', f: function (s) { return nbr(s.nv) + ' / ' + nbr(s.n); }, v: function (s) { return s.nv; } },
+      { t: 'Investi', f: function (s) { return eur(s.cout, 0); }, v: function (s) { return s.cout; }, barre: maxI > 0 },
+      { t: 'En stock', f: function (s) { return eur(s.cout_stock, 0); }, v: function (s) { return s.cout_stock; } },
+      { t: 'Réalisée', f: function (s) { return pct(s.rentab_real); }, v: function (s) { return s.rentab_real; }, cls: function (s) { return neg(s.rentab_real); } },
+      { t: 'Attendue', f: function (s) { return pct(s.rentab_att); }, v: function (s) { return s.rentab_att; }, cls: function (s) { return neg(s.rentab_att); } },
+      { t: 'Délai médian', f: function (s) { return s.n_delais ? NF0.format(s.delai_median) + ' j' : '—'; }, v: function (s) { return s.n_delais ? s.delai_median : null; } }
+    ], L, avecTri ? Object.assign({}, A.total, { cle: fa.dim === 'type' ? 'Ensemble' : 'Toutes les cartes', reco: null }) : null, 'Analyse par ' + A.dim.nom,
+      { cle: avecTri ? 'segments-' + fa.dim : null, trCls: function (s) { return fa.sel === s.cle ? 'pl-tr-sel' : null; } });
+  }
   function dateAchatCarte(r) {
     var a = r.c.achat || {}, id = (a.mode === 'ticket' && a.ticket) || r.c.ticket, t = id ? S.R.ticketsParId[id] : null;
     return r.c.date_achat || (t && t.t && t.t.date) || null;
@@ -1834,23 +1897,27 @@
       .map(function (x) { return h('option', { value: x.id, text: x.nom }); }));
     sel.value = fa.dimBudget;
     var zone = h('div', { class: 'pl-budget', 'aria-live': 'polite' }), minuteur = null;
+    var COUL = ['g-s1', 'g-s2', 'g-s3', 'g-s4', 'g-s5', 'g-s6', 'g-s7', 'g-s8'];
     function dessiner() {
       zone.textContent = '';
       var Ab = An.segments(S.R, fa.dimBudget), rep = An.repartition(Ab, fa.budget);
-      if (!rep.lignes.length) { zone.appendChild(h('p', { class: 'pl-note', text: 'Aucun segment assez solide pour ce découpage : essaie « Rareté » ou « Bloc ».' })); return; }
-      zone.appendChild(h('div', { class: 'pl-kpis' }, [
-        tuile('Bénéfice attendu', '≈ ' + eurS(rep.benef), 'une fois tout revendu'),
-        tuile('Rentabilité', rep.place ? pct(rep.benef / rep.place) : '—', 'sur ' + eur(rep.place) + ' placés')
+      if (!rep.lignes.length) { zone.appendChild(vide2('Aucun segment assez solide pour ce découpage : essaie « Rareté » ou « Bloc ».')); return; }
+      zone.appendChild(h('div', { class: 'pl-kpis pl-kpis--3' }, [
+        tuile('Bénéfice attendu', '≈ ' + eurS(rep.benef, 0), 'une fois tout revendu'),
+        tuile('Rentabilité', rep.place ? pct(rep.benef / rep.place) : '—', 'sur ' + eur(rep.place, 0) + ' placés'),
+        tuile('Non placé', eur(Math.max(0, rep.non_place), 0), rep.non_place > 0.5 ? 'aucun segment ne mérite plus (40 % maximum chacun)' : 'tout le budget est placé')
       ]));
-      if (rep.non_place > 0.5) zone.appendChild(h('p', { class: 'pl-note', text: eur(rep.non_place) + ' non placés : les autres segments ne méritent pas davantage, et aucun ne prend plus de 40 % du budget.' }));
+      var parts = rep.lignes.map(function (l, i) { return { label: l.s.cle, v: l.montant, txt: eur(l.montant, 0), cls: COUL[i % 8], court: rep.lignes.length <= 6 ? pct(l.montant / fa.budget) : null }; });
+      if (rep.non_place > 0.5) parts.push({ label: 'Non placé', v: rep.non_place, txt: eur(rep.non_place, 0), cls: 'g-mute' });
+      zone.appendChild(G.parts(h('div'), { parts: parts.slice(0, 8), haute: true, aria: 'Répartition du budget' }));
       zone.appendChild(tableau([
-        { t: Ab.dim.nom, f: function (l) { return l.s.cle; } },
-        { t: 'Budget', f: function (l) { return eur(l.montant); } },
-        { t: 'Part', f: function (l) { return pct(l.montant / fa.budget); } },
-        { t: 'Bénéfice att.', f: function (l) { return eurS(l.benef); } },
-        { t: '≈ Articles', f: function (l) { return l.cartes ? NF0.format(l.cartes) : '—'; } },
-        { t: 'Rôle', f: function (l) { return avis(l.role); } }
-      ], rep.lignes, null, 'Répartition du budget'));
+        { t: Ab.dim.nom, f: function (l) { return l.s.cle; }, v: function (l) { return l.s.cle; } },
+        { t: 'Budget', f: function (l) { return eur(l.montant, 0); }, v: function (l) { return l.montant; }, barre: true },
+        { t: 'Part', f: function (l) { return pct(l.montant / fa.budget); }, v: function (l) { return l.montant; } },
+        { t: 'Bénéfice att.', f: function (l) { return eurS(l.benef, 0); }, v: function (l) { return l.benef; } },
+        { t: '≈ Articles', f: function (l) { return l.cartes ? NF0.format(l.cartes) : '—'; }, v: function (l) { return l.cartes; } },
+        { t: 'Rôle', f: function (l) { return avis(l.role); }, v: function (l) { return l.role; } }
+      ], rep.lignes, null, 'Répartition du budget', { cle: 'budget' }));
     }
     champ.addEventListener('input', function () {
       clearTimeout(minuteur);
@@ -1858,12 +1925,12 @@
     });
     sel.addEventListener('change', function () { fa.dimBudget = sel.value; dessiner(); });
     dessiner();
-    return section('Prochain voyage : où placer ton budget', [
-      h('div', { class: 'pl-box' }, h('div', { class: 'pl-form' }, [
+    return carte({ span: 'pl-c12', titre: 'Prochain voyage : où placer ton budget', sous: 'part proportionnelle à rentabilité × écoulement, 40 % maximum par segment, 10 % pour tester',
+      corps: [h('div', { class: 'pl-form pl-form--ligne' }, [
         h('div', { class: 'field pl-demi' }, [h('label', { for: 'pl-budget', text: 'Budget d’achat (€)' }), champ]),
         h('div', { class: 'field pl-demi' }, [h('label', { for: 'pl-budget-dim', text: 'Répartir par' }), sel])
-      ])), zone
-    ], 'Chaque segment reçoit une part proportionnelle à rentabilité × écoulement (la logique marge × rotation d’un ROI), plafonnée à 40 % du budget ; 10 % vont tester les 2 meilleurs segments encore trop peu connus. Bénéfice attendu : si ces achats se revendent aux marges observées sur ce segment. Aide à la décision, à relire avec ton œil sur le marché.');
+      ]), zone],
+      pied: ['La logique marge × rotation d’un ROI ; 10 % vont tester les 2 meilleurs segments encore trop peu connus. Bénéfice attendu : si ces achats se revendent aux marges observées sur ce segment. Aide à la décision, à relire avec ton œil sur le marché.'] });
   }
   function simulateurGradation() {
     var An = w.PRAnalyse, P = S.R.params;
@@ -1894,7 +1961,7 @@
     }
     Object.keys(form.champs).forEach(function (k) { form.champs[k].addEventListener('input', calc); });
     calc();
-    return h('div', { class: 'pl-box pl-sec pl-sim' }, [h('p', { class: 'pl-label', text: 'Simulateur : faire grader une carte brute ?' }), form.el, sortie,
+    return h('div', { class: 'pl-sim' }, [form.el, sortie,
       h('p', { class: 'pl-note', text: 'Gradation = tarif PSA, envois aller-retour, assurance, TVA et frais au retour, par carte. Le reste des chances (ni 10 ni 9) se revend au prix brut. Frais de vente et d’envoi de tes réglages déduits.' })]);
   }
   function feuilleDatesVentes() {
@@ -2125,80 +2192,97 @@
     var X = couts(fc.periode), c = X.cascade, sd = X.seuil, ca = c.ca, nCh = (S.doc.charges || []).length;
     m.appendChild(entete('Analyse', 'Coûts complets, seuil de rentabilité, coûts cachés'));
     m.appendChild(sousOnglets('couts'));
-    var chips = h('div', { class: 'pl-chips pl-chips--dims', role: 'group', 'aria-label': 'Période' });
+    var seg = h('div', { class: 'pl-seg pl-seg--per', role: 'group', 'aria-label': 'Période' });
     [['tout', 'Depuis le début'], ['12m', '12 derniers mois']].concat(ans.map(function (a) { return [a, a]; })).forEach(function (p) {
-      chips.appendChild(h('button', { type: 'button', class: 'chip', 'data-focus': 'per-' + p[0], 'aria-pressed': String(fc.periode === p[0]), text: p[1], onclick: function () { fc.periode = p[0]; rendre(true); } }));
+      seg.appendChild(h('button', { type: 'button', 'data-focus': 'per-' + p[0], 'aria-pressed': String(fc.periode === p[0]), text: p[1], onclick: function () { fc.periode = p[0]; rendre(true); } }));
     });
-    m.appendChild(chips);
+    m.appendChild(seg);
     var info = [];
-    if (!nCh) info.push('Aucune charge saisie : le résultat ci-dessous ne compte que tes achats et tes ventes. ');
+    if (!nCh) info.push('Aucune charge saisie : le résultat ne compte que tes achats et tes ventes. ');
     if (X.non_datees) info.push(X.non_datees + ' vente' + pl(X.non_datees) + ' sans date ne compte' + (X.non_datees > 1 ? 'nt' : '') + ' que dans « Depuis le début ». ');
-    if (info.length || !nCh) m.appendChild(h('div', { class: 'pl-apercu' }, info.concat([nCh ? null : h('span', null, [lienBtn('Ajouter une charge', function () { feuilleCharge(null); })])])));
-    m.appendChild(h('section', { class: 'pl-hero' }, [
-      h('p', { class: 'pl-label', text: 'Résultat analytique' + (X.periode ? ' · ' + X.periode.nom : '') }),
-      h('p', { class: 'pl-hero__v' + (c.resultat < 0 ? ' pl-neg' : ''), text: eurS(c.resultat) }),
-      h('p', { class: 'pl-hero__s', text: 'après toutes les charges saisies · ' + (ca ? pct(c.resultat / ca) + ' du chiffre d’affaires · ' : '') + 'avec les coûts cachés : ' + eurS(c.resultat_economique) })
-    ]));
-    m.appendChild(h('div', { class: 'pl-kpis pl-sec' }, [
-      tuile('Chiffre d’affaires', eur(ca), nbr(X.nb_ventes) + ' vente' + pl(X.nb_ventes)),
-      tuile('Marge commerciale', eur(c.marge_commerciale), ca ? 'taux de marque ' + pct(c.marge_commerciale / ca) : null),
-      tuile('Charges payées', eur(X.totaux.charges), X.totaux.tva ? 'dont ' + eur(X.totaux.tva) + ' de TVA' : nCh + ' charge' + pl(nCh)),
-      tuile('Point mort', sd.point_mort_date ? (sd.point_mort_jours <= sd.duree ? dateFR(sd.point_mort_date) : 'pas atteint') : (sd.cf ? '—' : 'sans charge fixe'),
-        sd.point_mort_date ? (sd.point_mort_jours <= sd.duree ? 'charges fixes couvertes' : 'au rythme actuel : ' + dateFR(sd.point_mort_date)) : null)
-    ]));
+    if (info.length || !nCh) m.appendChild(h('p', { class: 'pl-note pl-base' }, info.concat([nCh ? null : lienBtn('Ajouter une charge', function () { feuilleCharge(null); })])));
+    var g = h('div', { class: 'pl-grille' });
+    m.appendChild(g);
+    g.appendChild(kpi({ hero: true, label: 'Résultat analytique' + (X.periode ? ' · ' + X.periode.nom : ''), v: eurS(c.resultat, 0), cls: c.resultat < 0 ? 'pl-neg' : '',
+      sous: 'après toutes les charges saisies' + (ca ? ' · ' + pct(c.resultat / ca) + ' du chiffre d’affaires' : ''),
+      leg: 'Avec les coûts cachés (temps, capital, décote, dépréciation) : ' + eurS(c.resultat_economique, 0) + '.' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Chiffre d’affaires', v: eur(ca, 0), sous: nbr(X.nb_ventes) + ' vente' + pl(X.nb_ventes) }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Marge commerciale', v: eur(c.marge_commerciale, 0), sous: ca ? 'taux de marque ' + pct(c.marge_commerciale / ca) : null }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Charges payées', v: eur(X.totaux.charges, 0), sous: X.totaux.tva ? 'dont ' + eur(X.totaux.tva, 0) + ' de TVA' : nCh + ' charge' + pl(nCh) }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Point mort', v: sd.point_mort_date ? (sd.point_mort_jours <= sd.duree ? dateFR(sd.point_mort_date) : 'pas atteint') : (sd.cf ? '—' : 'sans charge fixe'),
+      sous: sd.point_mort_date ? (sd.point_mort_jours <= sd.duree ? 'charges fixes couvertes' : 'au rythme actuel : ' + dateFR(sd.point_mort_date)) : null }));
     /* cascade des marges */
     var L = [
-      ['Chiffre d’affaires', c.ca, 'tot'],
+      ['Chiffre d’affaires', c.ca, 'total'],
       ['Coût d’achat des articles vendus', -c.cout_achat],
       ['Marge commerciale', c.marge_commerciale, 'sous'],
-      ['Frais d’achat des articles vendus (voyages, gradation…)', -c.frais_achat],
-      c.frais_achat_non_affectes ? ['Frais d’achat non rattachés à un article', -c.frais_achat_non_affectes] : null,
-      ['Frais de vente (commissions, envois)', -c.frais_vente],
+      ['Frais d’achat des articles vendus', -c.frais_achat, null, 'voyages, gradation…'],
+      c.frais_achat_non_affectes ? ['Frais d’achat non rattachés', -c.frais_achat_non_affectes] : null,
+      ['Frais de vente', -c.frais_vente, null, 'commissions, envois'],
       ['Marge sur coûts directs', c.marge_directe, 'sous'],
       ['Charges de structure', -c.structure],
-      ['Résultat analytique', c.resultat, 'tot'],
+      ['Résultat analytique', c.resultat, 'total'],
       ['Coûts cachés (non payés)', -c.caches],
-      ['Résultat économique', c.resultat_economique, 'tot']
+      ['Résultat économique', c.resultat_economique, 'total']
     ].filter(Boolean);
-    var tb = h('table', { class: 'pl-table pl-cascade' }, [h('caption', { class: 'sr-only', text: 'Cascade des marges' }),
-      h('thead', null, h('tr', null, [h('th', { scope: 'col', text: 'Du chiffre d’affaires au résultat' }), h('th', { scope: 'col', text: 'Montant' }), h('th', { scope: 'col', text: '% du CA' })])),
-      h('tbody', null, L.map(function (l) {
-        return h('tr', { class: l[2] ? 'pl-tot' + (l[2] === 'sous' ? ' pl-tot--sous' : '') : null }, [h('th', { scope: 'row', text: l[0] }),
-          h('td', { class: l[2] && l[1] < -0.005 ? 'pl-neg' : null, text: eur(Math.abs(l[1]) < 0.005 ? 0 : l[1], 2) }), h('td', { text: ca ? pct(Math.abs(l[1]) < 0.005 ? 0 : l[1] / ca) : '—' })]);
-      }))]);
-    m.appendChild(section('Cascade des marges', [h('div', { class: 'pl-scroll' }, tb)],
-      'Méthode des coûts complets : les frais d’un voyage s’ajoutent au coût des cartes achetées pendant ce voyage et passent en charge au fil des ventes. ' +
-      (X.totaux.stock_frais_voyage > 0.5 ? eur(X.totaux.stock_frais_voyage) + ' de frais de voyage sont encore dans la valeur de ton stock.' : '')));
+    var hostC = h('div');
+    G.cascade(hostC, { etapes: L.map(function (l) { return { label: l[0], v: l[1], type: l[2] || 'delta', note: l[3] }; }), base: ca || null, fmt: function (v) { return eur(v, 0); }, aria: 'Cascade du chiffre d’affaires au résultat' });
+    g.appendChild(carte({ span: 'pl-c7', titre: 'Cascade des marges', sous: 'du chiffre d’affaires au résultat · bleu : ce qui reste, rouge : ce qui part', corps: [hostC],
+      table: function () {
+        var tb = h('table', { class: 'pl-table pl-cascade' }, [h('caption', { class: 'sr-only', text: 'Cascade des marges' }),
+          h('thead', null, h('tr', null, [h('th', { scope: 'col', text: 'Du chiffre d’affaires au résultat' }), h('th', { scope: 'col', text: 'Montant' }), h('th', { scope: 'col', text: '% du CA' })])),
+          h('tbody', null, L.map(function (l) {
+            return h('tr', { class: l[2] ? 'pl-tot' + (l[2] === 'sous' ? ' pl-tot--sous' : '') : null }, [h('th', { scope: 'row', text: l[0] }),
+              h('td', { class: l[2] && l[1] < -0.005 ? 'pl-neg' : null, text: eur(Math.abs(l[1]) < 0.005 ? 0 : l[1], 2) }), h('td', { text: ca ? pct(Math.abs(l[1]) < 0.005 ? 0 : l[1] / ca) : '—' })]);
+          }))]);
+        return h('div', { class: 'pl-scroll' }, tb);
+      },
+      pied: ['Méthode des coûts complets : les frais d’un voyage s’ajoutent au coût des cartes achetées pendant ce voyage et passent en charge au fil des ventes.' +
+        (X.totaux.stock_frais_voyage > 0.5 ? ' ' + eur(X.totaux.stock_frais_voyage, 0) + ' de frais de voyage sont encore dans la valeur de ton stock.' : '')] }));
     /* directs, indirects, cachés */
-    m.appendChild(section('Directs, indirects, cachés', [h('div', { class: 'pl-kpis' }, [
-      tuile('Coûts directs', eur(X.totaux.directs), (ca ? pct(X.totaux.directs / ca) + ' du CA · ' : '') + 'achats, voyages, gradation, ventes'),
-      tuile('Coûts indirects', eur(X.totaux.indirects), (ca ? pct(X.totaux.indirects / ca) + ' du CA · ' : '') + 'structure : abonnements, fournitures…'),
-      tuile('Coûts cachés', eur(X.totaux.caches), (ca ? pct(X.totaux.caches / ca) + ' du CA · ' : '') + 'temps, capital, décote, dépréciation')
-    ])], 'Directs : rattachés à un article, une vente ou un voyage. Indirects : ceux de la structure, sur toute l’activité. Cachés : jamais payés, mais réels.'));
+    var DIC = [['Directs', X.totaux.directs, 'g-s1', 'achats, voyages, gradation, ventes'], ['Indirects', X.totaux.indirects, 'g-s2', 'structure : abonnements, fournitures…'], ['Cachés', X.totaux.caches, 'g-s3', 'temps, capital, décote, dépréciation']];
+    var tDIC = DIC.reduce(function (a, x) { return a + Math.max(0, x[1]); }, 0);
+    g.appendChild(carte({ span: 'pl-c5', titre: 'Directs, indirects, cachés', sous: 'ce que coûte l’activité, par nature',
+      corps: [G.parts(h('div'), { parts: DIC.map(function (x) { return { label: x[0], v: x[1], txt: eur(x[1], 0), cls: x[2], legende: null }; }), haute: true, legende: false, aria: 'Coûts directs, indirects et cachés' }),
+        h('dl', { class: 'pl-dl pl-dl--cles' }, [].concat.apply([], DIC.map(function (x) {
+          return [h('dt', null, [h('i', { class: 'g-cle ' + x[2], 'aria-hidden': 'true' }), x[0], h('small', { text: x[3] })]), h('dd', null, [eur(x[1], 0), h('small', { text: (ca ? pct(x[1] / ca) + ' du CA' : '') + (tDIC ? ' · ' + pct(x[1] / tDIC) + ' du total' : '') })])];
+        })))],
+      pied: ['Directs : rattachés à un article, une vente ou un voyage. Indirects : la structure. Cachés : jamais payés, mais réels.'] }));
     /* seuil de rentabilité */
-    var p = sd.sr ? Math.max(0, Math.min(1, ca / sd.sr)) : (sd.cf ? 0 : 1);
-    var jauge = h('div', { class: 'pl-meter', role: 'img', 'aria-label': sd.sr ? pct(ca / sd.sr) + ' du seuil de rentabilité atteint' : 'seuil non calculable' }, h('span'));
-    jauge.firstChild.style.width = (p * 100) + '%';
-    m.appendChild(section('Seuil de rentabilité', [
-      h('div', { class: 'pl-box' }, [
-        h('p', { class: 'pl-big', text: sd.sr == null ? (sd.cf ? 'Ta marge sur coûts variables est nulle ou négative : pas de seuil possible.' : 'Aucune charge fixe sur la période : chaque vente est déjà du bénéfice.')
-          : ca >= sd.sr ? 'Seuil dépassé de ' + eur(ca - sd.sr) + ' : tes charges fixes sont couvertes' : 'Il manque ' + eur(sd.sr - ca) + ' de chiffre d’affaires pour couvrir tes charges fixes' }),
-        jauge,
+    var hostS = h('div'), courbeOk = sd.sr != null && sd.tmcv != null && sd.tmcv > 0;
+    if (courbeOk) {
+      var xmax = Math.max(ca, sd.sr) * 1.25 || 100, xs = [];
+      for (var i = 0; i <= 40; i++) xs.push(xmax * i / 40);
+      [sd.sr, ca].forEach(function (v) { if (v > 0 && xs.indexOf(v) === -1) xs.push(v); });
+      xs.sort(function (a, b) { return a - b; });
+      G.courbe(hostS, { type: 'num', x: xs, series: [{ nom: 'Chiffre d’affaires', cls: 'g-s1', valeurs: xs }, { nom: 'Coûts (fixes + variables)', cls: 'g-s2', valeurs: xs.map(function (x) { return sd.cf + x * (1 - sd.tmcv); }) }],
+        points: [{ x: sd.sr, y: sd.sr, label: 'Seuil ' + eur(sd.sr, 0) }].concat(ca > 0 && Math.abs(ca - sd.sr) / xmax > 0.12 ? [{ x: ca, y: ca, label: 'Toi ' + eur(ca, 0) }] : []),
+        hauteur: 240, fmt: function (v) { return eur(v, 0); }, fmtX: function (v) { return G.eurAxe(xmax)(v); }, fmtTitre: function (v) { return 'Avec ' + eur(v, 0) + ' de chiffre d’affaires'; }, finLabel: false,
+        detail: function (i) { var r = xs[i] - (sd.cf + xs[i] * (1 - sd.tmcv)); return [{ v: eurS(r, 0), l: 'de résultat', sous: true }]; },
+        aria: 'Chiffre d’affaires et coûts selon le niveau de ventes ; ils se croisent au seuil de rentabilité.' });
+    }
+    g.appendChild(carte({ span: 'pl-c7', titre: 'Seuil de rentabilité', sous: 'à partir de quel chiffre d’affaires tes charges fixes sont couvertes',
+      corps: [h('p', { class: 'pl-big', text: sd.sr == null ? (sd.cf ? 'Ta marge sur coûts variables est nulle ou négative : pas de seuil possible.' : 'Aucune charge fixe sur la période : chaque vente est déjà du bénéfice.')
+          : ca >= sd.sr ? 'Seuil dépassé de ' + eur(ca - sd.sr, 0) + ' : tes charges fixes sont couvertes' : 'Il manque ' + eur(sd.sr - ca, 0) + ' de chiffre d’affaires pour couvrir tes charges fixes' }),
+        courbeOk ? G.legende([{ nom: 'Chiffre d’affaires', cls: 'g-s1', forme: 'ligne' }, { nom: 'Coûts fixes + variables', cls: 'g-s2', forme: 'ligne' }]) : null,
+        courbeOk ? hostS : null,
         h('dl', { class: 'pl-dl' }, [
-          h('dt', { text: 'Marge sur coûts variables' }), h('dd', { text: eur(sd.mcv) + (sd.tmcv != null ? ' (' + pct(sd.tmcv) + ' du CA)' : '') }),
-          h('dt', { text: 'Charges fixes de la période' }), h('dd', { text: eur(sd.cf) }),
-          h('dt', { text: 'Seuil de rentabilité' }), h('dd', { text: sd.sr != null ? eur(sd.sr) + ' de CA' : '—' }),
-          h('dt', { text: 'Marge de sécurité' }), h('dd', { text: sd.marge_securite != null ? eurS(sd.marge_securite) + ' (' + pct(sd.indice_securite) + ' du CA)' : '—' }),
+          h('dt', { text: 'Marge sur coûts variables' }), h('dd', { text: eur(sd.mcv, 0) + (sd.tmcv != null ? ' (' + pct(sd.tmcv) + ' du CA)' : '') }),
+          h('dt', { text: 'Charges fixes de la période' }), h('dd', { text: eur(sd.cf, 0) }),
+          h('dt', { text: 'Seuil de rentabilité' }), h('dd', { text: sd.sr != null ? eur(sd.sr, 0) + ' de CA' : '—' }),
+          h('dt', { text: 'Marge de sécurité' }), h('dd', { text: sd.marge_securite != null ? eurS(sd.marge_securite, 0) + ' (' + pct(sd.indice_securite) + ' du CA)' : '—' }),
           h('dt', { text: 'Levier opérationnel' }), h('dd', { text: sd.levier != null ? dec1(sd.levier) + ' : +10 % de CA = +' + NF0.format(sd.levier * 10) + ' % de résultat' : '—' }),
-          h('dt', { text: 'Résultat en coûts variables' }), h('dd', { text: eurS(sd.resultat) })
+          h('dt', { text: 'Résultat en coûts variables' }), h('dd', { text: eurS(sd.resultat, 0) })
         ]),
-        Math.abs(sd.ecart) > 0.5 ? h('p', { class: 'pl-note', text: 'Écart de ' + eurS(sd.ecart) + ' avec le résultat analytique : ici, les frais de voyage comptent en entier dans la période où tu les paies ; en coûts complets, ils suivent les cartes jusqu’à leur vente.' }) : null
-      ])
-    ], 'Coûts variables : achats des articles vendus, commissions, envois, gradation, fournitures. Charges fixes : voyages, abonnements, structure. Point mort calculé au rythme de la période (' + nbr(sd.duree) + ' jours depuis le ' + dateFR(sd.debut) + ').'));
+        Math.abs(sd.ecart) > 0.5 ? h('p', { class: 'pl-note', text: 'Écart de ' + eurS(sd.ecart, 0) + ' avec le résultat analytique : ici, les frais de voyage comptent en entier dans la période où tu les paies ; en coûts complets, ils suivent les cartes jusqu’à leur vente.' }) : null],
+      pied: ['Coûts variables : achats des articles vendus, commissions, envois, gradation, fournitures. Charges fixes : voyages, abonnements, structure. Point mort au rythme de la période (' + nbr(sd.duree) + ' jours depuis le ' + dateFR(sd.debut) + ').'] }));
     /* charges par catégorie */
-    if (X.categories.length) m.appendChild(section('Charges par catégorie', [barres(X.categories.map(function (k) {
-      return { l: k.cat.nom, s: (k.cat.compte ? 'compte ' + k.cat.compte + ' · ' : '') + (NATURES[k.cat.nature] || [''])[0].toLowerCase() + ' · ' + k.n + ' ligne' + pl(k.n), v: k.montant, txt: eur(k.montant) };
-    }), 'Charges par catégorie'), h('p', { class: 'pl-note' }, h('a', { href: '#charges', text: 'Voir et modifier les charges ›' }))]));
+    var hostK = h('div');
+    if (X.categories.length) G.barres(hostK, { lignes: X.categories.map(function (k) {
+      return { cle: k.cat.id || k.cat.nom, label: k.cat.nom, sous: (k.cat.compte ? 'compte ' + k.cat.compte + ' · ' : '') + (NATURES[k.cat.nature] || [''])[0].toLowerCase() + ' · ' + k.n + ' ligne' + pl(k.n), v: k.montant, txt: eur(k.montant, 0) };
+    }), valeurNom: 'payé', aria: 'Charges par catégorie' });
+    g.appendChild(carte({ span: 'pl-c5', titre: 'Charges par catégorie', sous: 'payées sur la période', corps: [X.categories.length ? hostK : vide2('Aucune charge sur la période.', lienBtn('Ajouter une charge', function () { feuilleCharge(null); }))],
+      pied: X.categories.length ? [h('a', { href: '#charges', text: 'Voir et modifier les charges ›' })] : null }));
     /* coûts cachés */
     var cc = X.caches, P = X.params;
     var lc = [
@@ -2207,16 +2291,42 @@
       ['Décote consentie', cc.decote, 'Prix marché moins prix de vente, sur les ventes de la période.'],
       ['Dépréciation du stock', cc.depreciation, cc.n_depreciation ? cc.n_depreciation + ' carte' + pl(cc.n_depreciation) + ' dont le coût complet dépasse ce qu’elles rapporteraient vendues (prix marché × ' + pct(cc.realisation) + ', frais déduits).' : 'Aucune carte sous son coût complet.']
     ];
-    var tcc = tableau([
-      { t: 'Coût caché', f: function (l) { return l.length > 2 ? h('span', null, [l[0], h('small', { class: 'pl-t-note', text: l[2] })]) : l[0]; } },
-      { t: 'Montant', f: function (l) { return l[1] == null ? '—' : eur(l[1], 2); } }
-    ], lc, ['Total', cc.total], 'Coûts cachés');
-    m.appendChild(section('Coûts cachés', [tcc, h('p', { class: 'pl-note' }, h('a', { href: '#reglages', text: 'Régler le taux horaire, le temps par vente et le coût du capital ›' }))],
-      'Ils ne sortent pas de ta poche mais réduisent ce que l’activité te rapporte vraiment.'));
+    var hostCC = h('div');
+    G.barres(hostCC, { lignes: lc.map(function (l) { return { cle: l[0], label: l[0], v: z(l[1]), txt: l[1] == null ? '—' : eur(l[1], 0), cls: 'g-s2' }; }), valeurNom: 'coût caché', aria: 'Coûts cachés' });
+    g.appendChild(carte({ span: 'pl-c12', titre: 'Coûts cachés · ' + eur(cc.total, 0), sous: 'ils ne sortent pas de ta poche mais réduisent ce que l’activité te rapporte vraiment', corps: [hostCC],
+      table: function () {
+        return tableau([
+          { t: 'Coût caché', f: function (l) { return h('span', null, [l[0], h('small', { class: 'pl-t-note', text: l[2] })]); } },
+          { t: 'Montant', f: function (l) { return l[1] == null ? '—' : eur(l[1], 2); } }
+        ], lc, ['Total', cc.total], 'Coûts cachés');
+      },
+      pied: [h('a', { href: '#reglages', text: 'Régler le taux horaire, le temps par vente et le coût du capital ›' }), ' · Détail de chaque calcul dans la vue Tableau.'] }));
   };
   function dec1(v) { return vide(v) ? '—' : new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(v); }
 
   /* ---------------------------------------------------------------- voyages */
+  function dateVoyage(V) {
+    if (!V.debut) return 'sans dates';
+    var d = new Date(V.debut + 'T12:00:00Z'), f = new Date((V.fin || V.debut) + 'T12:00:00Z'), M = G.MOIS;
+    return d.getUTCFullYear() === f.getUTCFullYear() && d.getUTCMonth() === f.getUTCMonth()
+      ? d.getUTCDate() + ' → ' + f.getUTCDate() + ' ' + M[f.getUTCMonth()] + ' ' + f.getUTCFullYear()
+      : d.getUTCDate() + ' ' + M[d.getUTCMonth()] + ' → ' + f.getUTCDate() + ' ' + M[f.getUTCMonth()] + ' ' + f.getUTCFullYear();
+  }
+  function roiTxt(x) { return x != null ? (x > 0.0005 ? '+' : '') + pct(x) : '—'; }
+  function carteVoyage(v, span) {
+    var V = v.V, rp = v.roi_potentiel;
+    return carte({ span: span, titre: V.nom, sous: [dateVoyage(V), v.duree ? v.duree + ' jour' + pl(v.duree) : null, nbr(v.articles.length) + ' article' + pl(v.articles.length)].filter(Boolean).join(' · '),
+      actions: [h('a', { class: 'pl-ibtn', href: '#voyage/' + encodeURIComponent(V.id) }, ['Détail', h('span', { 'aria-hidden': 'true', text: '›' })])],
+      corps: [h('div', { class: 'pl-voy' }, [
+        h('div', null, [h('p', { class: 'pl-label', text: 'Retour potentiel' }), h('p', { class: 'pl-voy__v' + (rp < 0 ? ' pl-neg' : ''), text: roiTxt(rp) }), h('p', { class: 'pl-voy__s', text: 'déjà réalisé : ' + roiTxt(v.roi_realise) })]),
+        h('div', null, [h('p', { class: 'pl-label', text: 'Coût récupéré' }), h('p', { class: 'pl-voy__v', text: v.recupere != null ? pct(v.recupere) : '—' }),
+          G.jauge(v.recupere, { aria: (v.recupere != null ? pct(v.recupere) : 'Rien') + ' du coût complet récupéré' })])]),
+        h('dl', { class: 'pl-dl' }, [
+          h('dt', { text: 'Coût complet' }), h('dd', { text: eur(v.cout_total, 0) }),
+          h('dt', { text: 'dont frais du voyage' }), h('dd', { text: eur(v.frais, 0) + (v.taux_frais != null ? ' · +' + pct(v.taux_frais) + ' sur les achats' : '') }),
+          h('dt', { text: 'Encaissé' }), h('dd', { text: eur(v.ca, 0) + ' · ' + nbr(v.n_vendus) + ' vendu' + pl(v.n_vendus) }),
+          h('dt', { text: 'Reste en stock' }), h('dd', { text: nbr(v.n_stock) + ' article' + pl(v.n_stock) + ' · ' + eur(v.valeur_stock, 0) })])] });
+  }
   VUES.voyages = function (m) {
     var X = couts('tout'), vs = X.voyages.slice().reverse(), prop = KC.proposition(S.doc, S.R);
     m.appendChild(entete('Analyse', 'Ce que te coûte et te rapporte chaque voyage', [h('button', { type: 'button', class: 'btn pl-btn-s', text: '+ Voyage', onclick: function () { feuilleVoyage(null); } })]));
@@ -2228,15 +2338,42 @@
         h('p', { class: 'pl-note', text: 'Un voyage regroupe ses frais (avion, hôtel, transports, repas) et les cartes achetées pendant ses dates. Tu sauras ce que chaque carte t’a vraiment coûté, le retour sur investissement du voyage, et le montant d’achats nécessaire pour amortir le prochain.' })]));
       return;
     }
-    m.appendChild(h('ul', { class: 'pl-rows pl-sec' }, vs.map(function (v) {
-      var V = v.V;
-      return h('li', null, h('a', { class: 'pl-row pl-row--sans', href: '#voyage/' + encodeURIComponent(V.id) }, [
-        h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: V.nom }),
-          h('span', { class: 'pl-row__meta', text: [V.debut ? dateFR(V.debut) + ' → ' + dateFR(V.fin) : null, v.articles.length + ' article' + pl(v.articles.length) + ' rattaché' + pl(v.articles.length), 'frais ' + eur(v.frais) + (v.taux_frais != null ? ' (+' + pct(v.taux_frais) + ' sur les achats)' : '')].filter(Boolean).join(' · ') })]),
-        h('span', { class: 'pl-row__nums' }, [h('span', { class: 'pl-row__prix ' + sens(v.roi_potentiel), text: v.roi_potentiel != null ? fleche(v.roi_potentiel) + pct(v.roi_potentiel) : '—' }), h('span', { class: 'pl-row__m', text: 'retour potentiel' })])
-      ]));
-    })));
-    m.appendChild(h('p', { class: 'pl-note', text: 'Une carte fait partie d’un voyage si son ticket ou sa date d’achat tombe dans ses dates, ou si tu l’y as rattachée (tickets et lots sans date, produits). Clé de répartition des frais : ' + (X.params.cle_voyage === 'nombre' ? 'le nombre d’articles' : 'le coût d’achat') + ' (Réglages).' }));
+    var T = vs.reduce(function (a, v) { a.cout += z(v.cout_total); a.frais += z(v.frais); a.achats += z(v.achats); a.ca += z(v.ca); a.benef += z(v.benef); a.latent += z(v.latent); a.stock += z(v.valeur_stock); a.ns += z(v.n_stock); return a; },
+      { cout: 0, frais: 0, achats: 0, ca: 0, benef: 0, latent: 0, stock: 0, ns: 0 });
+    var g = h('div', { class: 'pl-grille' });
+    m.appendChild(g);
+    var rpT = T.cout ? (T.benef + T.latent) / T.cout : null;
+    g.appendChild(kpi({ hero: true, label: 'Retour potentiel · ' + (vs.length > 1 ? 'les ' + vs.length + ' voyages' : 'ton voyage'), v: roiTxt(rpT), cls: rpT < 0 ? 'pl-neg' : '',
+      sous: 'si le stock des voyages part au prix marché · déjà réalisé : ' + roiTxt(T.cout ? T.benef / T.cout : null) + ' (' + eurS(T.benef, 0) + ')',
+      leg: 'Retour = (bénéfice des ventes + plus-value du stock) ÷ coût complet (achats + frais du voyage).' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Coût complet', v: eur(T.cout, 0), sous: 'achats + ' + eur(T.frais, 0) + ' de frais' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Frais en plus des achats', v: T.achats ? '+' + pct(T.frais / T.achats) : '—', sous: eur(T.frais, 0) + ' pour ' + eur(T.achats, 0) + ' d’achats' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Coût récupéré', v: T.cout ? pct(T.ca / T.cout) : '—', sous: eur(T.ca, 0) + ' encaissés' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Reste en stock', v: eur(T.stock, 0), sous: nbr(T.ns) + ' article' + pl(T.ns) + ' au prix marché' }));
+    vs.forEach(function (v) { g.appendChild(carteVoyage(v, vs.length === 1 ? 'pl-c12' : 'pl-c6')); });
+    if (vs.length >= 2) {
+      var hostR = h('div'), hostF = h('div');
+      G.barres(hostR, { lignes: vs.map(function (v) { return { cle: v.V.id, label: v.V.nom, sous: dateVoyage(v.V), v: z(v.roi_potentiel), repere: v.roi_realise, txt: roiTxt(v.roi_potentiel) }; }),
+        fmt: roiTxt, valeurNom: 'retour potentiel', repereNom: 'déjà réalisé', aria: 'Retour potentiel par voyage',
+        onSelect: function (k) { location.hash = '#voyage/' + encodeURIComponent(k); } });
+      G.barres(hostF, { lignes: vs.map(function (v) { return { cle: v.V.id, label: v.V.nom, sous: eur(v.frais, 0) + ' de frais', v: z(v.taux_frais), txt: v.taux_frais != null ? '+' + pct(v.taux_frais) : '—' }; }),
+        signe: false, valeurNom: 'frais en plus des achats', aria: 'Frais en plus des achats, par voyage',
+        detail: function (l) { var v = X.parVoyage[l.cle]; return v ? [{ v: eur(v.achats, 0), l: 'd’achats', sous: true }].concat(v.frais_par_jour ? [{ v: eur(v.frais_par_jour, 0), l: 'de frais par jour', sous: true }] : []) : []; } });
+      g.appendChild(carte({ span: 'pl-c6', titre: 'Retour par voyage', sous: 'barre : potentiel · trait : déjà réalisé', corps: [hostR], cle: 'voyages-comparaison',
+        table: function () {
+          return tableau([
+            { t: 'Voyage', f: function (v) { return h('a', { href: '#voyage/' + encodeURIComponent(v.V.id), text: v.V.nom }); }, v: function (v) { return v.V.debut || ''; } },
+            { t: 'Achats', f: function (v) { return eur(v.achats, 0); }, v: function (v) { return v.achats; } },
+            { t: 'Frais', f: function (v) { return eur(v.frais, 0); }, v: function (v) { return v.frais; } },
+            { t: 'Coût complet', f: function (v) { return eur(v.cout_total, 0); }, v: function (v) { return v.cout_total; } },
+            { t: 'Encaissé', f: function (v) { return eur(v.ca, 0); }, v: function (v) { return v.ca; } },
+            { t: 'Résultat', f: function (v) { return eurS(v.benef, 0); }, v: function (v) { return v.benef; }, cls: function (v) { return neg(v.benef); } },
+            { t: 'Retour potentiel', f: function (v) { return roiTxt(v.roi_potentiel); }, v: function (v) { return v.roi_potentiel; }, cls: function (v) { return neg(v.roi_potentiel); } }
+          ], vs, null, 'Voyages', { cle: 'voyages' });
+        } }));
+      g.appendChild(carte({ span: 'pl-c6', titre: 'Frais en plus des achats', sous: 'ce que le voyage ajoute au prix de chaque carte', corps: [hostF] }));
+    }
+    m.appendChild(h('p', { class: 'pl-note pl-base', text: 'Une carte fait partie d’un voyage si son ticket ou sa date d’achat tombe dans ses dates, ou si tu l’y as rattachée (tickets et lots sans date, produits). Clé de répartition des frais : ' + (X.params.cle_voyage === 'nombre' ? 'le nombre d’articles' : 'le coût d’achat') + ' (Réglages).' }));
   };
   VUES.voyage = function (m, id) {
     var X = couts('tout'), v = X.parVoyage[id];
@@ -2244,48 +2381,52 @@
     if (!v) { m.appendChild(h('p', { class: 'pl-box', text: 'Voyage introuvable.' })); return; }
     var V = v.V;
     m.appendChild(entete(V.nom, (V.debut ? dateFR(V.debut) + ' → ' + dateFR(V.fin) + ' · ' + v.duree + ' jour' + pl(v.duree) : 'sans dates'), [h('button', { type: 'button', class: 'btn btn--ghost pl-btn-s', text: 'Modifier', onclick: function () { feuilleVoyage(V.id); } })]));
-    m.appendChild(h('section', { class: 'pl-hero' }, [
-      h('p', { class: 'pl-label', text: 'Retour sur investissement potentiel' }),
-      h('p', { class: 'pl-hero__v' + (v.roi_potentiel < 0 ? ' pl-neg' : ''), text: v.roi_potentiel != null ? (v.roi_potentiel > 0 ? '+' : '') + pct(v.roi_potentiel) : '—' }),
-      h('p', { class: 'pl-hero__s', text: 'si le stock du voyage se vend au prix marché · déjà réalisé : ' + (v.roi_realise != null ? pct(v.roi_realise) : '—') + ' (' + eurS(v.benef) + ')' })
-    ]));
-    m.appendChild(h('div', { class: 'pl-kpis pl-sec' }, [
-      tuile('Coût complet', eur(v.cout_total), 'achats ' + eur(v.cout_achat) + ' + frais ' + eur(v.frais)),
-      tuile('Frais du voyage', eur(v.frais), v.taux_frais != null ? '+' + pct(v.taux_frais) + ' sur le prix des cartes' : 'aucun achat rattaché'),
-      tuile('Déjà récupéré', pct(v.recupere), eur(v.ca) + ' encaissés · ' + nbr(v.n_vendus) + ' vendu' + pl(v.n_vendus)),
-      tuile('Reste en stock', nbr(v.n_stock) + ' article' + pl(v.n_stock), 'valeur marché ' + eur(v.valeur_stock))
-    ]));
-    if (v.seuil_achat != null && v.frais > 0) m.appendChild(h('p', { class: 'pl-apercu pl-sec', text: 'Chaque carte de ce voyage t’a coûté ' + pct(v.taux_frais) + ' de plus que son prix. Avec une marge de ' + pct(v.marge_avant_frais) +
-      ' avant frais, il fallait au moins ' + eur(v.seuil_achat) + ' d’achats pour amortir ' + eur(v.frais) + ' de frais' + (v.achats ? ' ; tu en as fait ' + eur(v.achats) + '.' : '.') + (v.frais_par_jour ? ' Frais par jour : ' + eur(v.frais_par_jour) + '.' : '') }));
-    /* frais */
-    m.appendChild(section('Frais du voyage', [v.charges.length ? h('ul', { class: 'pl-rows' }, chargesDe(v.charges).map(function (c) {
-      var cat = KC.categorie(c.cat);
-      return h('li', null, h('button', { type: 'button', class: 'pl-row pl-row--sans pl-row--btn', onclick: function () { feuilleCharge(c.id); } }, [
-        h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: c.libelle }), h('span', { class: 'pl-row__meta', text: [dateFR(c.date), cat.nom, c.devise === 'JPY' ? yen(c.montant) : null].filter(Boolean).join(' · ') })]),
-        h('span', { class: 'pl-row__nums' }, h('span', { class: 'pl-row__prix', text: montantCharge(c) }))
-      ]));
-    })) : h('p', { class: 'pl-box', text: 'Aucun frais rattaché : ajoute l’avion, l’hôtel, les transports et les repas du voyage.' }),
-    h('div', { class: 'pl-actions' }, bouton('+ Frais du voyage', function () { feuilleCharge(null, { cat: 'voyage', cible: 'voyage', voyage: V.id, date: V.debut || aujourdhui() }); }, 'btn--ghost'))]));
-    /* achats */
+    var g = h('div', { class: 'pl-grille' });
+    m.appendChild(g);
+    g.appendChild(kpi({ hero: true, label: 'Retour sur investissement potentiel', v: roiTxt(v.roi_potentiel), cls: v.roi_potentiel < 0 ? 'pl-neg' : '',
+      sous: 'si le stock du voyage se vend au prix marché · déjà réalisé : ' + roiTxt(v.roi_realise) + ' (' + eurS(v.benef, 0) + ')' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Coût complet', v: eur(v.cout_total, 0), sous: 'achats ' + eur(v.cout_achat, 0) + ' + frais ' + eur(v.frais, 0) }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Frais du voyage', v: eur(v.frais, 0), sous: v.taux_frais != null ? '+' + pct(v.taux_frais) + ' sur le prix des cartes' : 'aucun achat rattaché' }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Coût récupéré', v: v.recupere != null ? pct(v.recupere) : '—', sous: eur(v.ca, 0) + ' encaissés · ' + nbr(v.n_vendus) + ' vendu' + pl(v.n_vendus) }));
+    g.appendChild(kpi({ span: 'pl-c4', label: 'Reste en stock', v: nbr(v.n_stock) + ' article' + pl(v.n_stock), sous: 'valeur marché ' + eur(v.valeur_stock, 0) }));
+    /* frais : une barre par dépense */
+    var parCh = {}, ordre = [];
+    v.charges.forEach(function (o) { if (!parCh[o.c.id]) { parCh[o.c.id] = { c: o.c, v: 0 }; ordre.push(o.c.id); } parCh[o.c.id].v += z(o.cout); });
+    var lignesF = ordre.map(function (k) { var x = parCh[k], cat = KC.categorie(x.c.cat); return { cle: k, label: x.c.libelle, sous: [dateFR(x.c.date), x.c.cat === 'voyage' ? null : cat.nom, x.c.devise === 'JPY' ? yen(x.c.montant) : null, cat.heures ? montantCharge(x.c) : null].filter(Boolean).join(' · '), v: x.v, txt: eur(x.v, 0) }; })
+      .sort(function (x, y) { return y.v - x.v; });
+    var hostF = h('div');
+    if (lignesF.length) G.barres(hostF, { lignes: lignesF, valeurNom: 'coût', aria: 'Frais du voyage', onSelect: function (k) { feuilleCharge(k); } });
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Frais du voyage', sous: lignesF.length ? eur(v.frais, 0) + ' · touche une dépense pour la modifier' : null,
+      actions: [h('button', { type: 'button', class: 'pl-ibtn', text: '+ Frais', onclick: function () { feuilleCharge(null, { cat: 'voyage', cible: 'voyage', voyage: V.id, date: V.debut || aujourdhui() }); } })],
+      corps: [lignesF.length ? hostF : vide2('Aucun frais rattaché : ajoute l’avion, l’hôtel, les transports et les repas du voyage.'),
+        lignesF.length ? h('dl', { class: 'pl-dl pl-dl--sep' }, [
+          h('dt', { text: 'Par jour' }), h('dd', { text: v.frais_par_jour ? eur(v.frais_par_jour, 0) : '—' }),
+          h('dt', { text: 'Par article acheté' }), h('dd', { text: v.articles.length ? eur(v.frais / v.articles.length, 2) : '—' }),
+          h('dt', { text: 'En plus du prix des cartes' }), h('dd', { text: v.taux_frais != null ? '+' + pct(v.taux_frais) : '—' })]) : null] }));
+    /* amortir les frais */
     var cartesV = v.articles.filter(function (a) { return a.type === 'carte'; }), prodV = v.articles.filter(function (a) { return a.type === 'produit'; });
     var nd = candidatsVoyage(V.id);
-    m.appendChild(section('Achats rattachés', [h('div', { class: 'pl-box' }, [
-      h('dl', { class: 'pl-dl' }, [
-        h('dt', { text: 'Cartes' }), h('dd', { text: nbr(cartesV.length) + ' · ' + eur(somme(cartesV, function (a) { return a.achat; })) }),
-        h('dt', { text: 'Produits' }), h('dd', { text: prodV.length ? nbr(prodV.length) + ' · ' + eur(somme(prodV, function (a) { return a.achat; })) : '—' }),
-        h('dt', { text: 'Total' }), h('dd', { text: eur(v.achats) })
-      ]),
-      prodV.length ? h('p', { class: 'pl-note', text: 'Produits : ' + prodV.map(function (a) { return a.x.p.libelle || a.x.p.nom; }).join(', ') + '.' }) : null,
-      nd.total ? h('p', { class: 'pl-note' }, [nd.libre + ' achat' + pl(nd.libre) + ' sans date (tickets, lots, cartes payées en yens) ou produit' + pl(nd.libre) + ' pas encore rattaché' + pl(nd.libre) + ' à un voyage. ', lienBtn('Choisir ceux de ce voyage', function () { feuilleAchatsVoyage(V.id); })]) : null
-    ])], 'Un ticket ou une date d’achat dans les dates du voyage suffit. Les achats sans date se rattachent à la main.'));
+    var corpsA = [h('dl', { class: 'pl-dl' }, [
+      h('dt', { text: 'Cartes' }), h('dd', { text: nbr(cartesV.length) + ' · ' + eur(somme(cartesV, function (a) { return a.achat; }), 0) }),
+      h('dt', { text: 'Produits' }), h('dd', { text: prodV.length ? nbr(prodV.length) + ' · ' + eur(somme(prodV, function (a) { return a.achat; }), 0) : '—' }),
+      h('dt', { text: 'Total des achats' }), h('dd', { text: eur(v.achats, 0) })])];
+    if (v.seuil_achat != null && v.frais > 0) {
+      var pS = v.achats / v.seuil_achat;
+      corpsA.push(h('p', { class: 'pl-label pl-label--sep', text: 'Amortir ' + eur(v.frais, 0) + ' de frais' }),
+        G.jauge(pS, { aria: pct(pS) + ' des achats nécessaires' }),
+        h('p', { class: 'pl-note', text: 'Avec une marge de ' + pct(v.marge_avant_frais) + ' avant frais, il fallait au moins ' + eur(v.seuil_achat, 0) + ' d’achats ; tu en as fait ' + eur(v.achats, 0) + ' (' + pct(pS) + ').' + (v.frais_par_jour ? ' Frais par jour : ' + eur(v.frais_par_jour, 0) + '.' : '') }));
+    }
+    if (prodV.length) corpsA.push(h('p', { class: 'pl-note', text: 'Produits : ' + prodV.map(function (a) { return a.x.p.libelle || a.x.p.nom; }).join(', ') + '.' }));
+    if (nd.total) corpsA.push(h('p', { class: 'pl-note' }, [nd.libre + ' achat' + pl(nd.libre) + ' sans date (tickets, lots, cartes payées en yens) ou produit' + pl(nd.libre) + ' pas encore rattaché' + pl(nd.libre) + ' à un voyage. ', lienBtn('Choisir ceux de ce voyage', function () { feuilleAchatsVoyage(V.id); })]));
+    g.appendChild(carte({ span: 'pl-c6', titre: 'Achats rattachés', sous: 'un ticket ou une date d’achat dans les dates du voyage suffit', corps: corpsA }));
     var vendues = cartesV.filter(function (a) { return a.vendu; }).sort(function (a, b) { return b.resultat - a.resultat; });
-    if (vendues.length) m.appendChild(section('Ventes de ce voyage', [tableau([
-      { t: 'Carte', f: function (a) { return h('a', { href: '#carte/' + encodeURIComponent(a.ref), text: a.r.c.nom || a.ref }); } },
-      { t: 'Vendue', f: function (a) { return eur(a.ca, 2); } },
-      { t: 'Coût complet', f: function (a) { return eur(a.cout_complet, 2); } },
-      { t: 'Résultat', f: function (a) { return eurS(a.resultat, 2); }, cls: function (a) { return a.resultat < 0 ? 'pl-neg' : ''; } }
-    ], vendues, null, 'Ventes du voyage')]));
-    m.appendChild(h('p', { class: 'pl-note' }, lienBtn('Supprimer ce voyage', function () {
+    g.appendChild(carte({ span: 'pl-c12', titre: 'Ventes de ce voyage · ' + vendues.length, sous: 'résultat = encaissé − frais de vente − coût complet (achat + part des frais du voyage)', corps: [vendues.length ? tableau([
+      { t: 'Carte', f: function (a) { return celluleCarte(a.r, sansDoublons(['N° ' + a.ref, a.r.c.vente_date ? 'vendue le ' + dateFR(a.r.c.vente_date) : null, a.r.c.canal]).join(' · ')); }, v: function (a) { return a.r.c.nom || a.ref; } },
+      { t: 'Encaissé', f: function (a) { return eur(a.ca, 2); }, v: function (a) { return a.ca; } },
+      { t: 'Coût complet', f: function (a) { return eur(a.cout_complet, 2); }, v: function (a) { return a.cout_complet; } },
+      { t: 'Résultat', f: function (a) { return eurS(a.resultat, 2); }, v: function (a) { return a.resultat; }, barre: true, cls: function (a) { return neg(a.resultat); } }
+    ], vendues, null, 'Ventes du voyage', { cle: 'voyage-ventes' }) : vide2('Aucune carte de ce voyage vendue pour l’instant.')] }));
+    m.appendChild(h('p', { class: 'pl-note pl-base' }, lienBtn('Supprimer ce voyage', function () {
       confirmer('Supprimer le voyage ?', 'Ses frais resteront dans tes charges, rattachés à toute l’activité, et ses achats ne seront plus rattachés à aucun voyage.', 'Supprimer', function () {
         location.hash = '#voyages';
         modifier('Voyage supprimé · ' + V.nom, function (d0) {
@@ -2412,37 +2553,13 @@
   }
   function pct1(v) { return vide(v) ? '—' : NF1.format(v * 100) + ' %'; }
   function compact(t) { var x = t.querySelector('table'); if (x) x.classList.add('pl-table--compact'); return t; }
-  function courbePoche(opt, largeur) {
-    var pts = opt.pas;
-    if (!pts.length || opt.max <= 0) return null;
-    var W = Math.round(Math.max(300, Math.min(largeur, 720))), H = Math.round(W * 0.55), g = { l: 58, r: 14, t: 30, b: 38 };
-    var yMax = Math.max.apply(null, pts.map(function (p) { return p.poche; })), yMin = Math.min(0, Math.min.apply(null, pts.map(function (p) { return p.poche; })));
-    if (yMax <= yMin) yMax = yMin + 1;
-    function X(v) { return g.l + (W - g.l - g.r) * v / opt.max; }
-    function Y(v) { return g.t + (H - g.t - g.b) * (1 - (v - yMin) / (yMax - yMin)); }
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, class: 'pl-matrice', role: 'img', 'aria-label': 'Argent qui te reste selon le salaire versé ; le maximum est indiqué sous le graphique.' });
-    [0, 0.5, 1].forEach(function (f) {
-      var v = yMin + (yMax - yMin) * f;
-      svg.appendChild(sv('line', { x1: g.l, x2: W - g.r, y1: Y(v), y2: Y(v), class: 'pl-m-grille' }));
-      svg.appendChild(sv('text', { x: g.l - 6, y: Y(v) + 4, 'text-anchor': 'end', class: 'pl-m-tick' }, eur(v)));
-    });
-    [0, 0.5, 1].forEach(function (f) { svg.appendChild(sv('text', { x: X(opt.max * f), y: H - g.b + 15, 'text-anchor': f === 0 ? 'start' : f === 1 ? 'end' : 'middle', class: 'pl-m-tick' }, eur(opt.max * f))); });
-    svg.appendChild(sv('text', { x: W - g.r, y: H - 5, 'text-anchor': 'end', class: 'pl-m-axe' }, 'Salaire net versé dans l’année →'));
-    svg.appendChild(sv('text', { x: 4, y: 11, class: 'pl-m-axe' }, '↑ Te reste après impôts'));
-    svg.appendChild(sv('polyline', { points: pts.map(function (p) { return X(p.salaire).toFixed(1) + ',' + Y(p.poche).toFixed(1); }).join(' '), class: 'pl-courbe' }));
-    var m = opt.meilleur;
-    var c = sv('circle', { cx: X(m.salaire), cy: Y(m.poche), r: 5, class: 'pl-courbe-pt' });
-    c.appendChild(sv('title', null, 'Maximum : salaire ' + eur(m.salaire) + ', il te reste ' + eur(m.poche)));
-    svg.appendChild(c);
-    return svg;
-  }
   VUES.fiscal = function (m) {
     var F = w.PRFiscal;
     m.appendChild(entete('Analyse', 'Ta future SASU : TVA, impôt, rémunération'));
     m.appendChild(sousOnglets('fiscal'));
     if (!F || !KC) { m.appendChild(h('p', { class: 'pl-box', text: 'Le simulateur ne s’est pas chargé : recharge la page.' })); return; }
     var X = couts('tout'), hs = hypothesesSasu(X), H = hs.H, D = hs.defaut, RG = F.REGLES;
-    m.appendChild(h('p', { class: 'pl-apercu pl-sec', text: 'Simulation d’une année complète de SASU avec les règles ' + RG.annee + ' (vérifiées le ' + dateFR(RG.verifie_le) +
+    m.appendChild(h('p', { class: 'pl-note pl-base', text: 'Simulation d’une année complète de SASU avec les règles ' + RG.annee + ' (vérifiées le ' + dateFR(RG.verifie_le) +
       '). Les hypothèses partent de ton rythme réel et se modifient ci-dessous. Je ne suis ni expert-comptable ni avocat : fais valider par un professionnel avant de décider.' }));
     var defs = [
       { k: 'ca', label: 'Ventes sur 12 mois (€)', type: 'num', demi: true, aide: 'Ton rythme actuel : ' + eur(D.ca) + ' (sur ' + nbr(D.base_jours) + ' jours).' },
@@ -2482,23 +2599,32 @@
       dessiner();
     }
     defs.forEach(function (df) { form.champs[df.k].addEventListener(df.type === 'select' ? 'change' : 'input', function () { clearTimeout(minuteur); minuteur = setTimeout(maj, 350); }); });
-    var hyp = details('Hypothèses de l’année', null, [h('div', { class: 'pl-box' }, [form.el, h('div', { class: 'pl-actions' }, bouton('Reprendre mes chiffres réels', function () {
+    var hyp = details('Modifier les hypothèses', null, [h('div', { class: 'pl-box' }, [form.el, h('div', { class: 'pl-actions' }, bouton('Reprendre mes chiffres réels', function () {
       try { localStorage.removeItem(CLE_SASU); } catch (e) {}
       rendre(true);
     }, 'btn--ghost'))])]);
     var resume = h('p', { class: 'pl-note', 'aria-live': 'polite' });
-    m.appendChild(section('Hypothèses', [resume, hyp]));
+    m.appendChild(carte({ titre: 'Hypothèses de l’année', sous: 'ouvre pour modifier : la simulation se met à jour', corps: [resume, hyp] }));
     m.appendChild(zone);
     function dessiner() {
       zone.textContent = '';
       resume.textContent = 'Ventes de ' + eur(H.ca) + ' sur 12 mois, coût d’achat ' + pct(H.taux_cout) + ' du prix, ' + pct(H.part_import) + ' d’achats importés, ' + nbr(H.voyages) + ' voyage' + pl(H.voyages) + ' à ' + eur(H.frais_voyage) +
-        ', salaire net ' + eur(H.salaire_net) + ', ' + pct(H.distribution) + ' du bénéfice en dividendes, TMI ' + pct(H.tmi) + '. Ouvre pour modifier.';
+        ', salaire net ' + eur(H.salaire_net) + ', ' + pct(H.distribution) + ' du bénéfice en dividendes, TMI ' + pct(H.tmi) + '.';
       var fr = F.simuler(H, 'franchise'), re = F.simuler(H, 'reel');
       var franchiseOk = fr.franchise_possible, choixAuto = franchiseOk && fr.remuneration.poche + fr.sig.resultat_net - fr.remuneration.dividendes >= re.remuneration.poche + re.sig.resultat_net - re.remuneration.dividendes ? 'franchise' : 'reel';
       var fs = S.fsasu || (S.fsasu = { regime: null });
       var regime = fs.regime || choixAuto;
       if (regime === 'franchise' && !fr.franchise_tolerance) regime = 'reel';
       var x = regime === 'franchise' ? fr : re, sg = x.sig, rm = x.remuneration;
+      var g = h('div', { class: 'pl-grille' });
+      zone.appendChild(g);
+      /* chiffres clés au régime retenu */
+      g.appendChild(kpi({ hero: true, label: 'Te reste après impôts · ' + (regime === 'franchise' ? 'en franchise' : 'au réel'), v: eur(rm.poche, 0),
+        sous: 'salaire ' + eur(rm.salaire, 0) + ' + dividendes ' + eur(rm.dividendes, 0) + ', impôts déduits', leg: rm.prelevements != null ? 'Prélèvements : ' + pct(rm.prelevements) + ' du bénéfice avant ta rémunération.' : null }));
+      g.appendChild(kpi({ span: 'pl-c4', label: 'Résultat net de la SASU', v: eurS(sg.resultat_net, 0), cls: sg.resultat_net < 0 ? 'pl-neg' : '', sous: sg.ca ? pct(sg.resultat_net / sg.ca) + ' du chiffre d’affaires' : null }));
+      g.appendChild(kpi({ span: 'pl-c4', label: 'Impôt sur les sociétés', v: eur(sg.is, 0), sous: sg.rcai > 0 ? 'taux effectif ' + pct(sg.is / sg.rcai) + ' sur ' + eurS(sg.rcai, 0) : 'pas de bénéfice imposable' }));
+      g.appendChild(kpi({ span: 'pl-c4', label: 'TVA à ta charge', v: eur(x.tva.cout, 0), sous: 'à reverser ' + eur(x.tva.a_payer, 0) }));
+      g.appendChild(kpi({ span: 'pl-c4', label: 'EBE', v: eurS(sg.ebe, 0), cls: sg.ebe < 0 ? 'pl-neg' : '', sous: sg.ca ? pct(sg.ebe / sg.ca) + ' du CA' : null }));
       /* TVA */
       var tr = F.tvaReelle(S.R);
       var lignesTva = [
@@ -2515,64 +2641,62 @@
       var verdict = !fr.franchise_tolerance ? 'Avec ' + eur(fr.sig.ca) + ' de ventes, tu dépasses 93 500 € : la franchise est impossible, tu es au réel.'
         : (Math.abs(ecartTva) < 1 ? 'Les deux régimes se valent sur ces hypothèses.' : ecartTva > 0 ? 'La franchise te coûte ' + eur(ecartTva) + ' de TVA de moins par an que le réel.' : 'Le réel te coûte ' + eur(-ecartTva) + ' de TVA de moins par an que la franchise : la TVA d’import récupérée compte plus que celle que tu factures.')
           + (fr.franchise_possible ? '' : ' Attention : au-delà de 85 000 € de ventes, la franchise s’arrête l’année suivante.');
-      zone.appendChild(section('TVA : franchise ou réel ?', [
-        h('p', { class: 'pl-big', text: verdict }),
-        compact(tableau([{ t: 'Sur 12 mois', f: function (l) { return l[0]; } }, { t: 'Franchise', f: function (l) { return l[1](fr); } }, { t: 'Réel', f: function (l) { return l[1](re); } }], lignesTva, null, 'Franchise ou réel')),
-        h('p', { class: 'pl-note', text: 'Franchise (CA sous 85 000 €, tolérance 93 500 €) : pas de TVA sur tes ventes, mention « TVA non applicable, art. 293 B du CGI » sur tes factures, mais aucune TVA récupérée, y compris celle de 20 % due à l’import de tes cartes japonaises. ' +
-          'Réel : cartes achetées à des particuliers au régime de la marge (TVA = marge × 20/120, carte par carte, mention « Régime particulier – Biens d’occasion ») ; cartes importées ou achetées à un pro : TVA sur le prix de vente, TVA payée à l’achat récupérée.' }),
-        h('p', { class: 'pl-note', text: 'Sur tes ventes réelles depuis le début, le réel aurait donné ' + eur(tr.collectee) + ' de TVA facturée (' + eur(tr.collectee_marge) + ' sur la marge, ' + eur(tr.collectee_normale) + ' sur le prix des cartes importées)' +
-          (tr.marges_negatives > 0.5 ? ' ; ' + eur(tr.marges_negatives) + ' de marges négatives sans TVA' : '') + ', pour ' + eur(tr.deductible_achats) + ' de TVA d’achat récupérable sur tout ton stock acheté. Provenance : ' + tr.n.import + ' cartes importées, ' + tr.n.particulier + ' de particuliers' + (tr.n.pro ? ', ' + tr.n.pro + ' de pros' : '') + ' (modifiable sur chaque fiche).' })
-      ]));
-      /* choix du régime pour la suite */
-      var chips = h('div', { class: 'pl-chips', role: 'group', 'aria-label': 'Régime de TVA retenu' }, [['franchise', 'En franchise'], ['reel', 'Au réel']].map(function (r) {
-        return h('button', { type: 'button', class: 'chip', 'aria-pressed': String(regime === r[0]), disabled: r[0] === 'franchise' && !fr.franchise_tolerance ? '' : null, text: r[1] + (r[0] === choixAuto ? ' · conseillé' : ''),
+      var hostT = h('div');
+      G.barres(hostT, { lignes: [['TVA à ta charge', function (y) { return y.tva.cout; }], ['Résultat net', function (y) { return y.sig.resultat_net; }], ['Te reste après impôts', function (y) { return y.remuneration.poche; }]]
+        .reduce(function (acc, l) { return acc.concat([{ cle: l[0] + 'f', label: l[0], sous: 'en franchise', v: l[1](fr), txt: eur(l[1](fr), 0), cls: 'g-s1' }, { cle: l[0] + 'r', label: l[0], sous: 'au réel', v: l[1](re), txt: eur(l[1](re), 0), cls: 'g-s2' }]); }, []),
+        signe: false, valeurNom: '', aria: 'Franchise et réel comparés' });
+      g.appendChild(carte({ span: 'pl-c6', titre: 'TVA : franchise ou réel ?', sous: 'sur 12 mois', corps: [h('p', { class: 'pl-big', text: verdict }), G.legende([{ nom: 'En franchise', cls: 'g-s1' }, { nom: 'Au réel', cls: 'g-s2' }]), hostT],
+        table: function () { return compact(tableau([{ t: 'Sur 12 mois', f: function (l) { return l[0]; } }, { t: 'Franchise', f: function (l) { return l[1](fr); } }, { t: 'Réel', f: function (l) { return l[1](re); } }], lignesTva, null, 'Franchise ou réel')); },
+        pied: ['Franchise (CA sous 85 000 €, tolérance 93 500 €) : pas de TVA sur tes ventes (« TVA non applicable, art. 293 B du CGI »), mais aucune TVA récupérée, y compris les 20 % payés à l’import de tes cartes japonaises. ' +
+          'Réel : cartes de particuliers au régime de la marge (TVA = marge × 20/120), cartes importées ou achetées à un pro : TVA sur le prix, TVA d’achat récupérée. ' +
+          'Sur tes ventes réelles, le réel aurait donné ' + eur(tr.collectee) + ' de TVA facturée (' + eur(tr.collectee_marge) + ' sur la marge, ' + eur(tr.collectee_normale) + ' sur le prix des cartes importées) pour ' + eur(tr.deductible_achats) + ' de TVA d’achat récupérable. Provenance : ' + tr.n.import + ' importées, ' + tr.n.particulier + ' de particuliers' + (tr.n.pro ? ', ' + tr.n.pro + ' de pros' : '') + '.'] }));
+      /* compte de résultat */
+      var chips = h('div', { class: 'pl-seg', role: 'group', 'aria-label': 'Régime de TVA retenu' }, [['franchise', 'En franchise'], ['reel', 'Au réel']].map(function (r) {
+        return h('button', { type: 'button', 'aria-pressed': String(regime === r[0]), disabled: r[0] === 'franchise' && !fr.franchise_tolerance ? '' : null, text: r[1] + (r[0] === choixAuto ? ' · conseillé' : ''),
           onclick: function () { fs.regime = r[0]; dessiner(); } });
       }));
-      /* compte de résultat */
       var ca = sg.ca;
       var L = [
-        ['Ventes de marchandises (HT)', sg.ca, 'tot'],
+        ['Ventes de marchandises (HT)', sg.ca, 'total'],
         ['Coût d’achat des marchandises vendues', -sg.achats],
         ['Marge commerciale', sg.marge_commerciale, 'sous'],
-        ['Charges externes (voyages, commissions, envois, abonnements…)', -sg.externes],
+        ['Charges externes', -sg.externes, null, 'voyages, commissions, envois, abonnements…'],
         ['Valeur ajoutée', sg.valeur_ajoutee, 'sous'],
         ['Impôts et taxes (CFE)', -sg.impots],
-        ['Charges de personnel (salaire + cotisations)', -sg.personnel],
-        ['Excédent brut d’exploitation (EBE)', sg.ebe, 'sous'],
+        ['Charges de personnel', -sg.personnel, null, 'salaire + cotisations'],
+        ['Excédent brut d’exploitation', sg.ebe, 'sous'],
         ['Résultat d’exploitation', sg.resultat_exploitation, 'sous'],
         ['Impôt sur les sociétés', -sg.is],
-        ['Résultat net', sg.resultat_net, 'tot']
+        ['Résultat net', sg.resultat_net, 'total']
       ];
-      var tb = h('table', { class: 'pl-table pl-cascade' }, [h('caption', { class: 'sr-only', text: 'Compte de résultat prévisionnel' }),
-        h('thead', null, h('tr', null, [h('th', { scope: 'col', text: 'Soldes intermédiaires de gestion' }), h('th', { scope: 'col', text: 'Montant' }), h('th', { scope: 'col', text: '% du CA' })])),
-        h('tbody', null, L.map(function (l) {
-          return h('tr', { class: l[2] ? 'pl-tot' + (l[2] === 'sous' ? ' pl-tot--sous' : '') : null }, [h('th', { scope: 'row', text: l[0] }),
-            h('td', { class: l[2] && l[1] < -0.005 ? 'pl-neg' : null, text: eur(Math.abs(l[1]) < 0.005 ? 0 : l[1]) }), h('td', { text: ca ? pct(Math.abs(l[1]) < 0.005 ? 0 : l[1] / ca) : '—' })]);
-        }))]);
-      zone.appendChild(section('Compte de résultat prévisionnel', [chips, h('div', { class: 'pl-scroll' }, tb)],
-        'Comptabilité générale : les frais de voyage sont des charges de l’année (compte 6251), pas un coût des cartes comme dans l’onglet Coûts. Capacité d’autofinancement ≈ résultat net (' + eurS(sg.caf) + '), sans amortissement prévu.'));
-      /* IS */
-      zone.appendChild(section('Impôt sur les sociétés', [h('div', { class: 'pl-kpis' }, [
-        tuile('Bénéfice imposable', eurS(sg.rcai)),
-        tuile('Impôt', eur(sg.is), sg.rcai > 0 ? 'taux effectif ' + pct(sg.is / sg.rcai) : 'pas de bénéfice'),
-        tuile('Taux réduit', pct(RG.is_reduit), 'jusqu’à ' + eur(RG.is_plafond) + ' de bénéfice, puis ' + pct(RG.is_normal))
-      ])], 'Taux réduit si le CA est sous 10 M€, le capital entièrement libéré et détenu à 75 % au moins par des personnes physiques (toi).'));
-      /* rémunération */
-      var opt = F.optimiser(H, regime);
-      var courbe = courbePoche(opt, Math.min(m.clientWidth || 360, 760) - 34);
-      zone.appendChild(section('Te payer : salaire ou dividendes', [
-        h('div', { class: 'pl-kpis' }, [
-          tuile('Salaire net', eur(rm.salaire), 'coûte ' + eur(rm.cout_salaire) + ' à la SASU'),
-          tuile('Dividendes', eur(rm.dividendes), rm.dividendes ? 'impôt ' + eur(rm.impot_dividendes) + ' (' + rm.option + ')' : 'rien de distribué'),
-          tuile('Te reste', eur(rm.poche), 'après impôt sur le revenu et dividendes'),
-          tuile('Prélèvements', rm.prelevements != null ? pct(rm.prelevements) : '—', 'du bénéfice avant ta rémunération')
-        ]),
-        courbe ? h('div', { class: 'pl-box pl-matrice-box pl-sec' }, courbe) : null,
-        h('p', { class: 'pl-apercu pl-sec', text: opt.max > 0 ? (opt.meilleur.salaire < 1 ? 'Sur ces hypothèses, c’est sans salaire, tout en dividendes, qu’il te reste le plus : ' + eur(opt.meilleur.poche) + '.'
-          : 'Le salaire qui te laisse le plus : ' + eur(opt.meilleur.salaire) + ' net, soit ' + eur(opt.meilleur.poche) + ' pour toi.') + ' Un salaire ouvre des droits (retraite, santé, indemnités) ; les dividendes n’en ouvrent aucun.' : 'Pas de bénéfice à partager sur ces hypothèses.' }),
-        h('p', { class: 'pl-note', text: 'Dividendes : prélèvement forfaitaire de ' + pct1(RG.pfu) + ' (12,8 % d’impôt + ' + pct1(RG.ps) + ' de prélèvements sociaux) ou barème après abattement de 40 % : le moins cher est retenu. ' +
-          'Réserve légale de ' + eur(rm.reserve) + ' (5 % du bénéfice jusqu’à 10 % du capital). Impôt sur le salaire estimé à ta TMI après l’abattement de 10 %.' })
-      ]));
+      var hostR = h('div');
+      G.cascade(hostR, { etapes: L.map(function (l) { return { label: l[0], v: l[1], type: l[2] || 'delta', note: l[3] }; }), base: ca || null, fmt: function (v) { return eur(v, 0); }, aria: 'Compte de résultat prévisionnel' });
+      g.appendChild(carte({ span: 'pl-c6', titre: 'Compte de résultat prévisionnel', sous: 'soldes intermédiaires de gestion · régime retenu :', actions: [], corps: [chips, hostR],
+        table: function () {
+          var tb = h('table', { class: 'pl-table pl-cascade' }, [h('caption', { class: 'sr-only', text: 'Compte de résultat prévisionnel' }),
+            h('thead', null, h('tr', null, [h('th', { scope: 'col', text: 'Soldes intermédiaires de gestion' }), h('th', { scope: 'col', text: 'Montant' }), h('th', { scope: 'col', text: '% du CA' })])),
+            h('tbody', null, L.map(function (l) {
+              return h('tr', { class: l[2] ? 'pl-tot' + (l[2] === 'sous' ? ' pl-tot--sous' : '') : null }, [h('th', { scope: 'row', text: l[0] }),
+                h('td', { class: l[2] && l[1] < -0.005 ? 'pl-neg' : null, text: eur(Math.abs(l[1]) < 0.005 ? 0 : l[1]) }), h('td', { text: ca ? pct(Math.abs(l[1]) < 0.005 ? 0 : l[1] / ca) : '—' })]);
+            }))]);
+          return h('div', { class: 'pl-scroll' }, tb);
+        },
+        pied: ['Comptabilité générale : les frais de voyage sont des charges de l’année (compte 6251), pas un coût des cartes comme dans l’onglet Coûts. Capacité d’autofinancement ≈ résultat net (' + eurS(sg.caf) + '), sans amortissement prévu. IS : ' + pct(RG.is_reduit) + ' jusqu’à ' + eur(RG.is_plafond) + ' de bénéfice, puis ' + pct(RG.is_normal) + ' (CA sous 10 M€, capital libéré, détenu à 75 % au moins par des personnes physiques).'] }));
+      /* rémunération : salaire ou dividendes */
+      var opt = F.optimiser(H, regime), hostP = h('div');
+      if (opt.pas.length && opt.max > 0) G.courbe(hostP, { type: 'num', x: opt.pas.map(function (p) { return p.salaire; }), series: [{ nom: 'Te reste après impôts', cls: 'g-s1', valeurs: opt.pas.map(function (p) { return p.poche; }), aire: true }],
+        points: [{ x: opt.meilleur.salaire, y: opt.meilleur.poche, label: 'Maximum : ' + eur(opt.meilleur.poche, 0) }], hauteur: 230, fmt: function (v) { return eur(v, 0); },
+        fmtX: function (v) { return G.eurAxe(opt.max)(v); }, fmtTitre: function (v) { return 'Salaire net de ' + eur(v, 0) + ' sur l’année'; }, finLabel: false,
+        aria: 'Ce qui te reste selon le salaire versé ; le maximum est indiqué.' });
+      g.appendChild(carte({ span: 'pl-c7', titre: 'Te payer : salaire ou dividendes', sous: 'ce qui te reste selon le salaire versé dans l’année',
+        corps: [h('div', { class: 'pl-kpis pl-kpis--3' }, [
+          tuile('Salaire net', eur(rm.salaire, 0), 'coûte ' + eur(rm.cout_salaire, 0) + ' à la SASU'),
+          tuile('Dividendes', eur(rm.dividendes, 0), rm.dividendes ? 'impôt ' + eur(rm.impot_dividendes, 0) + ' (' + rm.option + ')' : 'rien de distribué'),
+          tuile('Te reste', eur(rm.poche, 0), 'après impôt sur le revenu')
+        ]), opt.pas.length && opt.max > 0 ? hostP : null,
+        h('p', { class: 'pl-apercu', text: opt.max > 0 ? (opt.meilleur.salaire < 1 ? 'Sur ces hypothèses, c’est sans salaire, tout en dividendes, qu’il te reste le plus : ' + eur(opt.meilleur.poche) + '.'
+          : 'Le salaire qui te laisse le plus : ' + eur(opt.meilleur.salaire) + ' net, soit ' + eur(opt.meilleur.poche) + ' pour toi.') + ' Un salaire ouvre des droits (retraite, santé, indemnités) ; les dividendes n’en ouvrent aucun.' : 'Pas de bénéfice à partager sur ces hypothèses.' })],
+        pied: ['Dividendes : prélèvement forfaitaire de ' + pct1(RG.pfu) + ' (12,8 % d’impôt + ' + pct1(RG.ps) + ' de prélèvements sociaux) ou barème après abattement de 40 % : le moins cher est retenu. Réserve légale de ' + eur(rm.reserve) + ' (5 % du bénéfice jusqu’à 10 % du capital). Impôt sur le salaire estimé à ta TMI après l’abattement de 10 %.'] }));
       /* ratios */
       var ra = F.ratios(S.R, X), lr = [
         ['Taux de marge', ra.taux_marge != null ? pct(ra.taux_marge) : '—', 'marge commerciale ÷ coût d’achat'],
@@ -2586,12 +2710,12 @@
         ['Rentabilité de l’investissement', ra.roi != null ? pct(ra.roi) : '—', 'résultat analytique ÷ achats réels'],
         ['EBE ÷ CA (prévisionnel)', ca ? pct(sg.ebe / ca) : '—', 'au régime retenu ci-dessus']
       ];
-      zone.appendChild(section('Ratios de gestion', [tableau([
+      g.appendChild(carte({ span: 'pl-c5', titre: 'Ratios de gestion', sous: 'activité réelle depuis le début (' + nbr(ra.duree) + ' jours), sauf la dernière ligne', corps: [tableau([
         { t: 'Ratio', f: function (l) { return h('span', null, [l[0], h('small', { class: 'pl-t-note', text: l[2] })]); } },
         { t: 'Valeur', f: function (l) { return l[1]; } }
-      ], lr, null, 'Ratios de gestion')], 'Sur ton activité réelle depuis le début (' + nbr(ra.duree) + ' jours), sauf la dernière ligne.'));
-      zone.appendChild(section('Sources', [h('ul', { class: 'pl-sources' }, SOURCES_SASU.map(function (s) { return h('li', null, h('a', { href: s[1], target: '_blank', rel: 'noopener', text: s[0] + ' ↗' })); }))],
-        'Taux de cotisations du président et option barème des dividendes : estimations à confirmer avec ton expert-comptable.'));
+      ], lr, null, 'Ratios de gestion')] }));
+      g.appendChild(carte({ span: 'pl-c12', titre: 'Sources', sous: 'taux de cotisations du président et option barème des dividendes : estimations à confirmer avec ton expert-comptable',
+        corps: [h('ul', { class: 'pl-sources' }, SOURCES_SASU.map(function (s2) { return h('li', null, h('a', { href: s2[1], target: '_blank', rel: 'noopener', text: s2[0] + ' ↗' })); }))] }));
     }
     dessiner();
   };
