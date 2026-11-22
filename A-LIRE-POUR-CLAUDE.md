@@ -408,6 +408,10 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   du voyage rattaché sert d'achat ; sans rien, délai de 7 jours compté mais vente « sans date » dans le temps.
   **`c.vente_date` n'est jamais écrit par la règle** : les moteurs lisent `r.date_vente` (retenue), `r.vente_estimee`,
   `r.mise_en_vente`, `r.delai_vente`, `r.delai_estime` ; affichage « vers le » / « ≈ ». Une vraie date saisie l'emporte.
+- Vente annoncée par Arthur (Claude n'a pas la clé, donc pas accès à la compta D1) : 1) inscrire la réf dans
+  `config.js` › `vendues` et avancer `vendues_le` (site) ; 2) lui donner le lien
+  `https://pokeraichu.com/pilotage.html#vendre/REF?prix=50&canal=Vinted&date=AAAA-MM-JJ` : fiche de la carte + feuille
+  de vente préremplie, il n'a qu'à toucher « Enregistrer » (canal = un des `CANAUX`). Jamais le prix dans le dépôt.
 - Frais de vente par canal (22/11, `params.frais_canal`, Réglages › Frais de vente par canal) : taux propre au canal
   pour les cartes vendues dessus (Vinted 0 % par défaut : l'acheteur paie la protection), vide = taux général ;
   stock et scellé gardent le taux général. Seul écart voulu avec les règles de l'Excel. La feuille de vente montre

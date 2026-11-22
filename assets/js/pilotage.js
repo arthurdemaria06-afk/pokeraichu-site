@@ -1144,6 +1144,20 @@
     if (a.mode === 'eur') return ['Payé ' + eur(a.eur, 2) + (a.formule ? ' (calcul de l’Excel : ' + a.formule.replace(/^=/, '') + ')' : '')];
     return ['Pas de prix d’achat : coût estimé = ' + (c.vendu ? 'prix de vente' : 'prix marché') + ' ÷ ' + NF2.format(1 + P.tva + P.rent) + ' = ' + eur(r.estime, 2) + ' (rentabilité retenue de ' + pct(P.rent) + ', réglable dans Réglages).'];
   }
+  /* lien de vente préremplie (donné par Claude quand Arthur annonce une vente) :
+     pilotage.html#vendre/REF?prix=50&canal=Vinted&date=2026-11-22 → fiche de la carte + feuille de vente remplie, un bouton à toucher */
+  VUES.vendre = function (m, arg) {
+    var ref = String(arg || '').split('?')[0], qs = {};
+    String(arg || '').split('?')[1] && String(arg).split('?')[1].split('&').forEach(function (kv) { var j = kv.indexOf('='); if (j > 0) qs[kv.slice(0, j)] = kv.slice(j + 1); });
+    var r = S.R.parRef[ref];
+    try { history.replaceState(null, '', '#carte/' + encodeURIComponent(ref)); } catch (e) {}
+    S.vue = 'carte'; S.arg = ref;
+    VUES.carte(m, ref);
+    if (!r) return;
+    if (r.c.vendu) { setTimeout(function () { toast('Déjà enregistrée : cette carte est vendue.'); }, 0); return; }
+    var prix = lireNombre(qs.prix || '').v, canal = CANAUX.indexOf(qs.canal) !== -1 ? qs.canal : null, date = /^\d{4}-\d{2}-\d{2}$/.test(qs.date || '') ? qs.date : null;
+    setTimeout(function () { feuilleVente(ref, { prix: vide(prix) ? null : prix, canal: canal, date: date }); }, 0);
+  };
   VUES.carte = function (m, ref) {
     var r = S.R.parRef[ref], P = S.R.params;
     m.appendChild(retour('#stock', 'Retour'));
@@ -1215,7 +1229,7 @@
       { k: 'date', label: 'Date', type: 'date', demi: true },
       { k: 'canal', label: 'Vendue où ?', type: 'select', options: [['', '—']].concat(CANAUX.map(function (x) { return [x, x]; })) },
       { k: 'note', label: 'Note (facultatif)', type: 'text', ph: 'Acheteur, remise, lot…' }
-    ], { prix: opts && opts.prix != null ? opts.prix : c.prix, date: aujourdhui(), canal: lire(CLE_CANAL) || '' });
+    ], { prix: opts && opts.prix != null ? opts.prix : c.prix, date: (opts && opts.date) || aujourdhui(), canal: opts && opts.canal != null ? opts.canal : (lire(CLE_CANAL) || '') });
     var apercu = h('p', { class: 'pl-apercu', 'aria-live': 'polite' });
     var caseSite = null;
     if (sref && GIST && es !== 'vendue') { caseSite = h('input', { type: 'checkbox' }); caseSite.checked = true; }
