@@ -85,11 +85,21 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
     gardés dans le `localStorage`. Rien n'est envoyé aux plateformes (Vinted interdit l'automatisation).
     - **Titre eBay en français + anglais** (`titreEbay`, 22/11) : nom FR / nom EN, numéro, note PSA, langue en anglais
       d'abord, puis code et nom anglais de l'extension, rareté, « Pokémon », langue en français, état, tant que ça tient
-      dans 80 caractères (priorités, puis ordre de lecture). Vinted et Leboncoin gardent le titre français (`titre`).
-    - **Cadre Poké-Raichu sur les photos enregistrées** (22/11) : bandeau ajouté sous la photo (rien ne cache la carte),
-      logo `assets/img/logo-photo.png` dans le coin, « SITE WEB pokeraichu.com ». Les photos du site ne changent pas.
-      Case décochée par défaut sur l'onglet eBay (le règlement « Picture policy » d'eBay interdit texte, logo et
-      filigrane sur les photos), cochée ailleurs ; choix gardé par plateforme (`pr.annonce.cadre`).
+      dans 80 caractères (priorités, puis ordre de lecture). **L'anglais est réservé à eBay** (règle d'Arthur) :
+      Vinted et Leboncoin ont titre et description 100 % en français, extension sous son nom français (`extFr` :
+      `nom_fr`, sinon `nom` pour les sets japonais sans équivalent). La description eBay ajoute un bloc « — English — »
+      (nom anglais, set, rareté, état, envoi) avant la réf.
+    - **Titres eBay français + anglais** (section repliable de la page Gestion, `outils.js`) : une ligne par annonce eBay
+      à renommer (cartes cochées « Annonce postée sur eBay » sur l'appareil, sinon toutes les cartes en vente), nouveau
+      titre, « Copier », case « Titre changé sur eBay » gardée tant que le titre ne change pas (`pr.annonce.titres`).
+      Claude n'a pas accès au compte eBay : le renommage se fait à la main, annonce par annonce.
+    - **Photos** (22/11, deuxième version) : **Leboncoin** = photo rendue carrée, carte décalée à gauche, fond prolongé
+      à partir des bords de la photo (ou fond flou voilé de papier si la carte touche les bords), et un **sceau** rond
+      dans l'espace libre à droite (logo `assets/img/logo-photo.png`, « POKÉ-RAICHU » en arc, éclairs, ruban
+      « pokeraichu.com ») placé pour rester visible dans la vignette, même recadrée en 4:3. Case cochée par défaut
+      (`pr.annonce.tampon`). **eBay et Vinted = photos d'origine**, sans case : ils refusent logo et texte sur les
+      photos (règlement « Picture policy » d'eBay ; Vinted, d'après Arthur). L'ancien bandeau sous la photo ne se voyait
+      qu'en plein écran : abandonné. Les photos du site ne changent pas.
   - **Bouton « Modifier »** (`assets/js/modif.js`) : change le **nom** (FR et EN), l'**état** d'une carte non gradée
     (ou le n° de certificat d'un slab) et les **Pokémon** d'une fiche déjà en ligne. Un seul fichier est commité :
     `_ajouts/modifs.json` (`{"modifs": {"<réf>": {nom_fr, nom_en, etat | cert, pokemons, pokemons_en, le}}}`), puis
@@ -221,6 +231,8 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Annonces : anglais seulement sur eBay (titre + bloc « English »), section « Titres eBay français + anglais »
+  pour renommer les annonces en ligne, sceau Poké-Raichu sur les photos Leboncoin (photos d'origine pour eBay et Vinted).
 - (22/11) Pilotage et Gestion en allemand : bouton FR | DE (`langue.js` + `langue-de.js`), voir § Pilotage › Langue allemande.
 - (22/11) Pilotage : frais de vente par canal (Vinted 0 %).
 - (22/11) Pilotage : dates de vente (chrono à partir du 22/11/2026, ventes passées sans date à l'achat + 7 j) ;

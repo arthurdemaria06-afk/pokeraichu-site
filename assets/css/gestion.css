@@ -88,6 +88,18 @@ p.annonce__val{font-weight:600}
 .annonce__cadre{font-size:.9rem;line-height:1.35}
 .annonce__regle{margin-top:-4px!important}
 .annonce__save{justify-self:start}
+.annonce__strip img.is-carre{width:84px;height:84px;min-height:0}
+/* titres eBay français + anglais : une ligne par annonce à renommer */
+.titres-ebay{display:grid;margin:10px 0 0;padding:0;list-style:none}
+.titre-ebay{display:grid;gap:8px;padding:14px 0;border-top:1px solid var(--line)}
+.titre-ebay p{margin:0}
+.titre-ebay__tete{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px}
+.titre-ebay__nom{font-weight:600}
+.titre-ebay__ref{font-size:.82rem;color:var(--nezumi);font-variant-numeric:tabular-nums}
+.titre-ebay__act{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px}
+.titre-ebay__act .annonce__copy{margin-left:0}
+.titre-ebay__act .check{font-size:.92rem}
+.titre-ebay.is-fait .annonce__val{opacity:.55}
 
 /* modification d'une fiche déjà en ligne */
 .modif-btn{min-height:40px;padding:0 16px;font-size:.88rem}

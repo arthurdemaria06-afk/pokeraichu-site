@@ -380,7 +380,7 @@
           ab.setAttribute('aria-expanded', String(anOpen === c.ref));
           ab.addEventListener('click', function () { anOpen = anOpen === c.ref ? null : c.ref; render(); });
           ctrl.appendChild(ab);
-          if (anOpen === c.ref) li.appendChild(AN.panel(c, c.prix_eur === null || c.prix_eur === undefined ? null : (lp !== null ? lp : c.prix_eur), render));
+          if (anOpen === c.ref) li.appendChild(AN.panel(c, c.prix_eur === null || c.prix_eur === undefined ? null : (lp !== null ? lp : c.prix_eur), function () { render(); titresEbay(); }));
         }
         if (MO) {
           var mb = el('button', 'btn btn--ghost modif-btn', moOpen === c.ref ? 'Fermer la modification' : 'Modifier');
@@ -402,6 +402,70 @@
       count.textContent = state.reservees.length + ' réservée(s) · ' + state.vendues.length + ' vendue(s) · ' + nPx +
         ' prix changé(s) en direct' + (t ? '' : ' · tapez une référence ou un nom pour trouver une carte');
     }
+    /* titres eBay français + anglais (demande d'Arthur, 22/11/2026) : les annonces eBay à renommer, une ligne par carte
+       avec son nouveau titre et « Copier ». Cartes cochées « Annonce postée sur eBay » sur cet appareil, sinon toutes les
+       cartes en vente. « Titre changé sur eBay » reste coché tant que le titre ne bouge pas (pr.annonce.titres). */
+    var TE = d.querySelector('[data-titres-ebay]');
+    function faitsEbay() { try { return JSON.parse(localStorage.getItem('pr.annonce.titres') || '{}') || {}; } catch (e) { return {}; } }
+    function listeEbay() {
+      var enVente = cards.filter(function (c) { return statusOf(c.ref) !== 'vendue'; });
+      var postees = enVente.filter(function (c) { return AN.ou(c.ref).indexOf('eBay') !== -1; });
+      return { liste: postees.length ? postees : enVente, postees: postees.length };
+    }
+    function compteEbay() {
+      var f = faitsEbay(), L = listeEbay().liste;
+      var reste = L.filter(function (c) { return f[c.ref] !== AN.titreEbay(c, 80); }).length;
+      TE.querySelector('[data-titres-ebay-n]').textContent = ' · ' + (reste ? reste + ' à changer' : 'tous à jour');
+    }
+    function titresEbay() {
+      if (!TE || !AN || !AN.titreEbay || !loaded) return;
+      compteEbay();
+      if (!TE.open) return;
+      var body = TE.querySelector('[data-titres-ebay-body]'), L = listeEbay(), f = faitsEbay();
+      body.textContent = '';
+      body.appendChild(el('p', 'muted small', (L.postees
+        ? L.postees + ' carte(s) cochée(s) « Annonce postée sur eBay » sur cet appareil.'
+        : 'Aucune carte cochée « Annonce postée sur eBay » sur cet appareil : toutes les cartes en vente.') +
+        ' Dans eBay : Modifier l’annonce › Titre, collez, enregistrez, puis cochez la ligne ici.'));
+      var ul = el('ul', 'titres-ebay');
+      ul.setAttribute('role', 'list');
+      L.liste.forEach(function (c) {
+        var t = AN.titreEbay(c, 80), fait = f[c.ref] === t;
+        var li = el('li', 'titre-ebay' + (fait ? ' is-fait' : ''));
+        var tete = el('p', 'titre-ebay__tete');
+        var nom = el('span', 'titre-ebay__nom', label(c));
+        nom.setAttribute('translate', 'no');
+        tete.appendChild(nom);
+        tete.appendChild(el('span', 'titre-ebay__ref', 'Réf. ' + c.ref + ' · ' + t.length + ' / 80'));
+        li.appendChild(tete);
+        var val = el('p', 'annonce__val', t);
+        val.setAttribute('translate', 'no');
+        li.appendChild(val);
+        var act = el('div', 'titre-ebay__act');
+        var cp = el('button', 'annonce__copy', 'Copier');
+        cp.type = 'button';
+        cp.addEventListener('click', function () { AN.copier(t, cp); });
+        act.appendChild(cp);
+        var lab = el('label', 'check');
+        var cb = el('input');
+        cb.type = 'checkbox';
+        cb.checked = fait;
+        cb.addEventListener('change', function () {
+          var g = faitsEbay();
+          if (cb.checked) g[c.ref] = t; else delete g[c.ref];
+          try { localStorage.setItem('pr.annonce.titres', JSON.stringify(g)); } catch (e) {}
+          li.classList.toggle('is-fait', cb.checked);
+          compteEbay();
+        });
+        lab.appendChild(cb);
+        lab.appendChild(d.createTextNode(' Titre changé sur eBay'));
+        act.appendChild(lab);
+        li.appendChild(act);
+        ul.appendChild(li);
+      });
+      body.appendChild(ul);
+    }
+    if (TE) TE.addEventListener('toggle', titresEbay);
     function load() {
       Promise.all([loadStock(G.getAttribute('data-stock')), readStatus(), loadEbay()]).then(function (r) {
         cards = r[0].cartes.slice().sort(function (a, b) { return (parseInt(a.ref, 10) || 1e6) - (parseInt(b.ref, 10) || 1e6) || a.ref.localeCompare(b.ref); });
@@ -418,6 +482,7 @@
         });
         loaded = true;
         render();
+        titresEbay();
       }).catch(function (e) { setInfo('Lecture impossible (' + e.message + ').'); });
     }
     q.addEventListener('input', render);
