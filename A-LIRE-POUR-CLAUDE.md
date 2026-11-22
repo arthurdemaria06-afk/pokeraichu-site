@@ -231,6 +231,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Pilotage › Stock : le scellé compté avec les cartes (tuiles, liste, tableau).
 - (22/11) Annonces : anglais seulement sur eBay (titre + bloc « English »), section « Titres eBay français + anglais »
   pour renommer les annonces en ligne, sceau Poké-Raichu sur les photos Leboncoin (photos d'origine pour eBay et Vinted).
 - (22/11) Pilotage et Gestion en allemand : bouton FR | DE (`langue.js` + `langue-de.js`), voir § Pilotage › Langue allemande.
@@ -438,6 +439,11 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   carte #1A1A19 ; `pilotage.html` a `color-scheme` et deux `theme-color` (clair/sombre).
 - Test sans données réelles : banc local hors dépôt (données fictives tirées du stock public, API simulée, CSP du site,
   captures Playwright iPad 1376 px / portrait / Split View / iPhone, clair et sombre). Ne jamais mettre ces données dans le dépôt.
+- **Scellé dans le Stock (22/11, demande d'Arthur)** : la vue Stock compte le scellé comme les cartes. En-tête
+  « N cartes et M produits scellés en stock » ; tuiles Valeur marché, Coût et Plus-value = cartes + scellé (détail
+  « cartes … · scellé … » en sous-titre) ; liste : groupe « Scellé » (`ligneProduit`, touche → Plus › Scellé) puis
+  « Cartes » ; en Tableau, un tableau Scellé au-dessus de celui des cartes. Le scellé sort dès qu'un filtre propre aux
+  cartes est mis (groupe, catégorie, langue, À compléter, Vendues) ; la recherche le garde s'il correspond.
 - **Langue allemande (22/11, demande d'Arthur pour sa compagne, allemande et expert-comptable)** : bouton FR | DE dans
   la barre du haut du Pilotage et en haut à droite de l'en-tête de la page Gestion (l'en-tête du site garde son FR | EN
   public). Choix mémorisé par appareil (`localStorage` `pr.langue`) ; la page se recharge au changement. En FR, rien ne

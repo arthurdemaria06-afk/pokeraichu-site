@@ -1048,8 +1048,10 @@
   }
   VUES.stock = function (m) {
     var R = S.R, f = S.f, limite = 120;
-    var scelle = R.produits.reduce(function (a, x) { return a + (x.reste > 0 ? z(x.stock_valeur) : 0); }, 0);
-    m.appendChild(entete('Stock', nbr(R.stock.cartes) + ' cartes en stock' + (scelle >= 0.5 ? ' · scellé à part : ' + eur(scelle, 0) + ' (Plus › Scellé)' : ''),
+    /* le scellé (card sets, displays, boosters) est dans le stock comme les cartes : tuiles, liste et tableau
+       (demande d'Arthur, 22/11/2026) ; il sort dès qu'un filtre de carte (groupe, catégorie, langue, À compléter) est mis */
+    var nScel = R.produits.reduce(function (a, x) { return a + (x.reste > 0 ? x.reste : 0); }, 0);
+    m.appendChild(entete('Stock', nbr(R.stock.cartes) + ' carte' + pl(R.stock.cartes) + (nScel ? ' et ' + nbr(nScel) + ' produit' + pl(nScel) + ' scellé' + pl(nScel) : '') + ' en stock',
       [h('button', { type: 'button', class: 'btn pl-btn-s', onclick: function () { feuilleCarte(null); }, text: '+ Ajouter' })]));
     var champ = h('input', { class: 'input', type: 'search', placeholder: 'Nom, n°, set, nom japonais…', 'aria-label': 'Chercher une carte',
       autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'search', 'data-focus': 'q' });
@@ -1085,23 +1087,53 @@
     m.appendChild(aideM); m.appendChild(tuiles); m.appendChild(h('div', { class: 'pl-stock-barre' }, [resume, segV])); m.appendChild(liste); m.appendChild(plus);
     var auj = PB ? PB.jour(aujourdhui()) : null;
     function age(r) { return r.mise_en_vente && auj != null ? Math.max(0, auj - PB.jour(r.mise_en_vente)) : null; }
+    function produitsFiltres() {
+      if (f.statut === 'vendues' || f.manque || f.groupe || f.cat || f.langue) return [];
+      var mots = norm(f.q).trim().split(/\s+/).filter(Boolean);
+      return R.produits.filter(function (x) {
+        if (!(x.reste > 0)) return false;
+        var t = norm([x.p.nom, x.p.libelle, 'scellé'].join(' '));
+        for (var i = 0; i < mots.length; i++) if (t.indexOf(mots[i]) === -1) return false;
+        return true;
+      }).sort(function (a, b) { return z(b.stock_valeur) - z(a.stock_valeur); });
+    }
     function maj() {
       var l = trier(cartesFiltrees(), f.tri), val = 0, cout = 0, coutV = 0, np = 0, lat = 0, enc = 0, net = 0, nv = 0, ns = 0, sa = 0, na = 0;
       l.forEach(function (r) { if (r.c.vendu) { nv++; enc += z(r.encaisse); net += r.vente ? r.vente.net : 0; } else { ns++; val += z(r.c.prix); cout += z(r.cout); lat += z(r.latent); if (!vide(r.c.prix)) { np++; coutV += z(r.cout); } var a0 = age(r); if (a0 != null) { sa += a0; na++; } } });
+      var prods = produitsFiltres(), valS = 0, coutS = 0, latS = 0, nS = 0;
+      prods.forEach(function (x) { valS += z(x.stock_valeur); coutS += z(x.stock_reel) + z(x.stock_estime); latS += z(x.latent); nS += x.reste; });
       aideM.hidden = !f.manque;
       if (f.manque) {
         aideM.textContent = l.length ? 'À compléter : ' + nbr(l.length) + ' carte' + pl(l.length) + ' sans prix de vente. Tant qu’elle' + (l.length > 1 ? 's n’en ont' : ' n’en a') + ' pas, ' + (l.length > 1 ? 'elles ne comptent' : 'elle ne compte') + ' pas dans la valeur du stock : ouvre la carte › Modifier › Prix marché.'
           : 'À compléter : toutes tes cartes ont un prix de vente.';
       }
       tuiles.textContent = '';
-      if (f.statut !== 'vendues') ajouter(tuiles, [tuile('Valeur marché', np ? eur(val, 0) : '—', nbr(ns) + ' en stock' + (np < ns ? ', ' + nbr(ns - np) + ' sans prix' : '')), tuile('Coût', eur(cout, 0), 'prix d’achat (ou estimé)'),
-        tuile('Plus-value', np ? eurS(lat, 0) : '—', np ? (coutV ? pct(lat / coutV) + ' du coût, frais de vente déduits' : 'frais de vente déduits') : 'sans prix de vente', lat < -0.5 ? 'pl-neg' : ''), f.statut === 'toutes' ? tuile('Vendues', nbr(nv), eur(enc, 0) + ' encaissés') : tuile('En vente depuis', na ? nbr(Math.round(sa / na)) + ' j' : '—', 'moyenne · chrono lancé le ' + dateFR(R.dates_ventes ? R.dates_ventes.debut : aujourdhui()))]);
+      var sansPx = np < ns ? nbr(ns - np) + ' sans prix' : '';
+      if (f.statut !== 'vendues') ajouter(tuiles, [
+        tuile('Valeur marché', np || nS ? eur(val + valS, 0) : '—', nS ? 'cartes ' + eur(val, 0) + ' · scellé ' + eur(valS, 0) + (sansPx ? ' · ' + sansPx : '') : nbr(ns) + ' en stock' + (sansPx ? ', ' + sansPx : '')),
+        tuile('Coût', eur(cout + coutS, 0), nS ? 'cartes ' + eur(cout, 0) + ' · scellé ' + eur(coutS, 0) : 'prix d’achat (ou estimé)'),
+        tuile('Plus-value', np || nS ? eurS(lat + latS, 0) : '—', np || nS ? (coutV + coutS ? pct((lat + latS) / (coutV + coutS)) + ' du coût, frais de vente déduits' : 'frais de vente déduits') : 'sans prix de vente', lat + latS < -0.5 ? 'pl-neg' : ''),
+        f.statut === 'toutes' ? tuile('Vendues', nbr(nv), eur(enc, 0) + ' encaissés') : tuile('En vente depuis', na ? nbr(Math.round(sa / na)) + ' j' : '—', 'moyenne des cartes · chrono lancé le ' + dateFR(R.dates_ventes ? R.dates_ventes.debut : aujourdhui()))]);
       else ajouter(tuiles, [tuile('Vendues', nbr(nv)), tuile('Encaissé', eur(enc, 0)), tuile('Bénéfice', eurS(net, 0), enc ? pct(net / enc) + ' du prix de vente' : null, net < -0.5 ? 'pl-neg' : ''), tuile('Panier moyen', nv ? eur(enc / nv) : '—')]);
-      resume.textContent = nbr(l.length) + ' carte' + pl(l.length) + (l.length > limite ? ' · ' + nbr(limite) + ' affichées' : '');
+      resume.textContent = nbr(l.length) + ' carte' + pl(l.length) + (prods.length ? ' · ' + nbr(prods.length) + ' produit' + pl(prods.length) + ' scellé' + pl(prods.length) : '') + (l.length > limite ? ' · ' + nbr(limite) + ' affichées' : '');
       liste.textContent = '';
-      liste.hidden = !l.length;
+      liste.hidden = !l.length && !prods.length;
       var vis = l.slice(0, limite);
-      if (vue === 'tableau') {
+      if (prods.length) {
+        liste.appendChild(h('p', { class: 'pl-stock-groupe' }, [h('span', { text: 'Scellé' }), h('span', { text: nbr(nS) + ' en stock · ' + eur(valS, 0) })]));
+        if (vue === 'tableau') liste.appendChild(compact(tableau([
+          { t: 'Produit', f: function (x) { return x.p.nom || x.p.libelle; }, v: function (x) { return x.p.nom || ''; } },
+          { t: 'En stock', f: function (x) { return nbr(x.reste) + ' / ' + nbr(x.nb); }, v: function (x) { return x.reste; } },
+          { t: 'Prix unitaire', f: function (x) { return eur(x.prix_u, 2); }, v: function (x) { return x.prix_u; } },
+          { t: 'Valeur', f: function (x) { return eur(x.stock_valeur, 0); }, v: function (x) { return x.stock_valeur; } },
+          { t: 'Coût', f: function (x) { return eur(z(x.stock_reel) + z(x.stock_estime), 0); }, v: function (x) { return z(x.stock_reel) + z(x.stock_estime); } },
+          { t: 'Plus-value', f: function (x) { return eurS(x.latent, 0); }, v: function (x) { return x.latent; }, barre: true, cls: function (x) { return neg(x.latent); } }
+        ], prods, null, 'Scellé', { cle: 'stock-scelle' })));
+        else liste.appendChild(h('ul', { class: 'pl-rows' }, prods.map(ligneProduit)));
+        if (l.length) liste.appendChild(h('p', { class: 'pl-stock-groupe' }, [h('span', { text: 'Cartes' }), h('span', { text: f.statut === 'vendues' ? '' : nbr(ns) + ' en stock · ' + eur(val, 0) })]));
+      }
+      if (!l.length) { /* rien d'autre à montrer */ }
+      else if (vue === 'tableau') {
         var cols = [{ t: 'Carte', f: function (r) { return celluleCarte(r, sansDoublons(['N° ' + r.c.ref, nomGroupe(r.c.groupe), r.c.cat, r.c.langue]).join(' · ')); }, v: function (r) { return r.c.nom || r.ref; } }];
         if (f.statut === 'vendues') cols = cols.concat([
           { t: 'Vendue', f: function (r) { return dateVenteCourte(r); }, v: function (r) { return r.date_vente || ''; } },
@@ -1126,6 +1158,17 @@
     S.majListe = maj;
     maj();
   };
+  /* un produit scellé dans la liste du stock : quantité restante, valeur, plus-value ; touche → Plus › Scellé */
+  function ligneProduit(x) {
+    var cs = z(x.stock_reel) + z(x.stock_estime), nums = [h('span', { class: 'pl-row__prix', text: eur(x.stock_valeur, 0) })];
+    if (!vide(x.latent)) nums.push(h('span', { class: 'pl-row__m ' + sens(x.latent), text: fleche(x.latent) + eurS(x.latent, 0) + (cs ? ' · ' + pct(x.latent / cs) : '') }));
+    var meta = ['Scellé', nbr(x.reste) + ' en stock sur ' + nbr(x.nb), eur(x.prix_u, 2) + ' l’unité'];
+    return h('li', null, h('a', { class: 'pl-row', href: '#scelle' }, [
+      h('span', { class: 'pl-row__img pl-row__img--scelle', 'aria-hidden': 'true' }, h('b', { text: '×' + nbr(x.reste) })),
+      h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: x.p.nom || x.p.libelle }), h('span', { class: 'pl-row__meta', text: meta.join(' · ') })]),
+      h('span', { class: 'pl-row__nums' }, nums)
+    ]));
+  }
 
   /* ---------------------------------------------------------------- fiche d'une carte */
   function decrireAchat(r) {

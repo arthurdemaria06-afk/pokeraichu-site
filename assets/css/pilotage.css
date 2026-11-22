@@ -226,6 +226,11 @@ a.pl-row:hover,.pl-row--btn:hover{background:var(--pl-carte-2)}
 .pl-row--sans{grid-template-columns:minmax(0,1fr) auto}
 .pl-row__img{display:flex;align-items:center;justify-content:center;width:40px;height:56px;overflow:hidden;background:var(--pl-neutre);border-radius:4px}
 .pl-row__img img{display:block;width:100%;height:100%;object-fit:contain}
+.pl-row__img--scelle b{font:600 .8rem/1 var(--text);color:var(--pl-encre-2);font-variant-numeric:tabular-nums}
+/* stock : groupes « Scellé » puis « Cartes » dans la liste */
+.pl-stock-groupe{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:16px 2px 8px;font:600 .84rem/1.3 var(--text);color:var(--pl-encre-2)}
+.pl-stock-groupe:first-child{margin-top:4px}
+.pl-stock-groupe span + span{font-weight:500;color:var(--pl-encre-3);font-variant-numeric:tabular-nums}
 .pl-row__img b{font:600 .66rem/1 var(--text);color:var(--pl-encre-3)}
 .pl-row__main{min-width:0}
 .pl-row__nom{display:block;font-weight:600;font-size:.92rem;line-height:1.3;overflow-wrap:anywhere}
@@ -575,7 +580,8 @@ a.pl-ibtn{text-decoration:none}
 .pl-kpis--stock .pl-kpi__v{font-size:1.2rem}
 .pl-stock-aide{margin:0 0 12px}
 .pl-stock-barre{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
-.pl-stock-barre .pl-resume{margin:0}
+.pl-stock-barre .pl-resume{flex:1;min-width:0;margin:0}
+.pl-stock-barre .pl-seg{flex:none}
 .pl-stock-liste .pl-scroll{max-height:none}
 
 /* vue « Tableau » d'un graphique */
