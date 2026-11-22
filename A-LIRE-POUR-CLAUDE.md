@@ -221,6 +221,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Pilotage : frais de vente par canal (Vinted 0 %).
 - (22/11) Pilotage : dates de vente (chrono à partir du 22/11/2026, ventes passées sans date à l'achat + 7 j) ;
   « À compléter » = cartes sans prix de vente seulement.
 - (22/11) Pilotage : mode sombre automatique (suit le réglage de l'iPad ou de l'iPhone).
@@ -407,6 +408,10 @@ Premier import : POKE-RAICHU-VF.xlsx du 19/11/2026 (aucun chiffre de gestion à 
   du voyage rattaché sert d'achat ; sans rien, délai de 7 jours compté mais vente « sans date » dans le temps.
   **`c.vente_date` n'est jamais écrit par la règle** : les moteurs lisent `r.date_vente` (retenue), `r.vente_estimee`,
   `r.mise_en_vente`, `r.delai_vente`, `r.delai_estime` ; affichage « vers le » / « ≈ ». Une vraie date saisie l'emporte.
+- Frais de vente par canal (22/11, `params.frais_canal`, Réglages › Frais de vente par canal) : taux propre au canal
+  pour les cartes vendues dessus (Vinted 0 % par défaut : l'acheteur paie la protection), vide = taux général ;
+  stock et scellé gardent le taux général. Seul écart voulu avec les règles de l'Excel. La feuille de vente montre
+  le bénéfice avec les frais du canal choisi.
 - « À compléter » (Stock) = cartes en stock **sans prix de vente** seulement (demande d'Arthur, 22/11 : il n'aura pas
   d'autres infos). Les cartes à coût estimé sont des cartes normales : plus de mention « coût estimé » dans les listes,
   plus d'alerte ni de section Contrôles pour elles (le libellé « Coût estimé » reste sur la fiche).

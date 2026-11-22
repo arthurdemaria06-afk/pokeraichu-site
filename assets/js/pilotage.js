@@ -1222,11 +1222,13 @@
     function calc() {
       var v = lireNombre(form.champs.prix.value).v;
       if (vide(v)) { apercu.textContent = 'Indique le prix de vente.'; return; }
-      var cout = (r.paye != null ? r.paye : v * (1 - P.fv) / ((1 + P.tva) + P.rent)) * (1 + P.tva);
-      var net = v * (1 - P.fv) - cout - P.envoi;
-      apercu.textContent = 'Bénéfice net ' + eurS(net, 2) + (cout ? ' · rentabilité ' + pct(net / cout) : '') + (r.paye == null ? ' (coût estimé)' : '') + ' · frais d’envoi de ' + eur(P.envoi, 2) + ' déduits';
+      var cn = form.champs.canal.value, FCv = P.frais_canal || {}, fvC = cn && Object.prototype.hasOwnProperty.call(FCv, cn) ? FCv[cn] : P.fv;
+      var cout = (r.paye != null ? r.paye : v * (1 - fvC) / ((1 + P.tva) + P.rent)) * (1 + P.tva);
+      var net = v * (1 - fvC) - cout - P.envoi;
+      apercu.textContent = 'Bénéfice net ' + eurS(net, 2) + (cout ? ' · rentabilité ' + pct(net / cout) : '') + (r.paye == null ? ' (coût estimé)' : '') + ' · frais de vente ' + pct(fvC) + (cn ? ' (' + cn + ')' : '') + ' et envoi de ' + eur(P.envoi, 2) + ' déduits';
     }
     form.champs.prix.addEventListener('input', calc);
+    form.champs.canal.addEventListener('change', calc);
     calc();
     var fs = feuille('Enregistrer la vente', [h('p', { class: 'pl-note', text: c.nom + ' · N° ' + c.ref + (vide(c.prix) ? '' : ' · prix marché ' + eur(c.prix, 2)) }), form.el, apercu,
       caseSite ? h('label', { class: 'pl-check' }, [caseSite, ' Passer aussi la carte en « Vendue » sur pokeraichu.com']) : null],
@@ -2753,7 +2755,7 @@
     var form = formulaire([
       { k: 'taux_jpy', label: '1 € = combien de yens', type: 'num', demi: true, aide: 'Sert à convertir tous les tickets et lots.' },
       { k: 'frais_envoi', label: 'Frais d’envoi par envoi (€)', type: 'num', demi: true, aide: 'La pochette à bulles ; le port est payé par le client.' },
-      { k: 'frais_vente', label: 'Frais de vente (%)', type: 'num', demi: true, aide: notes.frais_vente || 'Commission du canal de vente.' },
+      { k: 'frais_vente', label: 'Frais de vente (%)', type: 'num', demi: true, aide: notes.frais_vente || 'Commission du canal de vente, sauf taux propre au canal (plus bas).' },
       { k: 'tva_import', label: 'TVA à l’import (%)', type: 'num', demi: true, aide: 'Hypothèse : 0 % (pas de TVA payée à l’import).' },
       { k: 'rentabilite_estimee', label: 'Rentabilité retenue sans prix d’achat (%)', type: 'num', aide: 'Coût estimé = prix ÷ (1 + ce taux), pour les cartes sans prix payé.' },
       { k: 'gardees', label: 'Cartes que tu gardes', type: 'select', options: [['avec', 'Comptées dans les totaux'], ['sans', 'Retirées des totaux']] }
@@ -2771,6 +2773,27 @@
       });
     });
     m.appendChild(section('Paramètres de calcul', [f]));
+    var FC = (S.R.params && S.R.params.frais_canal) || {}, tg = z(P.frais_vente) * 100;
+    var formC = formulaire(CANAUX.map(function (cn) { return { k: 'c_' + cn, label: cn + ' (%)', type: 'num', demi: true, ph: nbr(tg) + ' (général)' }; }),
+      CANAUX.reduce(function (o, cn) { if (Object.prototype.hasOwnProperty.call(FC, cn)) o['c_' + cn] = FC[cn] * 100; return o; }, {}));
+    var fC = h('form', { class: 'pl-box', novalidate: true }, [formC.el, h('div', { class: 'pl-actions' }, h('button', { type: 'submit', class: 'btn', text: 'Enregistrer les frais par canal' }))]);
+    fC.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var x = formC.lire();
+      if (!x) return;
+      var t = {}, faux = null;
+      CANAUX.forEach(function (cn) {
+        var v = x['c_' + cn];
+        if (v == null || v === '') { t[cn] = null; return; }
+        if (!(v >= 0 && v < 100)) { faux = faux || cn; return; }
+        t[cn] = Math.round(v * 100) / 10000;
+      });
+      if (faux) { formC.erreur('c_' + faux, 'Entre 0 et 99 %.'); return; }
+      modifier('Frais de vente par canal · ' + CANAUX.filter(function (cn) { return t[cn] != null; }).map(function (cn) { return cn + ' ' + pct(t[cn]); }).join(', '), function (doc) {
+        doc.params.frais_canal = t;
+      });
+    });
+    m.appendChild(section('Frais de vente par canal', [fC], 'Remplace le taux général pour les cartes vendues sur ce canal. Vide : taux général (' + nbr(tg) + ' %). Vinted : 0 %, c’est l’acheteur qui paie la protection.'));
     var form2 = formulaire([
       { k: 'taux_horaire', label: 'Valeur d’une heure de ton temps (€)', type: 'num', demi: true, aide: 'Ce que tu gagnerais ailleurs dans l’heure. Vide : temps non chiffré.' },
       { k: 'minutes_par_vente', label: 'Minutes par vente', type: 'num', demi: true, aide: 'Photo, annonce, échanges, emballage, poste.' },

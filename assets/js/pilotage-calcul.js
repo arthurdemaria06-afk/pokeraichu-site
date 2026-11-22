@@ -11,6 +11,9 @@
      début des ventes ; sans date d'achat, la fin du voyage rattaché sert d'achat ; sans rien, délai d'une semaine
      compté dans les délais mais la vente reste « sans date » dans le temps ;
    - une vraie date saisie l'emporte toujours (c.vente_date n'est jamais modifié : r.date_vente est la date retenue).
+   Frais de vente par canal (22/11/2026) : params.frais_canal = { canal: part du prix } remplace frais_vente pour les
+   cartes vendues sur ce canal (Vinted : 0 par défaut, l'acheteur paie la protection) ; null = taux général. Le stock et
+   le scellé gardent le taux général (canal inconnu). Seul écart voulu avec les règles de l'Excel.
    Aucune donnée ici : le document vient de /api/pilotage. Utilisable aussi dans Node (tests). */
 (function (racine, fabrique) {
   var api = fabrique();
@@ -22,7 +25,7 @@
   function nb(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
   function z(v) { return nb(v) || 0; }
   function somme(liste, f) { var s = 0; for (var i = 0; i < liste.length; i++) s += z(f(liste[i])); return s; }
-  var DEBUT_VENTES = '2026-11-22', DELAI_VENTE_PASSEE = 7;
+  var DEBUT_VENTES = '2026-11-22', DELAI_VENTE_PASSEE = 7, FRAIS_CANAL_DEFAUT = { 'Vinted': 0 };
   function dateOk(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null; }
   function jour(v) { return Math.floor(Date.parse(v + 'T00:00:00Z') / 864e5); }
   function iso(j) { return new Date(j * 864e5).toISOString().slice(0, 10); }
@@ -35,7 +38,14 @@
       delaiV = nb(P.delai_vente_passee) != null && P.delai_vente_passee >= 0 ? Math.round(P.delai_vente_passee) : DELAI_VENTE_PASSEE;
     var finVoyage = {};
     (doc.voyages || []).forEach(function (V) { if (V && V.id) finVoyage[V.id] = dateOk(V.fin) || dateOk(V.debut); });
-    function estime(base) { return base == null ? null : base * (1 - fv) / ((1 + tva) + rent); }
+    var fraisCanal = {};
+    Object.keys(FRAIS_CANAL_DEFAUT).forEach(function (k) { fraisCanal[k] = FRAIS_CANAL_DEFAUT[k]; });
+    if (P.frais_canal && typeof P.frais_canal === 'object') Object.keys(P.frais_canal).forEach(function (k) {
+      var v = P.frais_canal[k];
+      if (v === null) delete fraisCanal[k]; else if (nb(v) != null && v >= 0 && v < 1) fraisCanal[k] = v;
+    });
+    function fvDe(canal) { return canal && Object.prototype.hasOwnProperty.call(fraisCanal, canal) ? fraisCanal[canal] : fv; }
+    function estime(base, f) { var t = f == null ? fv : f; return base == null ? null : base * (1 - t) / ((1 + tva) + rent); }
 
     /* groupes : ceux du document, puis ceux qu'une carte utiliserait sans qu'ils soient déclarés */
     var groupes = [], gid = {};
@@ -81,7 +91,8 @@
       } else if (a.mode === 'eur') paye = nb(a.eur);
       var prix = nb(c.prix);
       var enc = c.vendu ? (nb(c.prix_vendu) != null ? c.prix_vendu : prix) : null;
-      var est = paye == null ? estime(c.vendu ? enc : prix) : null;
+      var fvC = c.vendu ? fvDe(c.canal) : fv;
+      var est = paye == null ? estime(c.vendu ? enc : prix, fvC) : null;
       var marge = prix != null && paye != null ? prix * (1 - fv) - paye * (1 + tva) : null;
       var g = gid[c.groupe];
       var hors = !!(g && g.hors_totaux);
@@ -107,12 +118,12 @@
       var r = {
         c: c, i: i, ref: c.ref, paye: paye, estime: est, cout: paye != null ? paye : est, source: paye != null ? 'réel' : (est != null ? 'estimé' : null),
         marge: marge, gain: marge != null && paye ? marge / paye : null,
-        encaisse: enc, benef: c.vendu ? z(enc) * (1 - fv) - (z(paye) + z(est)) * (1 + tva) : null,
+        encaisse: enc, benef: c.vendu ? z(enc) * (1 - fvC) - (z(paye) + z(est)) * (1 + tva) : null, fv: fvC,
         compte: compte, hors: hors, stock: !c.vendu && !hors && compte,
         date_achat: achat, date_vente: dv, vente_estimee: dvEst, mise_en_vente: mev, delai_vente: delai, delai_estime: delaiEst
       };
       if (c.vendu && !hors) {
-        var frais = z(enc) * fv, cout = (z(paye) + z(est)) * (1 + tva);
+        var frais = z(enc) * fvC, cout = (z(paye) + z(est)) * (1 + tva);
         r.vente = { encaisse: z(enc), frais: frais, cout: cout, envoi: envoi, net: z(enc) - frais - cout - envoi };
         r.vente.rentab = cout ? r.vente.net / cout : null;
       }
@@ -204,9 +215,10 @@
       var vd = rs.filter(function (r) { return r.c.vendu; });
       var enc = somme(vd, function (r) { return r.encaisse; });
       var cout = (somme(vd, function (r) { return r.paye; }) + somme(vd, function (r) { return r.estime; })) * (1 + tva);
-      var env = vd.length * envoi, b = enc - enc * fv - cout - env;
+      var fr = somme(vd, function (r) { return z(r.encaisse) * r.fv; });
+      var env = vd.length * envoi, b = enc - fr - cout - env;
       ventes.push({ cle: g.id, libelle: g.nom || g.id, ordre: nb(g.ordre) != null ? g.ordre : 50, vendus: vd.length, stock: rs.length - vd.length,
-        encaisse: enc, frais: enc * fv, cout: cout, envoi: env, net: b, rentab: cout ? b / cout : null,
+        encaisse: enc, frais: fr, cout: cout, envoi: env, net: b, rentab: cout ? b / cout : null,
         estime: somme(vd, function (r) { return r.estime; }) * (1 + tva) });
     });
     produits.forEach(function (x) {
@@ -272,7 +284,7 @@
     };
 
     return {
-      params: { taux: taux, fv: fv, tva: tva, rent: rent, envoi: envoi, gardees: gardees, debut_ventes: debutV, delai_vente_passee: delaiV },
+      params: { taux: taux, fv: fv, tva: tva, rent: rent, envoi: envoi, gardees: gardees, debut_ventes: debutV, delai_vente_passee: delaiV, frais_canal: fraisCanal },
       dates_ventes: {
         debut: debutV, delai: delaiV,
         estimees: cartes.filter(function (r) { return r.vente && r.vente_estimee; }).length,
@@ -285,5 +297,5 @@
     };
   }
 
-  return { calcul: calcul, nb: nb, DEBUT_VENTES: DEBUT_VENTES, DELAI_VENTE_PASSEE: DELAI_VENTE_PASSEE };
+  return { calcul: calcul, nb: nb, DEBUT_VENTES: DEBUT_VENTES, DELAI_VENTE_PASSEE: DELAI_VENTE_PASSEE, FRAIS_CANAL_DEFAUT: FRAIS_CANAL_DEFAUT };
 });
