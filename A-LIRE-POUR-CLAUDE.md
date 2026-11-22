@@ -83,6 +83,13 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
   - **Bouton « Annonce »** (`assets/js/annonce.js`) : titre, prix, description et photos prêts à copier pour
     **eBay (80 car.), Vinted (60), Leboncoin (50)**. Écart de prix par plateforme et cases « postée sur… »
     gardés dans le `localStorage`. Rien n'est envoyé aux plateformes (Vinted interdit l'automatisation).
+    - **Titre eBay en français + anglais** (`titreEbay`, 22/11) : nom FR / nom EN, numéro, note PSA, langue en anglais
+      d'abord, puis code et nom anglais de l'extension, rareté, « Pokémon », langue en français, état, tant que ça tient
+      dans 80 caractères (priorités, puis ordre de lecture). Vinted et Leboncoin gardent le titre français (`titre`).
+    - **Cadre Poké-Raichu sur les photos enregistrées** (22/11) : bandeau ajouté sous la photo (rien ne cache la carte),
+      logo `assets/img/logo-photo.png` dans le coin, « SITE WEB pokeraichu.com ». Les photos du site ne changent pas.
+      Case décochée par défaut sur l'onglet eBay (le règlement « Picture policy » d'eBay interdit texte, logo et
+      filigrane sur les photos), cochée ailleurs ; choix gardé par plateforme (`pr.annonce.cadre`).
   - **Bouton « Modifier »** (`assets/js/modif.js`) : change le **nom** (FR et EN), l'**état** d'une carte non gradée
     (ou le n° de certificat d'un slab) et les **Pokémon** d'une fiche déjà en ligne. Un seul fichier est commité :
     `_ajouts/modifs.json` (`{"modifs": {"<réf>": {nom_fr, nom_en, etat | cert, pokemons, pokemons_en, le}}}`), puis
@@ -214,6 +221,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (22/11) Gestion › Annonce : titres eBay français + anglais, cadre Poké-Raichu sur les photos enregistrées.
 - (22/11) Pilotage refait visuellement (tableau de bord filtrable façon Qlik, graphiques interactifs, rendu iPad) :
   voir § Pilotage › Refonte visuelle.
 - (22/11) Noms d'extensions en français sur tout le site FR (filtres, fiches, pages d'extension, vignettes, titres,

@@ -84,7 +84,9 @@ p.annonce__val{font-weight:600}
 .annonce__photos p{margin:0}
 .annonce__strip{display:flex;gap:8px;overflow-x:auto}
 .annonce__strip:empty{display:none}
-.annonce__strip img{display:block;width:60px;height:84px;object-fit:cover;border-radius:3px;box-shadow:0 0 0 1px var(--edge)}
+.annonce__strip img{display:block;width:60px;height:auto;min-height:84px;object-fit:contain;border-radius:3px;box-shadow:0 0 0 1px var(--edge)}
+.annonce__cadre{font-size:.9rem;line-height:1.35}
+.annonce__regle{margin-top:-4px!important}
 .annonce__save{justify-self:start}
 
 /* modification d'une fiche déjà en ligne */

@@ -47,6 +47,72 @@
     return t;
   }
 
+  /* eBay : titre en français ET en anglais, pour être trouvé en France comme à l'étranger (demande d'Arthur, 22/11/2026).
+     Chaque morceau a une priorité : d'abord ce qui identifie la carte (nom français, nom anglais, numéro, note PSA, langue
+     en anglais), puis le reste (code et nom de l'extension, rareté, « Pokémon », langue en français, état) tant que ça
+     tient dans les 80 caractères. Le titre se lit ensuite dans l'ordre naturel. Vinted et Leboncoin gardent titre(). */
+  var LANG_EN = { JP: 'Japanese', KR: 'Korean', FR: 'French', EN: 'English', CN: 'Chinese' };
+  var LANG_FR = { JP: 'Japonaise', KR: 'Coréenne', FR: 'VF', EN: 'Anglaise', CN: 'Chinoise' };
+  var RARETES = /^(AR|SAR|SR|CHR|CSR|UR|HR|SSR|RRR|RR|FUR|BWR|ACE|Promo|Holo)$/;
+  var VIEUX_CODES = /^(PMCG\d|PCG\d|neo\d|e\d|Gym|VS|CLL)$/i;
+  function cle(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+  /* nom anglais d'une extension tel qu'on le cherche : « Crossing the Ruins... (Neo Discovery) » → « Neo Discovery »,
+     « Golden Sky, Silvery Ocean (2005) » → « Golden Sky, Silvery Ocean » */
+  function setAnglais(e) {
+    if (!e || !e.nom) return '';
+    var m = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(e.nom);
+    if (!m) return e.nom;
+    return /^\d{4}$|Pokémon Card e/i.test(m[2]) ? m[1] : m[2];
+  }
+  function titreEbay(c, max) {
+    var en = c.en || {}, slab = c.type === 'slab', scelle = c.type === 'scelle', P = [];
+    function morceau(pos, prio, textes) {
+      textes = (Array.isArray(textes) ? textes : [textes]).map(function (t) { return String(t || '').replace(/\s*·\s*/g, ' ').replace(/\s+/g, ' ').trim(); }).filter(Boolean);
+      if (textes.length) P.push({ pos: pos, prio: prio, textes: textes });
+    }
+    var fr = c.nom_fr || (c.numero ? c.titre.replace(' ' + c.numero, '') : c.titre);
+    if (scelle) fr = c.titre;
+    var ang = c.nom_en || en.nom || '';
+    if (scelle) ang = [ang.replace(/^Sealed\s+/i, ''), ang.replace(/^Sealed\s+/i, '').split(/\s*·\s*/)[0]];
+    else if (cle(ang) === cle(fr)) ang = '';
+    else if (/ bundle$/i.test(ang)) ang = [ang, ang.replace(/ bundle$/i, '').replace(/ and /g, ' & ')];
+    var e = c.extension || {}, code = e.code && !VIEUX_CODES.test(e.code) ? e.code : '';
+    var setEn = setAnglais(e), setFr = e.nom_fr && cle(e.nom_fr) !== cle(setEn) ? e.nom_fr : '';
+    var rar = RARETES.test(c.rarete || '') ? c.rarete : (/^Shiny$/.test(en.rarete || '') ? 'Shiny' : '');
+    morceau(0, 7, 'Pokémon');
+    morceau(1, 1, fr);
+    morceau(2, 2, ang);
+    morceau(3, 3, c.numero);
+    if (slab) morceau(4, 1.5, c.etat && c.etat.libelle);
+    morceau(5, 4, en.edition || c.edition);
+    morceau(6, 5, code);
+    morceau(7, c.numero ? 6 : 4, setEn);
+    morceau(8, 6, rar);
+    morceau(9, 9, setFr);
+    morceau(10, c.langue === 'FR' ? 5 : 3, LANG_EN[c.langue]);
+    morceau(11, c.langue === 'FR' ? 4 : 8, LANG_FR[c.langue]);
+    if (scelle) { morceau(12, 4, 'Sealed'); morceau(13, 8, 'Scellé'); }
+    else if (!slab && c.etat && /near mint/i.test(c.etat.libelle)) morceau(12, 8, 'NM');
+    var pris = [];
+    function texte(l) {
+      return l.slice().sort(function (a, b) { return a.m.pos - b.m.pos; }).reduce(function (s, x) {
+        return s ? s + (x.m.pos === 2 && l.some(function (y) { return y.m.pos === 1; }) ? ' / ' : ' ') + x.t : x.t;
+      }, '');
+    }
+    P.slice().sort(function (a, b) { return a.prio - b.prio || a.pos - b.pos; }).forEach(function (m) {
+      var deja = cle(texte(pris));
+      for (var i = 0; i < m.textes.length; i++) {
+        var t = m.textes[i];
+        if (m.pos > 2 && deja.indexOf(cle(t)) !== -1) return;
+        var essai = pris.concat([{ m: m, t: t }]);
+        if (texte(essai).length <= max) { pris = essai; return; }
+      }
+    });
+    var out = texte(pris);
+    if (!out) out = fr.length > max ? fr.slice(0, max - 1).trim() + '…' : fr;
+    return out;
+  }
+
   function description(c, site) {
     var L = [], lang = (LANG[c.langue] || [])[0];
     var slab = c.type === 'slab', scelle = c.type === 'scelle';
@@ -110,19 +176,71 @@
     }
     return essai(1);
   }
-  function enJpeg(img, name) {
-    return new Promise(function (res, rej) {
-      var cv = el('canvas');
-      cv.width = img.naturalWidth; cv.height = img.naturalHeight;
-      var x = cv.getContext('2d');
-      x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height);
-      x.drawImage(img, 0, 0);
-      cv.toBlob(function (b) { if (b) res(new File([b], name, { type: 'image/jpeg' })); else rej(new Error('photo')); }, 'image/jpeg', 0.92);
+  /* cadre Poké-Raichu des photos d'annonce (demande d'Arthur, 22/11/2026) : un bandeau ajouté SOUS la photo (rien ne
+     cache la carte), le logo dans le coin, « site web : pokeraichu.com ». Les photos du site ne changent pas.
+     eBay interdit d'ajouter texte, logo ou filigrane aux photos (règlement « Picture policy ») : décoché par défaut sur
+     l'onglet eBay, coché ailleurs ; le choix est gardé par plateforme sur ce téléphone (pr.annonce.cadre). */
+  var LOGO = null, POLICE = '-apple-system, system-ui, "Helvetica Neue", Arial, sans-serif';
+  function logoPhoto() {
+    if (!LOGO) LOGO = new Promise(function (res) {
+      var i = new Image();
+      i.onload = function () { res(i); };
+      i.onerror = function () { res(null); };
+      i.src = 'assets/img/logo-photo.png?v=1';
+    });
+    return LOGO;
+  }
+  function cadreSur(site) { var c = getJSON('pr.annonce.cadre', {}); return Object.prototype.hasOwnProperty.call(c, site) ? !!c[site] : site !== 'ebay'; }
+  function cadreRegler(site, v) { var c = getJSON('pr.annonce.cadre', {}); c[site] = !!v; put('pr.annonce.cadre', JSON.stringify(c)); }
+  function espace(x, t, X, Y, pas) { for (var i = 0; i < t.length; i++) { x.fillText(t[i], X, Y); X += x.measureText(t[i]).width + pas; } return X; }
+  function largeurEspacee(x, t, pas) { var w = 0; for (var i = 0; i < t.length; i++) w += x.measureText(t[i]).width + (i ? pas : 0); return w; }
+  /* photo (et bandeau) sur un canvas ; largeur : pour les vignettes, sinon taille réelle */
+  function composer(img, lg, cadre, largeur) {
+    var k = largeur ? Math.min(1, largeur / img.naturalWidth) : 1;
+    var w = Math.round(img.naturalWidth * k), hp = Math.round(img.naturalHeight * k), bande = cadre ? Math.round(w * 0.13) : 0;
+    var cv = el('canvas');
+    cv.width = w; cv.height = hp + bande;
+    var x = cv.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height);
+    x.drawImage(img, 0, 0, w, hp);
+    if (!bande) return cv;
+    var y0 = hp, filet = Math.max(2, Math.round(bande * 0.045));
+    x.fillStyle = '#FBF3E4'; x.fillRect(0, y0, w, bande);
+    x.fillStyle = '#E5802B'; x.fillRect(0, y0, w, filet);
+    var m = Math.round(bande * 0.15), lh = bande - filet - 2 * m, lw = 0;
+    if (lg) { lw = lh * lg.naturalWidth / lg.naturalHeight; x.drawImage(lg, Math.round(m * 1.1), Math.round(y0 + filet + m), Math.round(lw), Math.round(lh)); }
+    var f1 = Math.max(8, Math.round(bande * 0.165)), f2 = Math.max(12, Math.round(bande * 0.34)), pas = f1 * 0.16;
+    x.font = '700 ' + f1 + 'px ' + POLICE;
+    var w1 = largeurEspacee(x, 'SITE WEB', pas);
+    x.font = '700 ' + f2 + 'px ' + POLICE;
+    var w2 = x.measureText('pokeraichu.com').width;
+    var bloc = Math.max(w1, w2), gauche = Math.round(m * 1.1 + lw + m * 1.2);
+    var tx = Math.max(gauche, Math.round((w - bloc) / 2)), ty = y0 + filet + (bande - filet) / 2;
+    x.textBaseline = 'alphabetic';
+    x.fillStyle = '#B85414'; x.font = '700 ' + f1 + 'px ' + POLICE;
+    espace(x, 'SITE WEB', tx, Math.round(ty - f2 * 0.42), pas);
+    x.fillStyle = '#3B2414'; x.font = '700 ' + f2 + 'px ' + POLICE;
+    x.fillText('pokeraichu.com', tx, Math.round(ty + f2 * 0.62));
+    return cv;
+  }
+  function enJpeg(img, name, cadre) {
+    return (cadre ? logoPhoto() : Promise.resolve(null)).then(function (lg) {
+      return new Promise(function (res, rej) {
+        composer(img, lg, cadre).toBlob(function (b) { if (b) res(new File([b], name, { type: 'image/jpeg' })); else rej(new Error('photo')); }, 'image/jpeg', 0.92);
+      });
     });
   }
-  function blocPhotos(c) {
+  function blocPhotos(c, plateforme) {
     var box = el('div', 'annonce__photos');
     box.appendChild(el('p', 'annonce__label', 'Photos'));
+    var ck = el('label', 'check annonce__cadre');
+    var cb = el('input');
+    cb.type = 'checkbox';
+    ck.appendChild(cb);
+    ck.appendChild(d.createTextNode(' Cadre Poké-Raichu : logo et « site web : pokeraichu.com » sous la photo'));
+    var regle = el('p', 'muted small annonce__regle', 'eBay interdit d’ajouter texte, logo ou filigrane aux photos (règlement « Picture policy ») : risque de retrait de l’annonce. Laisse décoché pour eBay.');
+    box.appendChild(ck);
+    box.appendChild(regle);
     var strip = el('div', 'annonce__strip');
     box.appendChild(strip);
     var msg = el('p', 'muted small', 'Recherche des photos…');
@@ -132,20 +250,47 @@
     btn.hidden = true;
     box.appendChild(btn);
     box.appendChild(msg);
-    trouverPhotos(c).then(function (imgs) {
-      if (!imgs.length) { msg.textContent = 'Aucune photo trouvée pour cette carte.'; return; }
-      imgs.forEach(function (im, i) {
-        var a = el('a');
-        a.href = im.src; a.target = '_blank'; a.rel = 'noopener';
-        var t = el('img');
-        t.src = im.src; t.alt = 'Photo ' + (i + 1); t.loading = 'lazy'; t.width = 60; t.height = 84;
-        a.appendChild(t); strip.appendChild(a);
+    var imgs = [], urls = [];
+    function vignettes() {
+      urls.forEach(function (u) { URL.revokeObjectURL(u); });
+      urls = [];
+      strip.textContent = '';
+      var cadre = cb.checked;
+      (cadre ? logoPhoto() : Promise.resolve(null)).then(function (lg) {
+        imgs.forEach(function (im, i) {
+          var a = el('a');
+          a.target = '_blank'; a.rel = 'noopener';
+          var t = el('img');
+          t.alt = 'Photo ' + (i + 1); t.width = 60; t.height = cadre ? 94 : 84;
+          if (cadre) {
+            composer(im, lg, true, 360).toBlob(function (b) {
+              if (!b) return;
+              var u = URL.createObjectURL(b);
+              urls.push(u);
+              t.src = u; a.href = u;
+            }, 'image/jpeg', 0.85);
+          } else { t.src = im.src; a.href = im.src; }
+          a.appendChild(t); strip.appendChild(a);
+        });
       });
+    }
+    function maj() {
+      var site = plateforme();
+      cb.checked = cadreSur(site);
+      regle.hidden = site !== 'ebay';
+      if (imgs.length) vignettes();
+    }
+    cb.addEventListener('change', function () { cadreRegler(plateforme(), cb.checked); vignettes(); });
+    trouverPhotos(c).then(function (found) {
+      imgs = found;
+      if (!imgs.length) { msg.textContent = 'Aucune photo trouvée pour cette carte.'; ck.hidden = true; regle.hidden = true; return; }
+      vignettes();
       btn.hidden = false;
       msg.textContent = imgs.length + ' photo' + (imgs.length > 1 ? 's' : '') + '. Sur iPhone : « Enregistrer les photos », puis « Enregistrer l’image ». Elles arrivent dans votre pellicule.';
       btn.addEventListener('click', function () {
         btn.disabled = true;
-        Promise.all(imgs.map(function (im, i) { return enJpeg(im, 'poke-raichu-' + c.ref + '-' + (i + 1) + '.jpg'); })).then(function (files) {
+        var cadre = cb.checked;
+        Promise.all(imgs.map(function (im, i) { return enJpeg(im, 'poke-raichu-' + c.ref + '-' + (i + 1) + '.jpg', cadre); })).then(function (files) {
           btn.disabled = false;
           if (navigator.canShare && navigator.canShare({ files: files })) {
             return navigator.share({ files: files }).catch(function () {});
@@ -160,6 +305,8 @@
         }).catch(function () { btn.disabled = false; msg.textContent = 'Photos indisponibles : touchez une vignette, puis gardez le doigt dessus pour l’enregistrer.'; });
       });
     });
+    maj();
+    box.majPlateforme = maj;
     return box;
   }
 
@@ -191,8 +338,8 @@
       var s = SITES.filter(function (x) { return x.id === cur; })[0];
       Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === cur)); });
       body.textContent = '';
-      var t = titre(c, s.max);
-      body.appendChild(champ('Titre', t, false, t.length + ' / ' + s.max));
+      var t = s.id === 'ebay' ? titreEbay(c, s.max) : titre(c, s.max);
+      body.appendChild(champ(s.id === 'ebay' ? 'Titre (français + anglais)' : 'Titre', t, false, t.length + ' / ' + s.max));
       if (prix === null || prix === undefined) {
         body.appendChild(el('p', 'muted small', 'Prix sur demande : à fixer vous-même dans l’annonce.'));
       } else {
@@ -244,12 +391,13 @@
       var b = el('button', '', s.nom);
       b.type = 'button';
       b.setAttribute('data-v', s.id);
-      b.addEventListener('click', function () { cur = s.id; put('pr.annonce.site', cur); draw(); });
+      b.addEventListener('click', function () { cur = s.id; put('pr.annonce.site', cur); draw(); if (photos && photos.majPlateforme) photos.majPlateforme(); });
       tabs.appendChild(b);
     });
     box.appendChild(tabs);
     box.appendChild(body);
-    box.appendChild(blocPhotos(c));
+    var photos = blocPhotos(c, function () { return cur; });
+    box.appendChild(photos);
     draw();
     return box;
   }
@@ -260,5 +408,5 @@
     return SITES.filter(function (s) { return m[s.id]; }).map(function (s) { return s.nom; });
   }
 
-  window.PR_ANNONCE = { panel: panel, ou: ou, titre: titre, description: description, prixPour: prixPour };
+  window.PR_ANNONCE = { panel: panel, ou: ou, titre: titre, titreEbay: titreEbay, description: description, prixPour: prixPour, composer: composer, logoPhoto: logoPhoto };
 })();
