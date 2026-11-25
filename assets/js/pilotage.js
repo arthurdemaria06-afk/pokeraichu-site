@@ -272,6 +272,9 @@
     try { a = JSON.parse(t); } catch (e) { effacer(CLE_ATTENTE); return; }
     if (!a || !docValide(a.data)) { effacer(CLE_ATTENTE); return; }
     if (a.base !== S.rev) {
+      /* copie locale d'un envoi qui a bien abouti (page rechargée pendant l'enregistrement, 25/11/2026) : la version
+         en base est exactement celle-là, rien à reprendre ni à demander */
+      if (JSON.stringify(a.data) === JSON.stringify(S.doc)) { effacer(CLE_ATTENTE); return; }
       confirmer('Modifications non enregistrées', 'Des modifications faites le ' + quand(a.le) + ' n’ont pas été enregistrées, mais tes données ont changé depuis. Elles ne peuvent pas être reprises.', 'Les jeter', function () { effacer(CLE_ATTENTE); }, true);
       return;
     }
