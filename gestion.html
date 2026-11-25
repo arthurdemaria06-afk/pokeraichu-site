@@ -13,7 +13,7 @@
 <link rel="manifest" href="site.webmanifest">
 <link rel="preload" href="assets/fonts/libre-caslon-display-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/site.css?v=1f1be8dc">
-<link rel="stylesheet" href="assets/css/gestion.css?v=7f7dbb2f">
+<link rel="stylesheet" href="assets/css/gestion.css?v=09bda0c1">
 <meta property="og:site_name" content="Poké-Raichu">
 <meta property="og:locale" content="fr_FR">
 <meta property="og:locale:alternate" content="en_GB">
@@ -25,13 +25,13 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Logo Poké-Raichu">
 <meta name="twitter:card" content="summary_large_image">
-<script src="assets/js/langue-de.js?v=bc959b87" defer></script>
+<script src="assets/js/langue-de.js?v=3bb19c57" defer></script>
 <script src="assets/js/langue.js?v=94789869" defer></script>
 <script src="config.js" defer></script>
 <script src="assets/js/ajout.js?v=a07183db" defer></script>
-<script src="assets/js/annonce.js?v=fb16d701" defer></script>
+<script src="assets/js/annonce.js?v=d78e3f80" defer></script>
 <script src="assets/js/modif.js?v=e25741e9" defer></script>
-<script src="assets/js/outils.js?v=278a6a7f" defer></script>
+<script src="assets/js/outils.js?v=07bec3d7" defer></script>
 <script src="assets/js/site.js?v=b5809414" data-qr="assets/js/qrcode.js?v=e84be42f" defer></script>
 </head>
 <body class="is-tool">
@@ -52,7 +52,8 @@
 <details class="ajout" data-clients><summary class="ajout__sum"><span class="ajout__plus" aria-hidden="true">+</span>Clients et favoris<span class="clients__n" data-clients-n></span></summary><div class="ajout__body" data-clients-body><p class="muted small">Chaque compte client (connexion Google) avec sa liste d’éclairs, et les cartes les plus demandées.</p></div></details>
 <details class="ajout" data-titres-ebay><summary class="ajout__sum"><span class="ajout__plus" aria-hidden="true">+</span>Titres eBay français + anglais<span class="clients__n" data-titres-ebay-n></span></summary><div class="ajout__body" data-titres-ebay-body><p class="muted small">Nom français et nom anglais dans chaque titre eBay, pour être trouvé à l’étranger.</p></div></details>
 <div class="field"><label for="g-q">Chercher une carte</label><input class="input" id="g-q" autocomplete="off" inputmode="search" placeholder="102, Raichu…"></div>
-<div class="chips g-filtres" role="group" aria-label="Filtrer la liste"><button type="button" class="chip" aria-pressed="false" data-gestion-ask>Prix sur demande<span class="g-filtres__n" data-gestion-ask-n></span></button></div>
+<div class="chips g-filtres" role="group" aria-label="Filtrer la liste"><button type="button" class="chip" aria-pressed="false" data-gestion-poste="a-poster">À poster<span class="g-filtres__n"></span></button><button type="button" class="chip" aria-pressed="false" data-gestion-poste="partout">Postées partout<span class="g-filtres__n"></span></button><button type="button" class="chip" aria-pressed="false" data-gestion-ask>Prix sur demande<span class="g-filtres__n" data-gestion-ask-n></span></button></div>
+<div class="g-tri"><span class="g-tri__l" id="g-tri-l">Trier</span><div class="seg" role="group" aria-labelledby="g-tri-l" data-gestion-tri><button type="button" data-v="ref" aria-pressed="true">Réf.</button><button type="button" data-v="prix-desc" aria-pressed="false">Prix décroissant</button><button type="button" data-v="prix-asc" aria-pressed="false">Prix croissant</button></div></div>
 <p class="count" data-gestion-count aria-live="polite"></p>
 <ul class="sel-list gestion-list" role="list" data-gestion-list></ul>
 <div class="privacy-tools"><label class="check"><input type="checkbox" data-pref="moi"> Ne pas compter mes visites dans la mesure d’audience (cet appareil)</label><p class="muted small">Toujours coché sur l’appareil où ta clé est enregistrée. Sur un autre navigateur (Instagram, ordinateur, autre téléphone) : ouvre une fois pokeraichu.com/#moi.</p></div>

@@ -66,6 +66,7 @@ window.PR_DE = {
 "Annonce postée sur Leboncoin": "Inserat auf Leboncoin veröffentlicht",
 "Annonce postée sur Vinted": "Inserat auf Vinted veröffentlicht",
 "Annonce postée sur eBay": "Inserat auf eBay veröffentlicht",
+"Annonce postée sur eBay, Vinted et Leboncoin : les trois cases d’un coup.": "Inserat auf eBay, Vinted und Leboncoin veröffentlicht: alle drei Haken auf einmal.",
 "Annulation": "Rückgängig",
 "Annulation de la restauration": "Wiederherstellung rückgängig gemacht",
 "Annuler": "Abbrechen",
@@ -272,6 +273,7 @@ window.PR_DE = {
 "Clé refusée": "Schlüssel abgelehnt",
 "Clé refusée par GitHub : elle a peut-être expiré. Créez-en une nouvelle et collez-la en haut de la page.": "Schlüssel von GitHub abgelehnt: Er ist vielleicht abgelaufen. Erstellen Sie einen neuen und fügen Sie ihn oben auf der Seite ein.",
 "Coche ce que tu as acheté pendant ce voyage. Les achats datés s’y rattachent déjà tout seuls.": "Hake an, was du auf dieser Reise gekauft hast. Datierte Einkäufe werden bereits automatisch zugeordnet.",
+"Cocher les {0} canaux": "Alle {0} Kanäle abhaken",
 "Code de l’extension": "Set-Code",
 "Coefficient multiplicateur": "Kalkulationsfaktor",
 "Collections": "Sammlungen",
@@ -764,15 +766,18 @@ window.PR_DE = {
 "Pokémon est une marque de Nintendo, Creatures Inc. et GAME FREAK inc. Site indépendant, non affilié à The Pokémon Company.": "Pokémon ist eine Marke von Nintendo, Creatures Inc. und GAME FREAK inc. Unabhängige Website, nicht mit The Pokémon Company verbunden.",
 "Pokémon sur la carte": "Pokémon auf der Karte",
 "Port ou douane d’un achat : rattache-le à la carte, au voyage, ou laisse « toute l’activité ».": "Porto oder Zoll eines Einkaufs: Ordne ihn der Karte oder der Reise zu, oder lass „gesamte Tätigkeit“.",
+"Postées partout": "Überall veröffentlicht",
 "Prix": "Preis",
 "Prix ?": "Preis?",
 "Prix affiché": "Angezeigter Preis",
+"Prix croissant": "Preis aufsteigend",
 "Prix de la fiche": "Preis des Eintrags",
 "Prix de vente": "Verkaufspreis",
 "Prix de vente face au prix marché, une carte par point": "Verkaufspreis gegenüber Marktpreis, eine Karte pro Punkt",
 "Prix de vente moyen": "Durchschnittlicher Verkaufspreis",
 "Prix de {0} envoyé à {1} : en ligne dans {2} à {3} minutes.": "Preis von {0} gesendet um {1}: online in {2} bis {3} Minuten.",
 "Prix du site différent du prix marché": "Website-Preis weicht vom Marktpreis ab",
+"Prix décroissant": "Preis absteigend",
 "Prix d’achat": "Einkaufspreis",
 "Prix en euros, réf. {0}": "Preis in Euro, Ref. {0}",
 "Prix en yens, sans ticket : {0} ÷ {1} par € = {2}": "Preis in Yen, ohne Beleg: {0} ÷ {1} pro € = {2}",
@@ -905,6 +910,7 @@ window.PR_DE = {
 "Réel": "Regelbesteuerung",
 "Réel : cartes de particuliers au régime de la marge (TVA = marge × {0}/{1}), cartes importées ou achetées à un pro : TVA sur le prix, TVA d’achat récupérée.": "Regelbesteuerung: Karten von Privatpersonen unter Differenzbesteuerung (USt. = Marge × {0}/{1}); importierte oder bei Händlern gekaufte Karten: USt. auf den Preis, Vorsteuer wird erstattet.",
 "Réessayer": "Erneut versuchen",
+"Réf.": "Ref.",
 "Réf. {0}": "Ref. {0}",
 "Réf. {0} : prix de {1} envoyé.": "Ref. {0}: Preis von {1} übermittelt.",
 "Régime de TVA retenu": "Gewählte USt.-Regelung",
@@ -1063,6 +1069,7 @@ window.PR_DE = {
 "Toujours coché sur l’appareil où ta clé est enregistrée. Sur un autre navigateur (Instagram, ordinateur, autre téléphone) : ouvre une fois pokeraichu.com/#moi.": "Immer angehakt auf dem Gerät, auf dem dein Schlüssel gespeichert ist. In einem anderen Browser (Instagram, Computer, anderes Telefon): einmal pokeraichu.com/#moi öffnen.",
 "Tous les canaux": "Alle Kanäle",
 "Tous les groupes": "Alle Gruppen",
+"Tout décocher": "Alle Haken entfernen",
 "Tout est en ordre": "Alles in Ordnung",
 "Tout est rattaché.": "Alles ist zugeordnet.",
 "Toute l’activité": "Gesamte Tätigkeit",
@@ -1486,6 +1493,10 @@ window.PR_DE = {
 "{0} carte(s) cochée(s) « Annonce postée sur eBay » sur cet appareil.": "{0} Karte(n) auf diesem Gerät als „Inserat auf eBay veröffentlicht“ markiert.",
 "{0} carte(s) en prix sur demande pour cette recherche · tapez le prix puis « Publier »": "{0} Karte(n) mit Preis auf Anfrage für diese Suche · Preis eingeben, dann „Veröffentlichen“",
 "{0} carte(s) en prix sur demande · tapez le prix puis « Publier »": "{0} Karte(n) mit Preis auf Anfrage · Preis eingeben, dann „Veröffentlichen“",
+"{0} carte(s) en vente pas encore postée(s) sur les {1} canaux": "{0} Karte[|n] im Verkauf, noch nicht auf allen {1} Kanälen veröffentlicht",
+"{0} carte(s) en vente pas encore postée(s) sur les {1} canaux pour cette recherche": "{0} Karte[|n] im Verkauf, noch nicht auf allen {1} Kanälen veröffentlicht, für diese Suche",
+"{0} carte(s) postée(s) sur eBay, Vinted et Leboncoin": "{0} Karte[|n] auf eBay, Vinted und Leboncoin veröffentlicht",
+"{0} carte(s) postée(s) sur eBay, Vinted et Leboncoin pour cette recherche": "{0} Karte[|n] auf eBay, Vinted und Leboncoin veröffentlicht, für diese Suche",
 "{0} cartes": "{0} [Karte|Karten]",
 "{0} cartes dont le coût complet dépasse ce qu’elles rapporteraient vendues (prix marché × {1}, frais déduits).": "{0} Karten, deren Vollkosten übersteigen, was sie beim Verkauf einbringen würden (Marktpreis × {1}, abzüglich Kosten).",
 "{0} cartes en stock": "{0} [Karte|Karten] im Bestand",
@@ -1605,6 +1616,7 @@ window.PR_DE = {
 "À compléter : toutes tes cartes ont un prix de vente.": "Zu ergänzen: Alle deine Karten haben einen Verkaufspreis.",
 "À compléter : {0} carte sans prix de vente. Tant qu’elle n’en a pas, elle ne compte pas dans la valeur du stock : ouvre la carte › Modifier › Prix marché.": "Zu ergänzen: {0} Karte ohne Verkaufspreis. Solange sie keinen hat, zählt sie nicht zum Bestandswert: Karte öffnen › Bearbeiten › Marktpreis.",
 "À compléter : {0} cartes sans prix de vente. Tant qu’elles n’en ont pas, elles ne comptent pas dans la valeur du stock : ouvre la carte › Modifier › Prix marché.": "Zu ergänzen: {0} Karten ohne Verkaufspreis. Solange sie keinen haben, zählen sie nicht zum Bestandswert: Karte öffnen › Bearbeiten › Marktpreis.",
+"À poster": "Zu veröffentlichen",
 "À propos": "Über uns",
 "À remplir.": "Auszufüllen.",
 "À surveiller": "Im Blick behalten",
@@ -1639,6 +1651,7 @@ window.PR_DE = {
 "≈ Articles": "≈ Artikel",
 "▲ {0} pts": "▲ {0} Pkt.",
 "▼ {0} pts": "▼ {0} Pkt.",
+"✓ Annonce postée sur les {0} canaux": "✓ Inserat auf allen {0} Kanälen veröffentlicht",
 "✓ En ligne : la fiche est à jour.": "✓ Online: Der Eintrag ist aktuell.",
 "✓ Prix de {0} enregistré à {1} : la fiche passe à ce prix dans {2} à {3} minutes.": "✓ Preis von {0} gespeichert um {1}: Der Eintrag wechselt in {2} bis {3} Minuten zu diesem Preis.",
 "✓ Publié à {0} : le site l’affiche d’ici une minute environ.": "✓ Veröffentlicht um {0}: Die Website zeigt es in etwa einer Minute an."
@@ -1807,6 +1820,18 @@ window.PR_DE_RE = [
 [
 "^(\\S+) · (.+) : retirée, le site se met à jour \\((\\d+) à (\\d+) minutes\\)\\.$",
 "$1 · $2: entfernt, die Website wird aktualisiert ($3 bis $4 Minuten)."
+],
+[
+"^Annonce postée sur (.+)$",
+"Inserat veröffentlicht auf $1"
+],
+[
+"^à poster sur (.+)$",
+"noch zu veröffentlichen auf $1"
+],
+[
+"^Vendue : annonce à retirer sur (.+)$",
+"Verkauft: Inserat entfernen auf $1"
 ]
 ];
 window.PR_DE_CTX = [[".pl-toast", {"Annuler": "Rückgängig"}]];

@@ -100,6 +100,15 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
       (`pr.annonce.tampon`). **eBay et Vinted = photos d'origine**, sans case : ils refusent logo et texte sur les
       photos (règlement « Picture policy » d'eBay ; Vinted, d'après Arthur). L'ancien bandeau sous la photo ne se voyait
       qu'en plein écran : abandonné. Les photos du site ne changent pas.
+    - **Filtres et tri des annonces** (25/11, `outils.js`) : sous la recherche, chips « À poster · n » (carte
+      disponible pas encore cochée sur les 3 canaux ; réservées et vendues à part) et « Postées partout · n » (les trois
+      cases cochées), puis « Trier : Réf. | Prix décroissant | Prix croissant » (prix en direct compris, cartes sans prix
+      à la fin, choix gardé dans `pr.gestion.tri`). Ligne de la carte : « Annonce postée sur eBay · à poster sur Vinted,
+      Leboncoin » ou « ✓ Annonce postée sur les 3 canaux ». Une carte qu'on vient de changer depuis son annonce reste
+      affichée (`garde`) jusqu'au prochain changement de filtre, de tri ou de recherche, et le compte ne la compte plus.
+    - **Bouton « Cocher les 3 canaux »** en bas de chaque annonce (25/11, `annonce.js` › `finAnnonce`) : coche eBay,
+      Vinted et Leboncoin d'un coup, referme l'annonce et ramène la ligne de la carte à l'écran ; « Tout décocher »
+      quand les trois sont cochées. Les cases restent propres à chaque appareil (`pr.annonce.postees`).
   - **Bouton « Modifier »** (`assets/js/modif.js`) : change le **nom** (FR et EN), l'**état** d'une carte non gradée
     (ou le n° de certificat d'un slab) et les **Pokémon** d'une fiche déjà en ligne. Un seul fichier est commité :
     `_ajouts/modifs.json` (`{"modifs": {"<réf>": {nom_fr, nom_en, etat | cert, pokemons, pokemons_en, le}}}`), puis
@@ -122,6 +131,17 @@ visites illimitées pour les fichiers statiques, 100 000 passages par jour pour 
 - `/tirage.html` : tirage au sort pour les jeux concours (import CSV/XLSX/texte, tirage pondéré, mode film).
   Arthur utilise surtout une **page de tirage séparée** hébergée comme artifact claude.ai
   (« Tirage Poké-Raichu »), qui n'est **pas** dans ce dépôt.
+
+### Prix en direct et Shopify (pour Claude)
+- Le Gist `statuts.json` n'est **pas lisible depuis le terminal** (proxy : gist.github.com et gist.githubusercontent.com
+  refusés, API `gists/` refusée car la session est liée au dépôt) ni par WebFetch sur le lien Raw (robots). Ce qui marche :
+  **WebFetch sur la page `https://gist.github.com/arthurdemaria06-afk/dcf1d1b3bd2d78231c263bdcba55fc41`**, lue deux fois
+  avec deux consignes différentes (JSON complet, puis liste CLÉ=VALEUR), et comparée. Ne pas passer par une branche
+  GitHub Actions pour la lire (refusé le 25/11).
+- Prix d'une carte = `prix` du Gist s'il existe (seuls les prix changés y sont), sinon `prix_eur` de `data/stock.json`.
+- Shopify (synchro Whatnot) : SKU `PKR-<réf sans les zéros de tête>` (`PKR-78` = 078), plusieurs réfs d'une même fiche
+  jointes par « - » (`PKR-38-210`, `PKR-118-119-120`) ; lots `PKR-L02`, gradées `PKR-G…`, boosters `PKR-BOOST-…` (hors
+  site, prix gérés à part). Mise à jour des prix avec `productVariantsBulkUpdate`, plusieurs produits par appel (alias).
 
 ## 4. Comment le site est construit
 
@@ -231,6 +251,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (25/11) Gestion : filtres « À poster » / « Postées partout », tri par prix, bouton « Cocher les 3 canaux » en bas de l'annonce.
 - (23/11) Pilotage › Stock : bouton « € | % » sur les lignes, tuile Rentabilité pondérée des ventes.
 - (22/11) Pilotage › Stock : le scellé compté avec les cartes (tuiles, liste, tableau).
 - (22/11) Annonces : anglais seulement sur eBay (titre + bloc « English »), section « Titres eBay français + anglais »

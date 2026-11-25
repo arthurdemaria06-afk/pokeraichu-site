@@ -123,6 +123,15 @@
     /* filtre « Prix sur demande » : seulement les cartes sans prix, pour leur en donner un vite */
     var askBtn = G.querySelector('[data-gestion-ask]'), askN = G.querySelector('[data-gestion-ask-n]'), askOnly = false;
     function isAsk(c) { return c.prix_eur === null || c.prix_eur === undefined; }
+    /* filtre des annonces (demande d'Arthur, 25/11/2026) : « À poster » = carte disponible pas encore cochée sur les
+       3 canaux (eBay, Vinted, Leboncoin), « Postées partout » = les trois cases cochées. Les cases restent
+       celles de cet appareil (pr.annonce.postees). Une carte qu'on vient de cocher reste affichée (garde) jusqu'au
+       prochain changement de filtre, de tri ou de recherche, pour voir que c'est fait. */
+    var posteBtns = G.querySelectorAll('[data-gestion-poste]'), poste = '', garde = {};
+    /* tri par prix (prix en direct compris), gardé sur l'appareil ; les cartes sans prix passent à la fin */
+    var triSeg = G.querySelector('[data-gestion-tri]'), tri = 'ref';
+    try { tri = localStorage.getItem('pr.gestion.tri') || 'ref'; } catch (e) {}
+    if (['ref', 'prix-desc', 'prix-asc'].indexOf(tri) === -1) tri = 'ref';
     var cards = [], byRef = {}, state = { reservees: [], vendues: [], prix: {} }, timer = null, loaded = false;
     var AN = window.PR_ANNONCE || null, anOpen = null;
     var MO = window.PR_MODIF || null, moOpen = null;
@@ -313,16 +322,36 @@
       wrap.appendChild(nt);
       return wrap;
     }
+    function prixDe(c) {
+      var lp = livePrice(c.ref);
+      if (lp !== null) return lp;
+      return c.prix_eur === null || c.prix_eur === undefined ? null : +c.prix_eur;
+    }
+    function aPoster(c) { return statusOf(c.ref) === 'dispo' && !AN.partout(c.ref); }
+    function vue() {
+      if (tri === 'ref') return cards;
+      var sens = tri === 'prix-desc' ? -1 : 1, rang = {};
+      cards.forEach(function (c, i) { rang[c.ref] = i; });
+      return cards.slice().sort(function (a, b) {
+        var pa = prixDe(a), pb = prixDe(b);
+        if (pa === null || pb === null) return (pa === null) - (pb === null) || rang[a.ref] - rang[b.ref];
+        return (pa - pb) * sens || rang[a.ref] - rang[b.ref];
+      });
+    }
     function render() {
       var t = norm(q.value).trim();
       list.textContent = '';
-      var shown = 0, nPx = Object.keys(state.prix).length;
-      cards.forEach(function (c) {
+      var shown = 0, nVrai = 0, nPx = Object.keys(state.prix).length;
+      vue().forEach(function (c) {
         if (askOnly && !isAsk(c)) return;
+        var dedans = !(AN && poste) || (poste === 'a-poster' ? aPoster(c) : AN.partout(c.ref));
+        if (!dedans && !garde[c.ref]) return;
         if (t && norm(c.ref + ' ' + label(c) + ' ' + (c.nom_en || '')).indexOf(t) === -1) return;
         var cur = statusOf(c.ref), lp = livePrice(c.ref);
         shown++;
+        if (dedans) nVrai++;
         var li = el('li', 'sel-row sel-row--pic' + (lp !== null ? ' is-live-price' : ''));
+        li.setAttribute('data-ref', c.ref);
         var pic = el('a', 'sel-pic' + (c.photo_t ? '' : ' sel-pic--none'));
         pic.href = 'cartes/' + c.slug + '.html';
         pic.target = '_blank';
@@ -344,9 +373,11 @@
           (lp !== null ? ' · prix changé en direct (publié : ' + eur0(c.prix_eur) + ')' : '')));
         var where = AN ? AN.ou(c.ref) : [];
         if (where.length) {
-          var gone = cur === 'vendue';
-          li.appendChild(el('span', 'sel-row__meta annonce-ou' + (gone ? ' is-warn' : ''),
-            (gone ? 'Vendue : annonce à retirer sur ' : 'Annonce postée sur ') + where.join(', ')));
+          var gone = cur === 'vendue', tout3 = AN.partout(c.ref);
+          li.appendChild(el('span', 'sel-row__meta annonce-ou' + (gone ? ' is-warn' : tout3 ? ' is-ok' : ''),
+            gone ? 'Vendue : annonce à retirer sur ' + where.join(', ')
+              : tout3 ? '✓ Annonce postée sur les 3 canaux'
+              : 'Annonce postée sur ' + where.join(', ') + ' · à poster sur ' + AN.manque(c.ref).join(', ')));
         }
         var wait = MO ? MO.etiquette(c) : '';
         if (wait) li.appendChild(el('span', 'sel-row__meta modif-attente', wait));
@@ -380,7 +411,18 @@
           ab.setAttribute('aria-expanded', String(anOpen === c.ref));
           ab.addEventListener('click', function () { anOpen = anOpen === c.ref ? null : c.ref; render(); });
           ctrl.appendChild(ab);
-          if (anOpen === c.ref) li.appendChild(AN.panel(c, c.prix_eur === null || c.prix_eur === undefined ? null : (lp !== null ? lp : c.prix_eur), function () { render(); titresEbay(); }));
+          if (anOpen === c.ref) li.appendChild(AN.panel(c, c.prix_eur === null || c.prix_eur === undefined ? null : (lp !== null ? lp : c.prix_eur), function (o) {
+            var ref = c.ref;
+            garde[ref] = true;
+            if (o && o.fermer) anOpen = null;
+            render();
+            titresEbay();
+            /* annonce refermée : la ligne de la carte revient à l'écran (sinon on se retrouve plus bas dans la liste) */
+            if (o && o.fermer) {
+              var row = list.querySelector('[data-ref="' + ref + '"]');
+              if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center' });
+            }
+          }));
         }
         if (MO) {
           var mb = el('button', 'btn btn--ghost modif-btn', moOpen === c.ref ? 'Fermer la modification' : 'Modifier');
@@ -395,8 +437,25 @@
       var nAsk = cards.filter(isAsk).length;
       if (askN) askN.textContent = ' · ' + nAsk;
       if (askBtn) askBtn.hidden = !nAsk && !askOnly;
+      if (AN) Array.prototype.forEach.call(posteBtns, function (b) {
+        var v = b.getAttribute('data-gestion-poste'), n = b.querySelector('.g-filtres__n');
+        b.setAttribute('aria-pressed', String(poste === v));
+        if (n) n.textContent = ' · ' + cards.filter(v === 'a-poster' ? aPoster : function (c) { return AN.partout(c.ref); }).length;
+      });
+      if (triSeg) Array.prototype.forEach.call(triSeg.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === tri));
+      });
       if (askOnly) {
         count.textContent = shown + ' carte(s) en prix sur demande' + (t ? ' pour cette recherche' : '') + ' · tapez le prix puis « Publier »';
+        return;
+      }
+      /* les cartes gardées à l'écran après un changement ne comptent plus dans le filtre */
+      if (poste === 'a-poster') {
+        count.textContent = nVrai + ' carte(s) en vente pas encore postée(s) sur les 3 canaux' + (t ? ' pour cette recherche' : '');
+        return;
+      }
+      if (poste === 'partout') {
+        count.textContent = nVrai + ' carte(s) postée(s) sur eBay, Vinted et Leboncoin' + (t ? ' pour cette recherche' : '');
         return;
       }
       count.textContent = state.reservees.length + ' réservée(s) · ' + state.vendues.length + ' vendue(s) · ' + nPx +
@@ -485,11 +544,30 @@
         titresEbay();
       }).catch(function (e) { setInfo('Lecture impossible (' + e.message + ').'); });
     }
-    q.addEventListener('input', render);
+    q.addEventListener('input', function () { garde = {}; render(); });
     if (askBtn) askBtn.addEventListener('click', function () {
       askOnly = !askOnly;
       askBtn.setAttribute('aria-pressed', String(askOnly));
+      garde = {};
       render();
+    });
+    Array.prototype.forEach.call(posteBtns, function (b) {
+      if (!AN) { b.hidden = true; return; }
+      b.addEventListener('click', function () {
+        var v = b.getAttribute('data-gestion-poste');
+        poste = poste === v ? '' : v;
+        garde = {};
+        anOpen = null;
+        render();
+      });
+    });
+    if (triSeg) Array.prototype.forEach.call(triSeg.querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () {
+        tri = b.getAttribute('data-v');
+        try { localStorage.setItem('pr.gestion.tri', tri); } catch (e) {}
+        garde = {};
+        render();
+      });
     });
     /* retour sur l'onglet : relire le Gist (changements faits depuis la caisse du salon ou un autre appareil) */
     d.addEventListener('visibilitychange', function () {

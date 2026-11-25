@@ -535,8 +535,29 @@
     box.appendChild(body);
     var photos = blocPhotos(c, function () { return cur; });
     box.appendChild(photos);
+    box.appendChild(finAnnonce(c, onChange));
     draw();
     return box;
+  }
+
+  /* en bas de l'annonce : les trois canaux cochés d'un coup (demande d'Arthur, 25/11/2026), au lieu de passer
+     par les onglets eBay, Vinted et Leboncoin. onChange({ fermer: true }) : la liste referme l'annonce. */
+  function finAnnonce(c, onChange) {
+    var fin = el('div', 'annonce__fin');
+    if (partout(c.ref)) {
+      fin.appendChild(el('p', 'annonce__ok', '✓ Annonce postée sur les 3 canaux'));
+      var defaire = el('button', 'linkbtn', 'Tout décocher');
+      defaire.type = 'button';
+      defaire.addEventListener('click', function () { cocherTout(c.ref, false); if (onChange) onChange(); });
+      fin.appendChild(defaire);
+    } else {
+      var tout = el('button', 'btn annonce__tout', 'Cocher les 3 canaux');
+      tout.type = 'button';
+      tout.addEventListener('click', function () { cocherTout(c.ref, true); if (onChange) onChange({ fermer: true }); });
+      fin.appendChild(tout);
+      fin.appendChild(el('p', 'muted small', 'Annonce postée sur eBay, Vinted et Leboncoin : les trois cases d’un coup.'));
+    }
+    return fin;
   }
 
   /* « eBay, Vinted » : plateformes où la carte est déjà postée */
@@ -544,6 +565,18 @@
     var m = postees()[ref] || {};
     return SITES.filter(function (s) { return m[s.id]; }).map(function (s) { return s.nom; });
   }
+  /* plateformes où elle reste à poster */
+  function manque(ref) {
+    var m = postees()[ref] || {};
+    return SITES.filter(function (s) { return !m[s.id]; }).map(function (s) { return s.nom; });
+  }
+  function partout(ref) { return !manque(ref).length; }
+  function cocherTout(ref, oui) {
+    var all = postees();
+    if (oui) { all[ref] = {}; SITES.forEach(function (s) { all[ref][s.id] = 1; }); }
+    else delete all[ref];
+    put('pr.annonce.postees', JSON.stringify(all));
+  }
 
-  window.PR_ANNONCE = { panel: panel, ou: ou, titre: titre, titreEbay: titreEbay, description: description, prixPour: prixPour, composer: composer, logoPhoto: logoPhoto, copier: copier };
+  window.PR_ANNONCE = { panel: panel, ou: ou, manque: manque, partout: partout, cocherTout: cocherTout, titre: titre, titreEbay: titreEbay, description: description, prixPour: prixPour, composer: composer, logoPhoto: logoPhoto, copier: copier };
 })();
