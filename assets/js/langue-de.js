@@ -376,6 +376,7 @@ window.PR_DE = {
 "Décote consentie": "Gewährter Abschlag",
 "Découper par": "Aufteilen nach",
 "Déjà enregistrée : cette carte est vendue.": "Bereits gespeichert: Diese Karte ist verkauft.",
+"Déjà enregistrée ainsi": "Bereits so gespeichert",
 "Délai (mois)": "Dauer (Monate)",
 "Délai médian": "Mediane Verkaufsdauer",
 "Départ": "Abreise",
@@ -417,6 +418,7 @@ window.PR_DE = {
 "Enregistrer les frais par canal": "Gebühren pro Kanal speichern",
 "Enregistrer les photos": "Fotos speichern",
 "Enregistrer les réglages": "Einstellungen speichern",
+"Enregistrer les {0} ventes": "Die {0} Verkäufe speichern",
 "Enregistrer sur cet appareil": "Auf diesem Gerät speichern",
 "Enregistrez d’abord votre clé GitHub en haut de la page.": "Speichern Sie zuerst Ihren GitHub-Schlüssel oben auf der Seite.",
 "Enregistré": "Gespeichert",
@@ -588,6 +590,7 @@ window.PR_DE = {
 "Lettres et chiffres seulement.": "Nur Buchstaben und Ziffern.",
 "Levier opérationnel": "Operativer Hebel",
 "Libellé": "Bezeichnung",
+"Lien de ventes impossible": "Verkaufslink lässt sich nicht öffnen",
 "Liste": "Liste",
 "Liste indisponible pour le moment ({0}). Réessayez.": "Liste derzeit nicht verfügbar ({0}). Versuchen Sie es erneut.",
 "Lot ajouté": "Lot hinzugefügt",
@@ -678,6 +681,7 @@ window.PR_DE = {
 "Nouveau ticket": "Neuer Beleg",
 "Nouveau voyage": "Neue Reise",
 "Nouvelle charge": "Neuer Aufwand",
+"Nouvelle vente": "Neuer Verkauf",
 "Novembre {0}": "November {0}",
 "Numéro": "Nummer",
 "N° de certificat": "Zertifikatsnummer",
@@ -722,6 +726,7 @@ window.PR_DE = {
 "Pas encore de photo": "Noch kein Foto",
 "Pas récupérable (particulier ou franchise) : charges comptées TTC": "Nicht abziehbar (Privatperson oder Kleinunternehmer): Aufwendungen brutto erfasst",
 "Passer aussi la carte en « Vendue » sur pokeraichu.com": "Karte auch auf pokeraichu.com auf „Verkauft“ setzen",
+"Passer aussi les {0} cartes en « Vendue » sur pokeraichu.com": "Die {0} Karten auch auf pokeraichu.com auf „Verkauft“ setzen",
 "Passer en Vendue": "Auf „Verkauft“ setzen",
 "Passez une carte en « Réservée » ou « Vendue », changez son prix ou ajoutez une nouvelle carte : le site se met à jour tout seul, sans republier. Le bouton « Modifier » change le nom, l’état ou les Pokémon d’une fiche déjà en ligne. Le bouton « Annonce » prépare le texte et les photos pour eBay, Vinted et Leboncoin.": "Setzen Sie eine Karte auf „Reserviert“ oder „Verkauft“, ändern Sie ihren Preis oder fügen Sie eine neue Karte hinzu: Die Website aktualisiert sich von selbst, ohne erneute Veröffentlichung. Die Schaltfläche „Bearbeiten“ ändert Name, Zustand oder Pokémon eines bereits veröffentlichten Eintrags. Die Schaltfläche „Inserat“ bereitet Text und Fotos für eBay, Vinted und Leboncoin vor.",
 "Payé": "Bezahlt",
@@ -751,6 +756,7 @@ window.PR_DE = {
 "Plus gardée": "Nicht mehr behalten",
 "Plus grosses pièces en stock": "Größte Stücke im Bestand",
 "Plus rien en stock pour ce découpage.": "Für diese Aufteilung nichts mehr im Bestand.",
+"Plus tard": "Später",
 "Plus › Scellé": "Mehr › Sealed",
 "Plus-value": "Unrealisierter Gewinn",
 "Plus-value latente": "Unrealisierter Gewinn",
@@ -811,6 +817,7 @@ window.PR_DE = {
 "Provenance : {0} importées, {1} de particuliers.": "Herkunft: {0} importiert, {1} von Privatpersonen.",
 "Prélèvements : {0} du bénéfice avant ta rémunération.": "Abgaben: {0} des Gewinns vor deiner Vergütung.",
 "Préparation des photos…": "Fotos werden vorbereitet…",
+"Préparées par Claude : vérifie, puis enregistre.": "Von Claude vorbereitet: prüfen, dann speichern.",
 "Présentation": "Präsentation",
 "Prêt : chaque changement est publié en quelques secondes.": "Bereit: Jede Änderung wird in wenigen Sekunden veröffentlicht.",
 "Publicité": "Werbung",
@@ -848,6 +855,8 @@ window.PR_DE = {
 "Remettre aussi la carte « Disponible » sur le site": "Karte auch auf der Website wieder auf „Verfügbar“ setzen",
 "Remonter en haut": "Nach oben",
 "Remonter en haut de la page": "Zum Seitenanfang",
+"Remplace la vente déjà enregistrée": "Ersetzt den bereits gespeicherten Verkauf",
+"Remplace la vente déjà enregistrée à {0}": "Ersetzt den bereits gespeicherten Verkauf zu {0}",
 "Remplace le taux général pour les cartes vendues sur ce canal.": "Ersetzt den allgemeinen Satz für Karten, die über diesen Kanal verkauft werden.",
 "Remplace le taux général pour les cartes vendues sur ce canal. Vide": "Ersetzt den allgemeinen Satz für Karten, die über diesen Kanal verkauft werden. Leer",
 "Remplace toutes les données actuelles. La version actuelle reste dans l’historique.": "Ersetzt alle aktuellen Daten. Die aktuelle Version bleibt im Verlauf.",
@@ -1068,10 +1077,12 @@ window.PR_DE = {
 "Total": "Summe",
 "Total des achats": "Summe der Einkäufe",
 "Total du ticket": "Belegsumme",
+"Total {0}": "Summe {0}",
 "Toujours coché sur l’appareil où ta clé est enregistrée. Sur un autre navigateur (Instagram, ordinateur, autre téléphone) : ouvre une fois pokeraichu.com/#moi.": "Immer angehakt auf dem Gerät, auf dem dein Schlüssel gespeichert ist. In einem anderen Browser (Instagram, Computer, anderes Telefon): einmal pokeraichu.com/#moi öffnen.",
 "Tous les canaux": "Alle Kanäle",
 "Tous les groupes": "Alle Gruppen",
 "Tout décocher": "Alle Haken entfernen",
+"Tout est déjà enregistré.": "Alles ist bereits gespeichert.",
 "Tout est en ordre": "Alles in Ordnung",
 "Tout est rattaché.": "Alles ist zugeordnet.",
 "Toute l’activité": "Gesamte Tätigkeit",
@@ -1153,6 +1164,7 @@ window.PR_DE = {
 "Ventes réussies eBay ↗": "Erfolgreiche eBay-Verkäufe ↗",
 "Ventes sans date (venues de l’Excel)": "Verkäufe ohne Datum (aus der Excel-Datei)",
 "Ventes sur {0} mois": "Verkäufe über {0} Monate",
+"Ventes à enregistrer": "Zu speichernde Verkäufe",
 "Ventes à perte": "Verkäufe mit Verlust",
 "Version anglaise du site": "Englische Version der Website",
 "Version anglaise du site (facultatif)": "Englische Version der Website (optional)",
@@ -1212,6 +1224,7 @@ window.PR_DE = {
 "boissons": "Getränke",
 "boosters)": "Booster)",
 "boutique non indiquée": "Laden nicht angegeben",
+"bénéfice net estimé {0}": "geschätzter Nettogewinn {0}",
 "bénéfice net ÷ coût des ventes": "Nettogewinn ÷ Kosten der Verkäufe",
 "bénéfice net, depuis le début": "Nettogewinn, seit Beginn",
 "bénéfice net, {0} derniers jours": "Nettogewinn, letzte {0} Tage",
@@ -1219,6 +1232,7 @@ window.PR_DE = {
 "bénéfice {0}": "Gewinn {0}",
 "bénéfice ÷ prix de vente · rentabilité {0}": "Gewinn ÷ Verkaufspreis · Rendite {0}",
 "cachée": "versteckt",
+"canal à préciser": "Kanal noch angeben",
 "capital": "Kapital",
 "capital libéré": "eingezahltes Kapital",
 "capital {0}": "Kapital {0}",
@@ -1464,6 +1478,7 @@ window.PR_DE = {
 "vendue vers le {0}": "verkauft um den {0}",
 "vendue. Publié à {0}": "verkauft. Veröffentlicht um {0}",
 "vendus à {0} du prix marché": "verkauft zu {0} des Marktpreises",
+"vente ignorée.": "Verkauf ignoriert.",
 "ventes faites sur le site, pas encore saisies ici": "Verkäufe über die Website, hier noch nicht erfasst",
 "ventes − achats − toutes les charges": "Verkäufe − Einkäufe − alle Aufwendungen",
 "voyages, commissions, envois, abonnements…": "Reisen, Provisionen, Versand, Abonnements…",
@@ -1484,6 +1499,7 @@ window.PR_DE = {
 "{0} articles": "{0} [Artikel|Artikel]",
 "{0} articles au prix marché": "{0} Artikel zum Marktpreis",
 "{0} articles vendus · {1} encaissés · rentabilité {2}": "{0} verkaufte Artikel · {1} Erlös · Rendite {2}",
+"{0} au lieu de {1}": "{0} statt {1}",
 "{0} au total": "{0} insgesamt",
 "{0} boutique": "{0} Laden",
 "{0} boutiques": "{0} Läden",
@@ -1838,6 +1854,34 @@ window.PR_DE_RE = [
 [
 "^Vendue : annonce à retirer sur (.+)$",
 "Verkauft: Inserat entfernen auf $1"
+],
+[
+"^Ventes (WhatsApp|Instagram|eBay|Vinted|Leboncoin|Whatnot|Cardmarket|Salon|Dépôt-vente|Autre)$",
+"Verkäufe über $1"
+],
+[
+"^Vente (WhatsApp|Instagram|eBay|Vinted|Leboncoin|Whatnot|Cardmarket|Salon|Dépôt-vente|Autre)$",
+"Verkauf über $1"
+],
+[
+"^Frais de vente (WhatsApp|Instagram|eBay|Vinted|Leboncoin|Whatnot|Cardmarket|Salon|Dépôt-vente|Autre)$",
+"Verkaufsgebühren $1"
+],
+[
+"^Réf\\. (\\S+) introuvable dans ton stock$",
+"Ref. $1 nicht in deinem Bestand"
+],
+[
+"^Réf\\. (\\S+) sans prix lisible$",
+"Ref. $1 ohne lesbaren Preis"
+],
+[
+"^La carte N° (\\S+) n’existe plus\\.$",
+"Die Karte Nr. $1 existiert nicht mehr."
+],
+[
+"^Les ventes sont enregistrées ici, mais le site n’a pas pu être mis à jour \\((.+)\\)\\. Fais-le depuis la page Gestion\\.$",
+"Die Verkäufe sind hier gespeichert, aber die Website konnte nicht aktualisiert werden ($1). Erledige das über die Verwaltungsseite."
 ]
 ];
 window.PR_DE_CTX = [[".pl-toast", {"Annuler": "Rückgängig"}]];

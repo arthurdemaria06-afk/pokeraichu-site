@@ -256,6 +256,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (25/11) Pilotage : lien de ventes chiffré (#ventes=…) préparé par Claude ; ventes eBay 011 et G1830 inscrites (site, Shopify à 0).
 - (25/11) Site : remises par quantité (−5 % / −10 %) supprimées partout (config, fiches, sélection, FAQ, CGV).
 - (25/11) Pilotage : ventes faites sur le site reprises toutes seules (canal à préciser), bouton « Modifier la vente ».
 - (25/11) Pilotage : prix marché alignés tout seuls sur les prix du site (page Gestion).
@@ -352,6 +353,19 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
   automatique tombe quand on choisit un canal). Lots et fiches à plusieurs exemplaires restent dans Contrôles ›
   Ventes du site à saisir ici. Le scellé (boosters,
   card sets) n'est pas concerné : quantités vendues et prix à l'unité se saisissent dans Pilotage › Scellé.
+- **Lien de ventes** (25/11, `lienVentes()` / `feuilleVentesLien()` de pilotage.js) : quand Arthur envoie des ventes
+  (capture eBay, Vinted…) en disant « gère », Claude, qui n'a pas la clé du Pilotage, écrit le JSON **hors du dépôt**
+  (`/tmp/ventes.json`) puis `python3 _outils/pilotage/ventes.py /tmp/ventes.json` : `pilotage/ventes-<id>.bin`
+  (AES-GCM) + lien `https://pokeraichu.com/pilotage.html#ventes=<id>.<clé>` à donner à Arthur. Format :
+  `{source, frais_canal?, frais_note?, ventes: [{ref, prix, date, canal, note}]}` ; `ref` = réf. du site (ou N° d'ici,
+  `alias_site` compris) ; **`prix` = ce qui reste de la vente** (bordereau d'envoi payé par Arthur déduit, détail dans
+  `note`) ; `frais_canal` = taux à fixer dans les réglages (`{eBay: 0}` : eBay ne prend plus de frais aux vendeurs
+  particuliers de l'EEE depuis le 1er septembre 2026). Arthur touche le lien : feuille « Ventes à enregistrer » (photo,
+  prix, bénéfice estimé, « Nouvelle vente » ou « Remplace la vente déjà enregistrée à … », case des frais, case
+  « Vendue sur pokeraichu.com » pour les fiches encore en vente) puis une seule version « Ventes eBay · N cartes · total ».
+  Pendant la relecture, `synchroSite()` laisse ces cartes de côté (`S.lienRefs`). Ce lien ne touche ni Shopify ni le site
+  public : Claude met lui-même le stock Shopify à 0 et inscrit les réfs dans `config.js` (`vendues`, `vendues_le`).
+  **Retirer `pilotage/ventes-<id>.bin` du dépôt** une fois les ventes enregistrées (à la session suivante au plus tard).
 - Contrôles avec le site : `alias_site` (P1, P1-2, P1-3 = fiche 301 ; P2… = 302 ; P3… = 303), `lots_site` (L01 = 095 + G4784,
   L02 = P1 + P2, L03 = P3 + P4, L04 = 313 + 314), `refs_site` des produits (card sets = S02–S10).
 - Coffrets ouverts (20/11) : `coffretOuvert()` de pilotage.js, appliqué une fois à l'ouverture et à chaque import (trace

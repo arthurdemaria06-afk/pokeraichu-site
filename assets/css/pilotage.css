@@ -622,3 +622,8 @@ a.pl-ibtn{text-decoration:none}
 /* ------------------------------------------------------------------ mouvement réduit, impression */
 @media (prefers-reduced-motion:reduce){.pl *{transition:none!important}}
 @media print{.pl-tabs,.pl-top,.pl-fbar,.pl-ibtn{display:none!important}.pl-main{margin:0!important}.pl-carte,.pl-kpi{break-inside:avoid}}
+/* ventes préparées par Claude (lien chiffré #ventes=…, 25/11/2026) */
+.pl-lien-v > * + *{margin-top:12px}
+.pl-lien-v > .pl-note:first-child{margin-top:0}
+.pl-lien-v > .pl-note + .pl-note{margin-top:2px}
+.pl-lien-v .pl-check small{display:block;margin-top:2px;color:var(--pl-encre-3);font-size:.76rem;line-height:1.35}

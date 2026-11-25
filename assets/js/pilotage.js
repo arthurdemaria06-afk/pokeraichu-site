@@ -395,6 +395,7 @@
     Object.keys(parRf).forEach(function (rf) {
       var p = prixSite(rf);
       if (parRf[rf].length !== 1 || vide(p) || !(p > 0)) return;
+      if (S.lienRefs && S.lienRefs.indexOf(parRf[rf][0].c.ref) !== -1) return;   /* vente apportée par un lien de Claude, en relecture */
       ventes.push({ ref: parRf[rf][0].c.ref, nom: parRf[rf][0].c.nom, p: p });
       total += p;
     });
@@ -3208,6 +3209,188 @@
       .catch(function (e) { ecranMessage('Import impossible', 'Le lien n’a pas pu être ouvert (' + (e && e.message ? e.message : 'clé incorrecte') + '). Demande un nouveau lien à Claude.', true); });
   }
 
+  /* ---------------------------------------------------------------- ventes préparées par Claude (lien chiffré, 25/11/2026)
+     Demande d'Arthur (« gère ces deux ventes, mets à jour tout », capture des transactions eBay) : Claude n'a pas la clé
+     du Pilotage. _outils/pilotage/ventes.py dépose pilotage/ventes-<id>.bin (AES-GCM ; la clé n'est que dans le lien, le
+     dépôt est public) et donne https://pokeraichu.com/pilotage.html#ventes=<id>.<clé>. Contenu :
+     { source, frais_canal?, frais_note?, ventes: [{ ref, prix, date, canal, note }] } ; ref = réf. du site ou N° d'ici ;
+     prix = ce qui reste de la vente (frais d'envoi payés par Arthur déduits). Feuille « Ventes à enregistrer » : photo,
+     prix, bénéfice estimé, ce que la ligne remplace (une vente déjà reprise du site au prix affiché, par exemple) ; une
+     seule version à la confirmation (Annuler pendant 7 s). frais_canal (ex. { eBay: 0 }) : case cochée qui fixe ce taux
+     dans les réglages. Case « Vendue sur pokeraichu.com » pour les fiches encore en vente sur le site. Pendant la
+     relecture, la synchro du site laisse ces cartes de côté (S.lienRefs). Retirer le .bin du dépôt ensuite. */
+  var RE_LIEN_V = /^#ventes=([a-f0-9]{8,40})\.([A-Za-z0-9_-]{43})$/;
+  function dechiffrerLien(chemin, cle) {
+    if (!w.crypto || !w.crypto.subtle || !w.TextDecoder) return Promise.reject(new Error('navigateur trop ancien, essaie Safari'));
+    return fetch(chemin, { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status === 404 ? 'ce lien a expiré' : 'erreur ' + r.status); return r.arrayBuffer(); })
+      .then(function (buf) {
+        return crypto.subtle.importKey('raw', octets(cle), { name: 'AES-GCM' }, false, ['decrypt']).then(function (k) {
+          return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(buf, 0, 12) }, k, new Uint8Array(buf, 12));
+        });
+      })
+      .then(function (pt) { return JSON.parse(new TextDecoder().decode(pt)); });
+  }
+  /* carte d'ici pour une réf. du lien : N° du Pilotage, sinon réf. du site (alias_site), de préférence encore en stock */
+  function carteDuLien(ref) {
+    var R = S.R, s = String(ref == null ? '' : ref).trim(), u = s.toUpperCase(), libre = null, autre = null;
+    if (R.parRef[s]) return R.parRef[s];
+    if (R.parRef[u]) return R.parRef[u];
+    R.cartes.forEach(function (r) {
+      var a = r.c.alias_site || [];
+      if (a.indexOf(s) === -1 && a.indexOf(u) === -1) return;
+      if (!r.c.vendu && !libre) libre = r;
+      if (!autre) autre = r;
+    });
+    return libre || autre;
+  }
+  function tauxVente(canal, fc) {
+    var P = S.R.params, F = fc || P.frais_canal || {};
+    return canal && Object.prototype.hasOwnProperty.call(F, canal) ? F[canal] : P.fv;
+  }
+  /* même estimation que la feuille « Enregistrer la vente » */
+  function beneficeVente(r, v, canal, fc) {
+    var P = S.R.params, f = tauxVente(canal, fc);
+    var cout = (r.paye != null ? r.paye : v * (1 - f) / ((1 + P.tva) + P.rent)) * (1 + P.tva);
+    return v * (1 - f) - cout - P.envoi;
+  }
+  /* plusieurs fiches du site d'un coup, en une seule écriture du Gist */
+  function statutsSite(refs, etat) {
+    if (!refs.length) return Promise.resolve(S.statuts);
+    if (!GIST) return Promise.reject(new Error('statuts_url manquant dans config.js'));
+    return lireStatuts().then(function (s) {
+      s.vendues = s.vendues.filter(function (r) { return refs.indexOf(r) === -1; });
+      s.reservees = s.reservees.filter(function (r) { return refs.indexOf(r) === -1; });
+      if (etat === 'vendue') s.vendues = s.vendues.concat(refs);
+      s.maj = new Date().toISOString();
+      var files = {};
+      files[GFILE] = { content: JSON.stringify({ maj: s.maj, reservees: s.reservees, vendues: s.vendues, prix: prixPropres(s.prix) }, null, 1) };
+      return gist('PATCH', { files: files }).then(function () { S.statuts = s; return s; });
+    });
+  }
+  function lienVentes(id, cle) {
+    dechiffrerLien('pilotage/ventes-' + id + '.bin', cle).then(function (data) {
+      if (!data || !Array.isArray(data.ventes) || !data.ventes.length) throw new Error('aucune vente dans ce lien');
+      S.lienRefs = [];
+      data.ventes.forEach(function (v) { var r = carteDuLien(v && v.ref); if (r) S.lienRefs.push(r.c.ref); });
+      return (S.site && S.statuts ? Promise.resolve() : chargerSite()).then(function () { return data; });
+    }).then(function (data) {
+      if (S.doc) feuilleVentesLien(data);
+    }).catch(function (e) {
+      S.lienRefs = null;
+      if (!S.site) chargerSite();
+      alerte('Lien de ventes impossible', 'Le lien n’a pas pu être ouvert (' + (e && e.message ? e.message : 'clé incorrecte') + '). Demande un nouveau lien à Claude.');
+    });
+  }
+  function feuilleVentesLien(data) {
+    var P = S.R.params, lignes = [], aFaire = [], refsSite = [], rejets = [], frais = [];
+    data.ventes.forEach(function (v) {
+      v = v || {};
+      var r = carteDuLien(v.ref), prix = typeof v.prix === 'number' && isFinite(v.prix) ? Math.round(v.prix * 100) / 100 : NaN;
+      if (!r) { rejets.push('Réf. ' + v.ref + ' introuvable dans ton stock : vente ignorée.'); return; }
+      if (!(prix >= 0)) { rejets.push('Réf. ' + v.ref + ' sans prix lisible : vente ignorée.'); return; }
+      var c = r.c, canal = CANAUX.indexOf(v.canal) !== -1 ? v.canal : null;
+      var date = /^\d{4}-\d{2}-\d{2}$/.test(String(v.date || '')) && v.date <= aujourdhui() ? v.date : aujourdhui();
+      var x = { r: r, prix: prix, date: date, canal: canal, note: String(v.note || '').trim().slice(0, 300), avant: c.vendu ? c.prix_vendu : null, sref: siteRefDe(c) };
+      x.pareil = !!c.vendu && c.prix_vendu === prix && c.vente_date === date && (c.canal || null) === canal && (c.vente_note || '') === x.note;
+      lignes.push(x);
+      if (!x.pareil) aFaire.push(x);
+      if (x.sref && S.statuts && etatSite(x.sref) !== 'vendue' && refsSite.indexOf(x.sref) === -1) refsSite.push(x.sref);
+    });
+    var fcLien = data.frais_canal && typeof data.frais_canal === 'object' ? data.frais_canal : {};
+    Object.keys(fcLien).forEach(function (cn) {
+      var t = +fcLien[cn], avant = tauxVente(cn);
+      if (CANAUX.indexOf(cn) !== -1 && t >= 0 && t < 1 && Math.abs(avant - t) > 1e-9) frais.push({ cn: cn, t: t, avant: avant });
+    });
+    var caseFrais = null, caseSite = null;
+    if (frais.length) { caseFrais = h('input', { type: 'checkbox' }); caseFrais.checked = true; }
+    if (refsSite.length && GIST && aFaire.length) { caseSite = h('input', { type: 'checkbox' }); caseSite.checked = true; }
+    function fcCoche() {
+      if (!caseFrais || !caseFrais.checked) return null;
+      var o = Object.assign({}, P.frais_canal || {});
+      frais.forEach(function (f) { o[f.cn] = f.t; });
+      return o;
+    }
+    var rows = lignes.map(function (x) {
+      var c = x.r.c;
+      x.netEl = h('span', { class: 'pl-row__m' });
+      var statut = x.pareil ? 'Déjà enregistrée ainsi' : !c.vendu ? 'Nouvelle vente'
+        : vide(x.avant) ? 'Remplace la vente déjà enregistrée' : 'Remplace la vente déjà enregistrée à ' + eur(x.avant, 2);
+      return h('li', null, h('div', { class: 'pl-row' }, [
+        vignette(c),
+        h('span', { class: 'pl-row__main' }, [
+          h('span', { class: 'pl-row__nom', translate: 'no', text: c.nom || c.ref }),
+          h('span', { class: 'pl-row__meta', text: 'N° ' + c.ref + ' · ' + (x.canal || 'canal à préciser') + ' · ' + dateFR(x.date) }),
+          x.note ? h('span', { class: 'pl-row__meta', text: x.note }) : null,
+          h('span', { class: 'pl-row__meta', text: statut })
+        ]),
+        h('span', { class: 'pl-row__nums' }, [h('span', { class: 'pl-row__prix', text: eur(x.prix, 2) }), x.netEl])
+      ]));
+    });
+    var apercu = h('p', { class: 'pl-apercu', 'aria-live': 'polite' });
+    function calc() {
+      var fc = fcCoche(), tot = 0, net = 0, estime = false;
+      lignes.forEach(function (x) {
+        var n = beneficeVente(x.r, x.prix, x.canal, fc);
+        x.netEl.className = 'pl-row__m ' + sens(n);
+        x.netEl.textContent = fleche(n) + eurS(n, 2);
+        tot += x.prix; net += n;
+        if (x.r.paye == null) estime = true;
+      });
+      apercu.textContent = (lignes.length > 1 ? 'Total ' + eur(tot, 2) + ' · ' : '') + 'bénéfice net estimé ' + eurS(net, 2) + (estime ? ' (coût estimé)' : '');
+    }
+    var n = aFaire.length;
+    var corps = h('div', { class: 'pl-lien-v' }, [
+      h('p', { class: 'pl-note', text: 'Préparées par Claude : vérifie, puis enregistre.' }),
+      data.source ? h('p', { class: 'pl-note', translate: 'no', text: String(data.source) }) : null,
+      lignes.length ? h('ul', { class: 'pl-rows' }, rows) : null,
+      rejets.length ? h('p', { class: 'pl-apercu', text: rejets.join(' ') }) : null,
+      lignes.length ? apercu : null,
+      caseFrais ? h('label', { class: 'pl-check' }, [caseFrais, h('span', null, [
+        frais.map(function (f) { return 'Frais de vente ' + f.cn + ' : ' + pct(f.t) + ' au lieu de ' + pct(f.avant); }).join(' · '),
+        data.frais_note ? h('small', { text: String(data.frais_note) }) : null])]) : null,
+      caseSite ? h('label', { class: 'pl-check' }, [caseSite, refsSite.length > 1 ? ' Passer aussi les ' + nbr(refsSite.length) + ' cartes en « Vendue » sur pokeraichu.com' : ' Passer aussi la carte en « Vendue » sur pokeraichu.com']) : null,
+      !n && !frais.length ? h('p', { class: 'pl-apercu', text: 'Tout est déjà enregistré.' }) : null
+    ]);
+    function plusTard() { S.lienRefs = null; fermer(); }
+    var fs = feuille('Ventes à enregistrer', [corps], n || frais.length
+      ? [bouton('Plus tard', plusTard, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: n > 1 ? 'Enregistrer les ' + nbr(n) + ' ventes' : n ? 'Enregistrer la vente' : 'Enregistrer' })]
+      : [bouton('Fermer', plusTard)]);
+    if (caseFrais) caseFrais.addEventListener('change', calc);
+    if (lignes.length) calc();
+    fs.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fraisOk = caseFrais && caseFrais.checked ? frais : [];
+      if (!n && !fraisOk.length) { plusTard(); return; }
+      var aMarquer = caseSite && caseSite.checked ? refsSite.slice() : [];
+      S.lienRefs = null;
+      fermer();
+      var tot = 0, cns = [], notes = [];
+      aFaire.forEach(function (x) { tot += x.prix; if (cns.indexOf(x.canal) === -1) cns.push(x.canal); });
+      var cn = cns.length === 1 && cns[0] ? ' ' + cns[0] : '';
+      if (n === 1) notes.push('Vente' + cn, aFaire[0].r.c.nom, eur(tot, 2));
+      else if (n) notes.push('Ventes' + cn, nbr(n) + ' cartes', eur(tot, 2));
+      if (fraisOk.length) notes.push('Frais de vente par canal', fraisOk.map(function (f) { return f.cn + ' ' + pct(f.t); }).join(', '));
+      var ok = modifier(notes.join(' · '), function (doc) {
+        aFaire.forEach(function (x) {
+          var cc = trouverCarte(doc, x.r.c.ref);
+          if (!cc) throw new Error('La carte N° ' + x.r.c.ref + ' n’existe plus.');
+          cc.vendu = true; cc.prix_vendu = x.prix; cc.vente_date = x.date; cc.canal = x.canal;
+          if (x.note) cc.vente_note = x.note; else delete cc.vente_note;
+        });
+        if (fraisOk.length) {
+          doc.params = doc.params || {};
+          var t = Object.assign({}, doc.params.frais_canal || {});
+          fraisOk.forEach(function (f) { t[f.cn] = f.t; });
+          doc.params.frais_canal = t;
+        }
+      }, { annuler: aMarquer.length ? function () { statutsSite(aMarquer, 'disponible').then(function () { rendre(true); }, function () {}); } : null });
+      if (ok && aMarquer.length) statutsSite(aMarquer, 'vendue').then(function () { rendre(true); }, function (err) {
+        alerte('Site pas mis à jour', 'Les ventes sont enregistrées ici, mais le site n’a pas pu être mis à jour (' + err.message + '). Fais-le depuis la page Gestion.');
+      });
+    });
+  }
+
   /* ---------------------------------------------------------------- démarrage */
   function demarrer() {
     if (!K) { ecranMessage('Chargement incomplet', 'Recharge la page.', true); return; }
@@ -3223,14 +3406,17 @@
       if (!x.j.data) { ecranImport(); return; }
       installer(x.j.data);
       sync('ok');
-      var attente = !!lire(CLE_ATTENTE);
+      var attente = !!lire(CLE_ATTENTE), lv = !attente && RE_LIEN_V.exec(location.hash);
+      if (lv) history.replaceState(null, '', location.pathname + '#ventes');
       route();
       if (attente) reprendreAttente(); else ouvrirCoffret();
-      chargerSite();
+      if (lv) lienVentes(lv[1], lv[2]); else chargerSite();
     }, function () { ecranMessage('Pas de réseau', 'Impossible de joindre pokeraichu.com. Vérifie ta connexion puis réessaie.', true); });
   }
   w.addEventListener('hashchange', function () {
     if (/^#import=/.test(location.hash)) { demarrer(); return; }
+    var lv = S.doc && RE_LIEN_V.exec(location.hash);
+    if (lv) { history.replaceState(null, '', location.pathname + '#ventes'); fermer(); route(); lienVentes(lv[1], lv[2]); return; }
     if (S.doc) { fermer(); route(); }
   });
   w.addEventListener('beforeunload', function (e) { if (S.sale || S.envoi) { e.preventDefault(); e.returnValue = ''; } });
