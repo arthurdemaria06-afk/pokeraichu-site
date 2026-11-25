@@ -257,6 +257,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 ## 7. Historique récent (commits)
 
 - (25/11) Ajout 351 Méga-Darkrai-ex 118/081 MUR (M5 Nuit Noire), recto + verso, catégorie « Autres » (pas de catégorie MUR), Shopify PKR-351.
+- (25/11) 084 Méga-Darkrai-ex 114/081 vendue sur le site mais jamais passée « Vendue » dans le Gist : inscrite dans `config.js`, Shopify PKR-84 à 0.
 - (25/11) Pilotage : lien de ventes chiffré (#ventes=…) préparé par Claude ; ventes eBay 011 et G1830 inscrites (site, Shopify à 0).
 - (25/11) Site : remises par quantité (−5 % / −10 %) supprimées partout (config, fiches, sélection, FAQ, CGV).
 - (25/11) Pilotage : ventes faites sur le site reprises toutes seules (canal à préciser), bouton « Modifier la vente ».
@@ -366,6 +367,10 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
   « Vendue sur pokeraichu.com » pour les fiches encore en vente) puis une seule version « Ventes eBay · N cartes · total ».
   Pendant la relecture, `synchroSite()` laisse ces cartes de côté (`S.lienRefs`). Ce lien ne touche ni Shopify ni le site
   public : Claude met lui-même le stock Shopify à 0 et inscrit les réfs dans `config.js` (`vendues`, `vendues_le`).
+  Le même lien ajoute aussi des cartes au stock (`cartes: [{ref, nom, nom_en, groupe, cat, langue, prix, set, rarete,
+  etat, achat: {mode: 'eur', eur}, date_achat}]`, N° = réf. du site ; un N° déjà présent est ignoré) : feuille « Carte à
+  ajouter », puis la fiche de la carte. Carte ajoutée « de partout » : site (`construire.py`), Shopify (`productSet`
+  sur le modèle des autres produits, publié sur le canal Whatnot) et ce lien pour le Pilotage.
   **Retirer `pilotage/ventes-<id>.bin` du dépôt** une fois les ventes enregistrées (à la session suivante au plus tard).
 - Contrôles avec le site : `alias_site` (P1, P1-2, P1-3 = fiche 301 ; P2… = 302 ; P3… = 303), `lots_site` (L01 = 095 + G4784,
   L02 = P1 + P2, L03 = P3 + P4, L04 = 313 + 314), `refs_site` des produits (card sets = S02–S10).

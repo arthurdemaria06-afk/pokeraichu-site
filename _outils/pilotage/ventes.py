@@ -4,7 +4,11 @@
 Le JSON vient d'un fichier HORS du dépôt (ex. /tmp/ventes.json) :
   {"source": "<d'où viennent les ventes>",
    "frais_canal": {"<canal>": <taux entre 0 et 1>}, "frais_note": "<pourquoi ce taux, affiché sous la case>",
-   "ventes": [{"ref": "<réf.>", "prix": <euros>, "date": "AAAA-MM-JJ", "canal": "<canal>", "note": "<commande, détail>"}]}
+   "ventes": [{"ref": "<réf.>", "prix": <euros>, "date": "AAAA-MM-JJ", "canal": "<canal>", "note": "<commande, détail>"}],
+   "cartes": [{"ref": "<réf. du site>", "nom": "<nom n°>", "nom_en": "…", "groupe": "Cartes", "cat": "<SAR, AR…>",
+               "langue": "JP", "prix": <prix marché>, "set": "<code · nom>", "rarete": "…", "etat": "Near Mint",
+               "achat": {"mode": "eur", "eur": <payé>}, "date_achat": "AAAA-MM-JJ ou null"}]}
+ventes et cartes sont chacune facultatives (au moins une des deux).
 (aucun chiffre réel dans ce fichier : le dépôt est public)
 ref = réf. du site (ou N° du Pilotage) ; prix = ce qui reste de la vente, frais d'envoi payés par Arthur déduits ;
 canal parmi CANAUX ; frais_canal (facultatif) = part du prix, entre 0 et 1.
@@ -20,8 +24,13 @@ racine = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 if os.path.abspath(src).startswith(racine + os.sep):
     sys.exit('Le JSON en clair ne doit pas être dans le dépôt (public) : mets-le dans /tmp.')
 doc = json.load(open(src, encoding='utf-8'))
-ventes = doc.get('ventes')
-assert isinstance(ventes, list) and ventes, 'aucune vente'
+ventes, cartes = doc.get('ventes') or [], doc.get('cartes') or []
+assert isinstance(ventes, list) and isinstance(cartes, list) and (ventes or cartes), 'ni vente ni carte'
+for a in cartes:
+    assert str(a.get('ref', '')).strip() and str(a.get('nom', '')).strip(), a
+    assert a.get('prix') is None or (isinstance(a['prix'], (int, float)) and a['prix'] >= 0), a
+    ach = a.get('achat')
+    assert ach is None or (ach.get('mode') == 'eur' and isinstance(ach.get('eur'), (int, float)) and ach['eur'] >= 0), a
 for v in ventes:
     assert str(v.get('ref', '')).strip(), v
     assert isinstance(v.get('prix'), (int, float)) and v['prix'] >= 0, v
