@@ -770,6 +770,7 @@ window.PR_DE = {
 "Prix": "Preis",
 "Prix ?": "Preis?",
 "Prix affiché": "Angezeigter Preis",
+"Prix alignés sur le site": "Preise an die Website angeglichen",
 "Prix croissant": "Preis aufsteigend",
 "Prix de la fiche": "Preis des Eintrags",
 "Prix de vente": "Verkaufspreis",

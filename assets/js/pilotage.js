@@ -354,10 +354,44 @@
       if (x[0] && Array.isArray(x[0].cartes)) x[0].cartes.forEach(function (c) { m[c.ref] = c; });
       S.site = x[0] ? m : null;
       S.statuts = x[1];
-      if (S.doc) rendre(true);
+      if (S.doc && !alignerSurSite()) rendre(true);
     });
   }
-  function rafraichirSite() { lireStatuts().then(function (s) { S.statuts = s; rendre(true); }, function () {}); }
+  function rafraichirSite() { lireStatuts().then(function (s) { S.statuts = s; if (!alignerSurSite()) rendre(true); }, function () {}); }
+  /* prix marché alignés sur le site (demande d'Arthur, 25/11/2026 : « c'est pas du tout à jour ») : les prix se
+     changent sur la page Gestion (prix en direct du Gist) ; le Pilotage reprend tout seul le prix du site pour chaque
+     carte en stock, à l'ouverture et au retour sur l'onglet, en une version « Prix alignés sur le site ». Les cartes en
+     stock sans prix marché prennent aussi celui du site. « Annuler » : cette version des prix du site n'est plus
+     réappliquée sur cet appareil (pr.pilotage.align.refus = maj du Gist), jusqu'au prochain changement de prix. */
+  var CLE_ALIGN = 'pr.pilotage.align.refus';
+  function alignerSurSite() {
+    if (!S.doc || !S.R || !S.site || !S.statuts || lire(CLE_ATTENTE)) return false;
+    var marque = String(S.statuts.maj || '');
+    if (marque && lire(CLE_ALIGN) === marque) return false;
+    var cs = controlesSite();
+    if (!cs) return false;
+    var liste = cs.prix.map(function (x) { return { ref: x.r.c.ref, p: x.p }; });
+    S.R.cartes.forEach(function (r) {
+      if (r.hors || r.c.vendu || !vide(r.c.prix)) return;
+      var sref = siteRefDe(r.c), p = sref ? prixSite(sref) : null;
+      if (!vide(p) && p > 0 && etatSite(sref) !== 'vendue') liste.push({ ref: r.c.ref, p: p });
+    });
+    if (!liste.length) return false;
+    return modifier('Prix alignés sur le site · ' + nbr(liste.length) + ' carte' + pl(liste.length), function (doc) {
+      liste.forEach(function (x) { var c = trouverCarte(doc, x.ref); if (c) c.prix = x.p; });
+    }, { annuler: function () { if (marque) ecrire(CLE_ALIGN, marque); } });
+  }
+  /* retour sur l'onglet (prix changés entre-temps sur la page Gestion) : relecture du Gist, sans toucher à une fiche ouverte */
+  d.addEventListener('visibilitychange', function () {
+    if (d.visibilityState !== 'visible' || !S.doc || !S.site) return;
+    var dlg = q('[data-pl-sheet]');
+    if (dlg && (dlg.open || dlg.hasAttribute('open'))) return;
+    lireStatuts().then(function (s) {
+      var change = !S.statuts || s.maj !== S.statuts.maj;
+      S.statuts = s;
+      if (change && !alignerSurSite()) rendre(true);
+    }, function () {});
+  });
   function siteRefDe(c) {
     if (!S.site) return null;
     if (S.site[c.ref]) return c.ref;
