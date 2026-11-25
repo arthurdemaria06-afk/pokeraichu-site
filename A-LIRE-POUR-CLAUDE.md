@@ -207,6 +207,11 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - `data/stock.json` : clés `meta, taxonomies, cartes, vendus, parties, coups_de_foudre` (217 cartes au 16/11).
 - `config.js` : **seul fichier de réglages à la main** (WhatsApp, livraison, remises, coups de foudre, TVA, médiateur…).
   Tout est documenté en tête du fichier.
+- **Remises par quantité supprimées le 25/11** à la demande d'Arthur (il vend vite, prix déjà baissés) : `remises: []`
+  dans `config.js` (le code de `site.js` reste, inactif quand la liste est vide), ligne « −5 % dès 3 cartes · −10 % dès
+  6 cartes » retirée des 500 fiches FR/EN (les nouvelles fiches reprennent le bloc livraison d'une fiche existante, donc
+  sans elle), de Ma sélection, de la FAQ (question + données structurées), des CGV et des coups de foudre. Ne pas
+  les remettre sans demande explicite ; pour les rétablir il faudrait remplir `remises` ET réécrire ces textes.
 
 ### Règles quand on modifie un fichier CSS ou JS
 
@@ -251,6 +256,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (25/11) Site : remises par quantité (−5 % / −10 %) supprimées partout (config, fiches, sélection, FAQ, CGV).
 - (25/11) Pilotage : ventes faites sur le site reprises toutes seules (canal à préciser), bouton « Modifier la vente ».
 - (25/11) Pilotage : prix marché alignés tout seuls sur les prix du site (page Gestion).
 - (25/11) Gestion : filtres « À poster » / « Postées partout », tri par prix, bouton « Cocher les 3 canaux » en bas de l'annonce.

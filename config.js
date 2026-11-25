@@ -31,7 +31,8 @@
                      en France métropolitaine dès ce montant d'achat (après remise). null = sur devis.
                      carte = 1 à 5 cartes brutes · cartes = 6 cartes et plus · slab = 1 slab · slabs = 2 ou 3 slabs
                      · scelle = 1 produit scellé.
-  remises          : remises par nombre de cartes (hors pièces à prix sur demande).
+  remises          : remises par nombre de cartes (hors pièces à prix sur demande), ex. [{ des: 3, pourcent: 5 }].
+                     [] = aucune remise (paliers −5 % / −10 % retirés le 25/11/2026).
   coups_de_foudre  : la vente flash de la semaine (onglet « Coups de foudre »). « du » et « au » : premier et dernier jour,
                      au format AAAA-MM-JJ (de 0 h le premier jour à 23 h 59 le dernier, heure de Paris). « cartes » :
                      les références et leurs prix flash, par exemple { ref: "095", prix: 179 }. Le prix barré est calculé
@@ -89,10 +90,7 @@ window.PR_CONFIG = {
       { ref: "071", prix: 29 },
     ]
   },
-  remises: [
-    { des: 3, pourcent: 5 },
-    { des: 6, pourcent: 10 }
-  ],
+  remises: [],
   tva: "",
   mediateur: { nom: "", adresse: "", site: "" },
   legal: {
