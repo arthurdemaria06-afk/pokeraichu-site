@@ -251,6 +251,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 ## 7. Historique récent (commits)
 
+- (25/11) Pilotage : ventes faites sur le site reprises toutes seules (canal à préciser), bouton « Modifier la vente ».
 - (25/11) Pilotage : prix marché alignés tout seuls sur les prix du site (page Gestion).
 - (25/11) Gestion : filtres « À poster » / « Postées partout », tri par prix, bouton « Cocher les 3 canaux » en bas de l'annonce.
 - (23/11) Pilotage › Stock : bouton « € | % » sur les lignes, tuile Rentabilité pondérée des ventes.
@@ -331,13 +332,19 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
 - Photos : fiche du site (par n° ou `alias_site`), sinon fiche du site d'un exemplaire au nom identique, sinon image
   officielle Limitless TCG (`tpc/{SET}/{SET}_{n}_R_JP_SM|LG.png`, international `tpci/{SET}/{SET}_{nnn}_R_EN_…`),
   sinon le n°. `_headers` donne à /pilotage.html sa propre CSP (img-src + limitlesstcg.nyc3.cdn.digitaloceanspaces.com).
-- **Prix marché alignés sur le site** (25/11, `alignerSurSite()` de pilotage.js) : Arthur change ses prix sur la page
+- **Synchro avec le site** (25/11, `synchroSite()` de pilotage.js), **prix marché** : Arthur change ses prix sur la page
   Gestion (prix en direct du Gist) ; à l'ouverture du Pilotage et au retour sur l'onglet (Gist relu si sa `maj` a
   changé), chaque carte en stock prend le prix du site (`prixSite` : Gist, sinon `data/stock.json`), en une version
   « Prix alignés sur le site · N cartes » ; une carte sans prix marché prend aussi celui du site. « Annuler » garde
   `pr.pilotage.align.refus` = `maj` du Gist : cette version des prix n'est plus réappliquée sur l'appareil jusqu'au
   prochain changement. Le contrôle « Prix du site différent du prix marché » reste comme filet. Page rechargée pendant
-  un enregistrement : la copie locale (`pr.pilotage.attente`) identique à la version en base est jetée sans question. Le scellé (boosters,
+  un enregistrement : la copie locale (`pr.pilotage.attente`) identique à la version en base est jetée sans question.
+- **Ventes du site reprises toutes seules** (25/11, même `synchroSite()`, même version que l'alignement des prix) : une
+  fiche passée « Vendue » sur le site (page Gestion), derrière laquelle il y a une seule carte en stock ici, est vendue
+  ici au prix du site, à la date du dernier changement du Gist, sans canal, avec la note « Vendue sur le site : canal à
+  préciser ». Bouton « Modifier la vente » sur la fiche d'une carte vendue (prix, date, canal, note ; la note
+  automatique tombe quand on choisit un canal). Lots et fiches à plusieurs exemplaires restent dans Contrôles ›
+  Ventes du site à saisir ici. Le scellé (boosters,
   card sets) n'est pas concerné : quantités vendues et prix à l'unité se saisissent dans Pilotage › Scellé.
 - Contrôles avec le site : `alias_site` (P1, P1-2, P1-3 = fiche 301 ; P2… = 302 ; P3… = 303), `lots_site` (L01 = 095 + G4784,
   L02 = P1 + P2, L03 = P3 + P4, L04 = 313 + 314), `refs_site` des produits (card sets = S02–S10).

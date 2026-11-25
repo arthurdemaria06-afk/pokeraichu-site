@@ -357,31 +357,59 @@
       if (x[0] && Array.isArray(x[0].cartes)) x[0].cartes.forEach(function (c) { m[c.ref] = c; });
       S.site = x[0] ? m : null;
       S.statuts = x[1];
-      if (S.doc && !alignerSurSite()) rendre(true);
+      if (S.doc && !synchroSite()) rendre(true);
     });
   }
-  function rafraichirSite() { lireStatuts().then(function (s) { S.statuts = s; if (!alignerSurSite()) rendre(true); }, function () {}); }
-  /* prix marché alignés sur le site (demande d'Arthur, 25/11/2026 : « c'est pas du tout à jour ») : les prix se
-     changent sur la page Gestion (prix en direct du Gist) ; le Pilotage reprend tout seul le prix du site pour chaque
-     carte en stock, à l'ouverture et au retour sur l'onglet, en une version « Prix alignés sur le site ». Les cartes en
-     stock sans prix marché prennent aussi celui du site. « Annuler » : cette version des prix du site n'est plus
-     réappliquée sur cet appareil (pr.pilotage.align.refus = maj du Gist), jusqu'au prochain changement de prix. */
-  var CLE_ALIGN = 'pr.pilotage.align.refus';
-  function alignerSurSite() {
+  function rafraichirSite() { lireStatuts().then(function (s) { S.statuts = s; if (!synchroSite()) rendre(true); }, function () {}); }
+  /* synchronisation avec le site (demandes d'Arthur du 25/11/2026 : « c'est pas du tout à jour », puis « la
+     synchronisation ne se fait pas » pour une vente) : prix et ventes se changent sur la page Gestion (Gist) ; à
+     l'ouverture du Pilotage et au retour sur l'onglet, en une seule version :
+     - prix marché : chaque carte en stock reprend le prix du site (une carte sans prix marché aussi) ;
+     - ventes : une fiche passée « Vendue » sur le site, derrière laquelle il y a UNE carte en stock ici, est vendue
+       ici au prix du site, à la date du dernier changement du site (maj du Gist), canal à préciser (note de vente ;
+       « Modifier la vente » sur la fiche de la carte). Lots et fiches à plusieurs exemplaires : à la main, dans
+       Contrôles › Ventes du site à saisir ici.
+     « Annuler » : cette version du site n'est plus réappliquée sur cet appareil (pr.pilotage.align.refus = maj du
+     Gist), jusqu'au prochain changement sur le site. */
+  var CLE_ALIGN = 'pr.pilotage.align.refus', NOTE_SITE = 'Vendue sur le site : canal à préciser';
+  function jourLocal(iso) {
+    var t = new Date(iso);
+    if (isNaN(t)) return null;
+    var j = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+    return j > aujourdhui() ? aujourdhui() : j;
+  }
+  function synchroSite() {
     if (!S.doc || !S.R || !S.site || !S.statuts || lire(CLE_ATTENTE)) return false;
     var marque = String(S.statuts.maj || '');
     if (marque && lire(CLE_ALIGN) === marque) return false;
     var cs = controlesSite();
     if (!cs) return false;
-    var liste = cs.prix.map(function (x) { return { ref: x.r.c.ref, p: x.p }; });
+    var prix = cs.prix.map(function (x) { return { ref: x.r.c.ref, p: x.p }; });
     S.R.cartes.forEach(function (r) {
       if (r.hors || r.c.vendu || !vide(r.c.prix)) return;
       var sref = siteRefDe(r.c), p = sref ? prixSite(sref) : null;
-      if (!vide(p) && p > 0 && etatSite(sref) !== 'vendue') liste.push({ ref: r.c.ref, p: p });
+      if (!vide(p) && p > 0 && etatSite(sref) !== 'vendue') prix.push({ ref: r.c.ref, p: p });
     });
-    if (!liste.length) return false;
-    return modifier('Prix alignés sur le site · ' + nbr(liste.length) + ' carte' + pl(liste.length), function (doc) {
-      liste.forEach(function (x) { var c = trouverCarte(doc, x.ref); if (c) c.prix = x.p; });
+    var parRf = {}, ventes = [], total = 0;
+    cs.a_saisir.forEach(function (x) { if (x.r) (parRf[x.rf] = parRf[x.rf] || []).push(x.r); });
+    Object.keys(parRf).forEach(function (rf) {
+      var p = prixSite(rf);
+      if (parRf[rf].length !== 1 || vide(p) || !(p > 0)) return;
+      ventes.push({ ref: parRf[rf][0].c.ref, nom: parRf[rf][0].c.nom, p: p });
+      total += p;
+    });
+    if (!prix.length && !ventes.length) return false;
+    var jour = jourLocal(S.statuts.maj) || aujourdhui(), notes = [];
+    if (ventes.length === 1) notes.push('Vente du site · ' + ventes[0].nom + ' · ' + eur(ventes[0].p));
+    else if (ventes.length) notes.push('Ventes du site · ' + nbr(ventes.length) + ' cartes · ' + eur(total));
+    if (prix.length) notes.push('Prix alignés sur le site · ' + nbr(prix.length) + ' carte' + pl(prix.length));
+    return modifier(notes.join(' · '), function (doc) {
+      prix.forEach(function (x) { var c = trouverCarte(doc, x.ref); if (c) c.prix = x.p; });
+      ventes.forEach(function (x) {
+        var c = trouverCarte(doc, x.ref);
+        if (!c || c.vendu) return;
+        c.vendu = true; c.prix_vendu = x.p; c.vente_date = jour; c.canal = null; c.vente_note = NOTE_SITE;
+      });
     }, { annuler: function () { if (marque) ecrire(CLE_ALIGN, marque); } });
   }
   /* retour sur l'onglet (prix changés entre-temps sur la page Gestion) : relecture du Gist, sans toucher à une fiche ouverte */
@@ -392,7 +420,7 @@
     lireStatuts().then(function (s) {
       var change = !S.statuts || s.maj !== S.statuts.maj;
       S.statuts = s;
-      if (change && !alignerSurSite()) rendre(true);
+      if (change && !synchroSite()) rendre(true);
     }, function () {});
   });
   function siteRefDe(c) {
@@ -1294,6 +1322,7 @@
     m.appendChild(section('Informations', [h('div', { class: 'pl-box' }, [h('dl', { class: 'pl-dl pl-dl--infos' }, [].concat.apply([], infos.map(function (x) { return [h('dt', { text: x[0] }), h('dd', { text: x[1] })]; }))),
       liens.length ? h('p', { class: 'pl-liens' }, liens) : null])]));
     var act = [];
+    if (!r.hors && c.vendu) act.push(bouton('Modifier la vente', function () { feuilleVente(c.ref, { edition: true }); }));
     if (!r.hors) act.push(c.vendu ? bouton('Annuler la vente', function () { feuilleAnnulerVente(c.ref); }, 'btn--ghost') : bouton('Enregistrer la vente', function () { feuilleVente(c.ref); }));
     act.push(bouton('Modifier', function () { feuilleCarte(c.ref); }, 'btn--ghost'));
     m.appendChild(h('div', { class: 'pl-actions' }, act));
@@ -1314,16 +1343,18 @@
   function feuilleVente(ref, opts) {
     var r = S.R.parRef[ref];
     if (!r) return;
-    var c = r.c, P = S.R.params, sref = siteRefDe(c), es = etatSite(sref);
+    var c = r.c, P = S.R.params, sref = siteRefDe(c), es = etatSite(sref), edition = !!(opts && opts.edition);
+    var init = edition ? { prix: c.prix_vendu, date: c.vente_date || aujourdhui(), canal: c.canal || '', note: c.vente_note === NOTE_SITE ? '' : (c.vente_note || '') }
+      : { prix: opts && opts.prix != null ? opts.prix : c.prix, date: (opts && opts.date) || aujourdhui(), canal: opts && opts.canal != null ? opts.canal : (lire(CLE_CANAL) || '') };
     var form = formulaire([
       { k: 'prix', label: 'Prix de vente (€)', type: 'num', demi: true, req: true },
       { k: 'date', label: 'Date', type: 'date', demi: true },
       { k: 'canal', label: 'Vendue où ?', type: 'select', options: [['', '—']].concat(CANAUX.map(function (x) { return [x, x]; })) },
       { k: 'note', label: 'Note (facultatif)', type: 'text', ph: 'Acheteur, remise, lot…' }
-    ], { prix: opts && opts.prix != null ? opts.prix : c.prix, date: (opts && opts.date) || aujourdhui(), canal: opts && opts.canal != null ? opts.canal : (lire(CLE_CANAL) || '') });
+    ], init);
     var apercu = h('p', { class: 'pl-apercu', 'aria-live': 'polite' });
     var caseSite = null;
-    if (sref && GIST && es !== 'vendue') { caseSite = h('input', { type: 'checkbox' }); caseSite.checked = true; }
+    if (!edition && sref && GIST && es !== 'vendue') { caseSite = h('input', { type: 'checkbox' }); caseSite.checked = true; }
     function calc() {
       var v = lireNombre(form.champs.prix.value).v;
       if (vide(v)) { apercu.textContent = 'Indique le prix de vente.'; return; }
@@ -1335,7 +1366,7 @@
     form.champs.prix.addEventListener('input', calc);
     form.champs.canal.addEventListener('change', calc);
     calc();
-    var fs = feuille('Enregistrer la vente', [h('p', { class: 'pl-note', text: c.nom + ' · N° ' + c.ref + (vide(c.prix) ? '' : ' · prix marché ' + eur(c.prix, 2)) }), form.el, apercu,
+    var fs = feuille(edition ? 'Modifier la vente' : 'Enregistrer la vente', [h('p', { class: 'pl-note', text: c.nom + ' · N° ' + c.ref + (vide(c.prix) ? '' : ' · prix marché ' + eur(c.prix, 2)) }), form.el, apercu,
       caseSite ? h('label', { class: 'pl-check' }, [caseSite, ' Passer aussi la carte en « Vendue » sur pokeraichu.com']) : null],
       [bouton('Annuler', fermer, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: 'Enregistrer' })]);
     fs.form.addEventListener('submit', function (e) {
@@ -1346,10 +1377,11 @@
       ecrire(CLE_CANAL, x.canal || '');
       var site = caseSite && caseSite.checked;
       fermer();
-      modifier('Vente · ' + c.nom + ' (N° ' + c.ref + ') · ' + eur(x.prix, 2), function (doc) {
+      modifier((edition ? 'Vente modifiée · ' : 'Vente · ') + c.nom + ' (N° ' + c.ref + ') · ' + eur(x.prix, 2), function (doc) {
         var cc = trouverCarte(doc, ref);
         cc.vendu = true; cc.prix_vendu = x.prix; cc.vente_date = x.date || aujourdhui(); cc.canal = x.canal || null;
-        if (x.note) cc.vente_note = x.note; else delete cc.vente_note;
+        if (x.note) cc.vente_note = x.note;
+        else if (!(edition && !x.canal && cc.vente_note === NOTE_SITE)) delete cc.vente_note;
       }, { annuler: site ? function () { statutSite(sref, 'disponible').then(function () { rendre(true); }, function () {}); } : null });
       if (site) statutSite(sref, 'vendue').then(function () { rendre(true); }, function (err) {
         alerte('Site pas mis à jour', 'La vente est enregistrée ici, mais la carte n’a pas pu passer en « Vendue » sur le site (' + err.message + '). Fais-le depuis la page Gestion.');
