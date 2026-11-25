@@ -258,6 +258,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 
 - (25/11) Ajout 351 Méga-Darkrai-ex 118/081 MUR (M5 Nuit Noire), recto + verso, catégorie « Autres » (pas de catégorie MUR), Shopify PKR-351.
 - (25/11) 084 Méga-Darkrai-ex 114/081 vendue sur le site mais jamais passée « Vendue » dans le Gist : inscrite dans `config.js`, Shopify PKR-84 à 0.
+- (25/11 soir) 345 Raikou-ex 108/076 KR et 058 Magicarpe 165/103 vendues (canal non précisé) : `config.js`, Shopify à 0, lien Pilotage.
 - (25/11) Pilotage : lien de ventes chiffré (#ventes=…) préparé par Claude ; ventes eBay 011 et G1830 inscrites (site, Shopify à 0).
 - (25/11) Site : remises par quantité (−5 % / −10 %) supprimées partout (config, fiches, sélection, FAQ, CGV).
 - (25/11) Pilotage : ventes faites sur le site reprises toutes seules (canal à préciser), bouton « Modifier la vente ».
