@@ -8,7 +8,9 @@ Le JSON vient d'un fichier HORS du dépôt (ex. /tmp/ventes.json) :
    "cartes": [{"ref": "<réf. du site>", "nom": "<nom n°>", "nom_en": "…", "groupe": "Cartes", "cat": "<SAR, AR…>",
                "langue": "JP", "prix": <prix marché>, "set": "<code · nom>", "rarete": "…", "etat": "Near Mint",
                "achat": {"mode": "eur", "eur": <payé>}, "date_achat": "AAAA-MM-JJ ou null"}]}
-ventes et cartes sont chacune facultatives (au moins une des deux).
+scelle : [{"id": "<produit>", "creer": {…nouvelle ligne…}, "delta": {"quantite": …, "paye_total": …, "displays": …},
+           "ventes": [{"n": <nombre>, "prix": <prix unitaire>, "envois": 1, "date": "AAAA-MM-JJ", "canal": null, "note": "…"}]}]
+ventes, cartes et scelle sont chacune facultatives (au moins une des trois).
 (aucun chiffre réel dans ce fichier : le dépôt est public)
 ref = réf. du site (ou N° du Pilotage) ; prix = ce qui reste de la vente, frais d'envoi payés par Arthur déduits ;
 canal parmi CANAUX (null = à préciser) ; frais_canal (facultatif) = part du prix, entre 0 et 1.
@@ -24,8 +26,12 @@ racine = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 if os.path.abspath(src).startswith(racine + os.sep):
     sys.exit('Le JSON en clair ne doit pas être dans le dépôt (public) : mets-le dans /tmp.')
 doc = json.load(open(src, encoding='utf-8'))
-ventes, cartes = doc.get('ventes') or [], doc.get('cartes') or []
-assert isinstance(ventes, list) and isinstance(cartes, list) and (ventes or cartes), 'ni vente ni carte'
+ventes, cartes, scelle = doc.get('ventes') or [], doc.get('cartes') or [], doc.get('scelle') or []
+assert isinstance(ventes, list) and isinstance(cartes, list) and isinstance(scelle, list) and (ventes or cartes or scelle), 'rien à enregistrer'
+for o in scelle:
+    assert isinstance(o.get('id'), str) and o['id'], o
+    for v in o.get('ventes') or []:
+        assert isinstance(v.get('n'), int) and v['n'] > 0 and isinstance(v.get('prix'), (int, float)) and v['prix'] >= 0, v
 for a in cartes:
     assert str(a.get('ref', '')).strip() and str(a.get('nom', '')).strip(), a
     assert a.get('prix') is None or (isinstance(a['prix'], (int, float)) and a['prix'] >= 0), a

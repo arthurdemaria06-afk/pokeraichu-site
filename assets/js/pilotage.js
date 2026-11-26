@@ -3220,7 +3220,9 @@
      seule version à la confirmation (Annuler pendant 7 s). frais_canal (ex. { eBay: 0 }) : case cochée qui fixe ce taux
      dans les réglages. Case « Vendue sur pokeraichu.com » pour les fiches encore en vente sur le site. Pendant la
      relecture, la synchro du site laisse ces cartes de côté (S.lienRefs). cartes : ajout au stock (25/11, carte ajoutée
-     « de partout ») ; un N° déjà présent est ignoré. Retirer le .bin du dépôt ensuite. */
+     « de partout ») ; un N° déjà présent est ignoré. scelle (26/11, displays vendues entières) : [{ id, creer?, delta?:
+     { quantite, paye_total, displays }, ventes?: [{ n, prix, envois, date, canal, note }] }] sur les produits du scellé,
+     comme la feuille « Vendre » ; aperçu calculé avec le moteur sur une copie du document. Retirer le .bin du dépôt ensuite. */
   var RE_LIEN_V = /^#ventes=([a-f0-9]{8,40})\.([A-Za-z0-9_-]{43})$/;
   function dechiffrerLien(chemin, cle) {
     if (!w.crypto || !w.crypto.subtle || !w.TextDecoder) return Promise.reject(new Error('navigateur trop ancien, essaie Safari'));
@@ -3275,7 +3277,8 @@
       data = data && typeof data === 'object' ? data : {};
       data.ventes = Array.isArray(data.ventes) ? data.ventes : [];
       data.cartes = Array.isArray(data.cartes) ? data.cartes : [];
-      if (!data.ventes.length && !data.cartes.length) throw new Error('rien à enregistrer dans ce lien');
+      data.scelle = Array.isArray(data.scelle) ? data.scelle : [];
+      if (!data.ventes.length && !data.cartes.length && !data.scelle.length) throw new Error('rien à enregistrer dans ce lien');
       S.lienRefs = [];
       data.ventes.forEach(function (v) { var r = carteDuLien(v && v.ref); if (r) S.lienRefs.push(r.c.ref); });
       return (S.site && S.statuts ? Promise.resolve() : chargerSite()).then(function () { return data; });
@@ -3316,6 +3319,66 @@
       ajoutsVus.push(y);
       if (!y.existe) ajouts.push(y);
     });
+    var opsS = data.scelle.filter(function (o) { return o && typeof o.id === 'string' && /^[a-z0-9_-]{1,30}$/.test(o.id); });
+    function nombre(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+    function dateOk(v) { return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && v <= aujourdhui() ? v : aujourdhui(); }
+    function appliquerScelle(doc) {
+      doc.produits = doc.produits || [];
+      opsS.forEach(function (o) {
+        var pp = produit(doc, o.id);
+        if (!pp) {
+          if (!o.creer || typeof o.creer !== 'object') throw new Error('produit « ' + o.id + ' » introuvable');
+          pp = Object.assign({ notes: [] }, o.creer, { id: o.id, vendus: 0, prix_reel_moyen: null, envois: null });
+          ['quantite', 'paye_u', 'paye_total', 'prix_u', 'frais_u'].forEach(function (k) { if (k in o.creer && nombre(o.creer[k]) == null) pp[k] = null; });
+          doc.produits.push(pp);
+        }
+        Object.keys(o.delta || {}).forEach(function (k) {
+          var dv = nombre(o.delta[k]);
+          if (dv == null || ['quantite', 'paye_total', 'displays'].indexOf(k) === -1) return;
+          if (k !== 'quantite' && nombre(pp[k]) == null) return;
+          pp[k] = Math.round((z(pp[k]) + dv) * 100) / 100;
+        });
+        (Array.isArray(o.ventes) ? o.ventes : []).forEach(function (v) {
+          var nv = nombre(v && v.n), px = nombre(v && v.prix);
+          if (!(nv > 0) || px == null || px < 0) return;
+          var ancienN = z(pp.vendus), moyen = pp.prix_reel_moyen != null ? pp.prix_reel_moyen : z(pp.prix_u), env = nombre(v.envois);
+          pp.vendus = ancienN + nv;
+          pp.prix_reel_moyen = (ancienN * moyen + nv * px) / pp.vendus;
+          pp.envois = (pp.envois != null ? pp.envois : ancienN) + (env != null ? env : nv);
+          var hx = { date: dateOk(v.date), n: nv, prix: px, envois: env != null ? env : nv, canal: CANAUX.indexOf(v.canal) !== -1 ? v.canal : null };
+          if (v.note) hx.note = String(v.note).slice(0, 120);
+          (pp.historique = pp.historique || []).push(hx);
+        });
+        if (z(pp.vendus) > z(pp.quantite)) throw new Error('« ' + (pp.libelle || pp.nom) + ' » : plus de vendus que de stock');
+      });
+    }
+    var rowsS = [];
+    if (opsS.length) {
+      try {
+        var copie = JSON.parse(JSON.stringify(S.doc));
+        appliquerScelle(copie);
+        var R2 = K.calcul(copie);
+        rowsS = opsS.map(function (o) {
+          var av = S.R.produits.filter(function (y) { return y.id === o.id; })[0] || null, ap = R2.produits.filter(function (y) { return y.id === o.id; })[0];
+          var meta = [av ? 'Stock ' + nbr(av.nb) + ' → ' + nbr(ap.nb) : 'Nouvelle ligne'];
+          if (av && nombre(av.p.paye_total) != null && av.paye !== ap.paye) meta.push('payé ' + eur(av.paye, 0) + ' → ' + eur(ap.paye, 0));
+          var vendus = ap.vente.vendus - (av ? av.vente.vendus : 0), nums = [];
+          if (vendus > 0) {
+            meta.push(nbr(vendus) + ' vendu' + (vendus > 1 ? 's' : ''));
+            var net = ap.vente.net - (av ? av.vente.net : 0);
+            nums.push(h('span', { class: 'pl-row__prix', text: eur(ap.vente.encaisse - (av ? av.vente.encaisse : 0), 2) }), h('span', { class: 'pl-row__m ' + sens(net), text: fleche(net) + eurS(net, 2) }));
+          }
+          return h('li', null, h('div', { class: 'pl-row' }, [
+            h('span', { class: 'pl-row__img pl-row__img--scelle', 'aria-hidden': 'true' }, h('b', { text: '×' + nbr(ap.reste) })),
+            h('span', { class: 'pl-row__main' }, [h('span', { class: 'pl-row__nom', text: ap.p.nom || ap.p.libelle }), h('span', { class: 'pl-row__meta', text: meta.join(' · ') })]),
+            h('span', { class: 'pl-row__nums' }, nums)
+          ]));
+        });
+      } catch (e) {
+        rejets.push('Scellé : ' + (e && e.message ? e.message : 'erreur') + ' : ignoré.');
+        opsS = []; rowsS = [];
+      }
+    }
     var fcLien = data.frais_canal && typeof data.frais_canal === 'object' ? data.frais_canal : {};
     Object.keys(fcLien).forEach(function (cn) {
       var t = +fcLien[cn], avant = tauxVente(cn);
@@ -3371,26 +3434,28 @@
       });
       apercu.textContent = (lignes.length > 1 ? 'Total ' + eur(tot, 2) + ' · ' : '') + 'bénéfice net estimé ' + eurS(net, 2) + (estime ? ' (coût estimé)' : '');
     }
-    var n = aFaire.length, nA = ajouts.length, deux = lignes.length && ajoutsVus.length;
+    var n = aFaire.length, nA = ajouts.length, nS = opsS.length, deux = (lignes.length ? 1 : 0) + (ajoutsVus.length ? 1 : 0) + (nS ? 1 : 0) > 1;
     var corps = h('div', { class: 'pl-lien-v' }, [
       h('p', { class: 'pl-note', text: 'Préparées par Claude : vérifie, puis enregistre.' }),
       data.source ? h('p', { class: 'pl-note', translate: 'no', text: String(data.source) }) : null,
-      deux ? h('p', { class: 'pl-label', text: 'Ventes' }) : null,
+      deux && lignes.length ? h('p', { class: 'pl-label', text: 'Ventes' }) : null,
       lignes.length ? h('ul', { class: 'pl-rows' }, rows) : null,
-      deux ? h('p', { class: 'pl-label', text: 'Cartes à ajouter' }) : null,
+      deux && ajoutsVus.length ? h('p', { class: 'pl-label', text: 'Cartes à ajouter' }) : null,
       ajoutsVus.length ? h('ul', { class: 'pl-rows' }, rowsA) : null,
+      deux && nS ? h('p', { class: 'pl-label', text: 'Scellé' }) : null,
+      nS ? h('ul', { class: 'pl-rows' }, rowsS) : null,
       rejets.length ? h('p', { class: 'pl-apercu', text: rejets.join(' ') }) : null,
       lignes.length ? apercu : null,
       caseFrais ? h('label', { class: 'pl-check' }, [caseFrais, h('span', null, [
         frais.map(function (f) { return 'Frais de vente ' + f.cn + ' : ' + pct(f.t) + ' au lieu de ' + pct(f.avant); }).join(' · '),
         data.frais_note ? h('small', { text: String(data.frais_note) }) : null])]) : null,
       caseSite ? h('label', { class: 'pl-check' }, [caseSite, refsSite.length > 1 ? ' Passer aussi les ' + nbr(refsSite.length) + ' cartes en « Vendue » sur pokeraichu.com' : ' Passer aussi la carte en « Vendue » sur pokeraichu.com']) : null,
-      !n && !frais.length && !nA ? h('p', { class: 'pl-apercu', text: 'Tout est déjà enregistré.' }) : null
+      !n && !frais.length && !nA && !nS ? h('p', { class: 'pl-apercu', text: 'Tout est déjà enregistré.' }) : null
     ]);
     function plusTard() { S.lienRefs = null; fermer(); }
-    var titre = !lignes.length && ajoutsVus.length ? (ajoutsVus.length > 1 ? 'Cartes à ajouter' : 'Carte à ajouter') : deux ? 'Mises à jour à enregistrer' : 'Ventes à enregistrer';
-    var ok1 = n && !nA ? (n > 1 ? 'Enregistrer les ' + nbr(n) + ' ventes' : 'Enregistrer la vente') : nA && !n ? (nA > 1 ? 'Ajouter les ' + nbr(nA) + ' cartes' : 'Ajouter la carte') : 'Enregistrer';
-    var fs = feuille(titre, [corps], n || frais.length || nA
+    var titre = deux ? 'Mises à jour à enregistrer' : nS ? 'Scellé à mettre à jour' : ajoutsVus.length ? (ajoutsVus.length > 1 ? 'Cartes à ajouter' : 'Carte à ajouter') : 'Ventes à enregistrer';
+    var ok1 = n && !nA && !nS ? (n > 1 ? 'Enregistrer les ' + nbr(n) + ' ventes' : 'Enregistrer la vente') : nA && !n && !nS ? (nA > 1 ? 'Ajouter les ' + nbr(nA) + ' cartes' : 'Ajouter la carte') : 'Enregistrer';
+    var fs = feuille(titre, [corps], n || frais.length || nA || nS
       ? [bouton('Plus tard', plusTard, 'btn--ghost'), h('button', { type: 'submit', class: 'btn', text: ok1 })]
       : [bouton('Fermer', plusTard)]);
     if (caseFrais) caseFrais.addEventListener('change', calc);
@@ -3398,7 +3463,7 @@
     fs.form.addEventListener('submit', function (e) {
       e.preventDefault();
       var fraisOk = caseFrais && caseFrais.checked ? frais : [];
-      if (!n && !fraisOk.length && !nA) { plusTard(); return; }
+      if (!n && !fraisOk.length && !nA && !nS) { plusTard(); return; }
       var aMarquer = caseSite && caseSite.checked ? refsSite.slice() : [];
       S.lienRefs = null;
       fermer();
@@ -3410,6 +3475,7 @@
       if (fraisOk.length) notes.push('Frais de vente par canal', fraisOk.map(function (f) { return f.cn + ' ' + pct(f.t); }).join(', '));
       if (nA === 1) notes.push('Carte ajoutée', ajouts[0].nom + ' (N° ' + ajouts[0].ref + ')');
       else if (nA) notes.push('Cartes ajoutées', nbr(nA) + ' cartes');
+      if (nS) notes.push('Scellé mis à jour', opsS.map(function (o) { var pp = produit(S.doc, o.id); return pp ? (pp.libelle || pp.nom) : (o.creer && (o.creer.libelle || o.creer.nom)) || o.id; }).join(', '));
       var ok = modifier(notes.join(' · '), function (doc) {
         aFaire.forEach(function (x) {
           var cc = trouverCarte(doc, x.r.c.ref);
@@ -3424,6 +3490,7 @@
             gardee: false, yen: null, achat: y.paye != null ? { mode: 'eur', eur: y.paye } : null,
             vendu: false, prix_vendu: null, vente_date: null, canal: null, alias_site: [], lots_site: [] });
         });
+        if (nS) appliquerScelle(doc);
         if (fraisOk.length) {
           doc.params = doc.params || {};
           var t = Object.assign({}, doc.params.frais_canal || {});
@@ -3431,6 +3498,7 @@
           doc.params.frais_canal = t;
         }
       }, { annuler: aMarquer.length ? function () { statutsSite(aMarquer, 'disponible').then(function () { rendre(true); }, function () {}); } : null });
+      if (ok && nS && !n && !nA) location.hash = '#scelle';
       if (ok && nA === 1 && !n) location.hash = '#carte/' + encodeURIComponent(ajouts[0].ref);
       if (ok && aMarquer.length) statutsSite(aMarquer, 'vendue').then(function () { rendre(true); }, function (err) {
         alerte('Site pas mis à jour', 'Les ventes sont enregistrées ici, mais le site n’a pas pu être mis à jour (' + err.message + '). Fais-le depuis la page Gestion.');

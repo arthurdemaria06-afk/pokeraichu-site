@@ -260,6 +260,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - (25/11) 084 Méga-Darkrai-ex 114/081 vendue sur le site mais jamais passée « Vendue » dans le Gist : inscrite dans `config.js`, Shopify PKR-84 à 0.
 - (25/11 soir) 345 Raikou-ex 108/076 KR et 058 Magicarpe 165/103 vendues (canal non précisé) : `config.js`, Shopify à 0, lien Pilotage.
 - (26/11) 014 Zeraora V 074/070 vendue (canal non précisé) : `config.js`, Shopify à 0, lien Pilotage.
+- (26/11) 2 displays vendues entières (Storm Emeralda M6, Mega Brave M1L) : lien Pilotage (scellé). Stock Shopify des boosters M6 à recaler quand Arthur donne le nombre restant.
 - (25/11) Pilotage : lien de ventes chiffré (#ventes=…) préparé par Claude ; ventes eBay 011 et G1830 inscrites (site, Shopify à 0).
 - (25/11) Site : remises par quantité (−5 % / −10 %) supprimées partout (config, fiches, sélection, FAQ, CGV).
 - (25/11) Pilotage : ventes faites sur le site reprises toutes seules (canal à préciser), bouton « Modifier la vente ».
@@ -374,6 +375,10 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
   ajouter », puis la fiche de la carte. Carte ajoutée « de partout » : site (`construire.py`), Shopify (`productSet`
   sur le modèle des autres produits, publié sur le canal Whatnot) et ce lien pour le Pilotage.
   **Retirer `pilotage/ventes-<id>.bin` du dépôt** une fois les ventes enregistrées (à la session suivante au plus tard).
+- Le lien gère aussi le **scellé** (`scelle: [{id, creer?, delta?: {quantite, paye_total, displays}, ventes?: [{n, prix,
+  envois, date, canal, note}]}]`, aperçu calculé par le moteur sur une copie) : une display vendue entière sort de la
+  ligne « boosters » (30 boosters et son prix payé) et entre dans la ligne « displays » (vendues d'un bloc), sinon les
+  frais fixes par booster de la ligne boosters fausseraient le bénéfice.
 - **À chaque vente qu'Arthur annonce** (demande du 26/11) : en plus du site, de Shopify et du lien, lui donner tout de
   suite la **rentabilité de la carte** : moteur `assets/js/pilotage-calcul.js` (`calcul(doc).parRef[ref].vente` → net,
   rentab) sur le document du Pilotage tel qu'importé (`/home/claude/pilotage/modele.json`, hors dépôt ; sinon le
