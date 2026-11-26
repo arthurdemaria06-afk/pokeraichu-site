@@ -259,6 +259,7 @@ modifiées directement, et les nouvelles cartes sont produites par :
 - (25/11) Ajout 351 Méga-Darkrai-ex 118/081 MUR (M5 Nuit Noire), recto + verso, catégorie « Autres » (pas de catégorie MUR), Shopify PKR-351.
 - (25/11) 084 Méga-Darkrai-ex 114/081 vendue sur le site mais jamais passée « Vendue » dans le Gist : inscrite dans `config.js`, Shopify PKR-84 à 0.
 - (25/11 soir) 345 Raikou-ex 108/076 KR et 058 Magicarpe 165/103 vendues (canal non précisé) : `config.js`, Shopify à 0, lien Pilotage.
+- (26/11) 014 Zeraora V 074/070 vendue (canal non précisé) : `config.js`, Shopify à 0, lien Pilotage.
 - (25/11) Pilotage : lien de ventes chiffré (#ventes=…) préparé par Claude ; ventes eBay 011 et G1830 inscrites (site, Shopify à 0).
 - (25/11) Site : remises par quantité (−5 % / −10 %) supprimées partout (config, fiches, sélection, FAQ, CGV).
 - (25/11) Pilotage : ventes faites sur le site reprises toutes seules (canal à préciser), bouton « Modifier la vente ».
@@ -373,6 +374,11 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
   ajouter », puis la fiche de la carte. Carte ajoutée « de partout » : site (`construire.py`), Shopify (`productSet`
   sur le modèle des autres produits, publié sur le canal Whatnot) et ce lien pour le Pilotage.
   **Retirer `pilotage/ventes-<id>.bin` du dépôt** une fois les ventes enregistrées (à la session suivante au plus tard).
+- **À chaque vente qu'Arthur annonce** (demande du 26/11) : en plus du site, de Shopify et du lien, lui donner tout de
+  suite la **rentabilité de la carte** : moteur `assets/js/pilotage-calcul.js` (`calcul(doc).parRef[ref].vente` → net,
+  rentab) sur le document du Pilotage tel qu'importé (`/home/claude/pilotage/modele.json`, hors dépôt ; sinon le
+  refaire avec `extraire.py` depuis son Excel POKE-RAICHU-VF), en marquant la carte vendue au prix annoncé. Dire que
+  c'est calculé avec les réglages de l'import et, si le canal manque, l'effet des frais Whatnot (~8 % + 0,40 €).
 - Contrôles avec le site : `alias_site` (P1, P1-2, P1-3 = fiche 301 ; P2… = 302 ; P3… = 303), `lots_site` (L01 = 095 + G4784,
   L02 = P1 + P2, L03 = P3 + P4, L04 = 313 + 314), `refs_site` des produits (card sets = S02–S10).
 - Coffrets ouverts (20/11) : `coffretOuvert()` de pilotage.js, appliqué une fois à l'ouverture et à chaque import (trace
