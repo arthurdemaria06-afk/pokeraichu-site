@@ -542,7 +542,67 @@
         loaded = true;
         render();
         titresEbay();
+        if (!lienFait) { lienFait = true; lienPrix(); }
       }).catch(function (e) { setInfo('Lecture impossible (' + e.message + ').'); });
+    }
+    /* Lien de prix préparé par Claude (#prix=<id>.<clé>) : liste chiffrée dans pilotage/prix-<id>.bin (iv 12 octets +
+       AES-256-GCM, clé dans le lien seulement). La liste s'affiche, rien n'est publié avant « Appliquer » ; ensuite
+       chaque prix part dans le Gist comme une saisie à la main (un prix égal au prix publié retire le prix en direct). */
+    var RE_PX = /^#prix=([a-f0-9]{8,40})\.([A-Za-z0-9_-]{43})$/, lienFait = false;
+    function lienPrix() {
+      var m = RE_PX.exec(location.hash || '');
+      if (!m) return;
+      var box = el('div', 'prix-lien'), head = el('p', null, 'Lecture du lien de prix…');
+      box.style.cssText = 'margin:0 0 1rem;padding:.9rem 1rem;border:1px solid #DDD5C6;border-radius:8px;background:#FBF9F4';
+      head.style.margin = '0';
+      box.appendChild(head);
+      list.parentNode.insertBefore(box, list);
+      function fail(t) { head.textContent = t; }
+      if (!window.crypto || !window.crypto.subtle || !window.TextDecoder) { fail('Navigateur trop ancien pour lire ce lien : essayez Safari.'); return; }
+      var b64 = m[2].replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      var raw = atob(b64), key = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) key[i] = raw.charCodeAt(i);
+      fetch('/pilotage/prix-' + m[1] + '.bin', { cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error(r.status === 404 ? 'ce lien a expiré' : 'erreur ' + r.status); return r.arrayBuffer(); })
+        .then(function (buf) {
+          return crypto.subtle.importKey('raw', key, { name: 'AES-GCM' }, false, ['decrypt']).then(function (k) {
+            return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(buf, 0, 12) }, k, new Uint8Array(buf, 12));
+          });
+        })
+        .then(function (pt) {
+          var data = JSON.parse(new TextDecoder().decode(pt)), rows = [];
+          (Array.isArray(data.prix) ? data.prix : []).forEach(function (x) {
+            var c = byRef[K(x && x.ref)], v = x && +x.prix;
+            if (!c || !isFinite(v) || !(v > 0) || v >= 1e6) return;
+            var lp = livePrice(c.ref), cur = lp !== null ? lp : c.prix_eur;
+            if (cur === v) return;
+            rows.push({ c: c, v: v, cur: cur });
+          });
+          if (!rows.length) { fail('Tous les prix de ce lien sont déjà à jour.'); return; }
+          head.textContent = (data.source ? data.source + ' : ' : '') + rows.length + ' prix à changer. Rien n’est publié avant « Appliquer ».';
+          var ul = el('ul', null);
+          ul.style.cssText = 'margin:.6rem 0;padding-left:1.1rem';
+          rows.forEach(function (r) {
+            ul.appendChild(el('li', null, 'Réf. ' + r.c.ref + ' · ' + label(r.c) + ' : ' + (r.cur == null ? 'sur demande' : eur0(r.cur)) + ' → ' + eur0(r.v)));
+          });
+          box.appendChild(ul);
+          var go = el('button', 'btn', 'Appliquer ' + rows.length + ' prix'), no = el('button', 'btn btn--ghost', 'Ignorer');
+          go.type = 'button'; no.type = 'button'; no.style.marginLeft = '.5rem';
+          go.addEventListener('click', function () {
+            rows.forEach(function (r) {
+              if (r.v === r.c.prix_eur) delete state.prix[K(r.c.ref)]; else state.prix[K(r.c.ref)] = r.v;
+            });
+            render();
+            publish(rows.length + ' prix mis à jour', null);
+            head.textContent = rows.length + ' prix envoyés : le site les affiche d’ici une minute environ.';
+            ul.remove(); go.remove(); no.remove();
+            try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+          });
+          no.addEventListener('click', function () { box.remove(); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} });
+          box.appendChild(go); box.appendChild(no);
+        })
+        .catch(function (e) { fail('Lien illisible (' + (e && e.message ? e.message : 'erreur') + ').'); });
     }
     q.addEventListener('input', function () { garde = {}; render(); });
     if (askBtn) askBtn.addEventListener('click', function () {
