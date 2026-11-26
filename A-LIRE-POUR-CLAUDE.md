@@ -375,6 +375,7 @@ dans la base D1 (binding DB), tables `pilotage` (version courante) et `pilotage_
   ajouter », puis la fiche de la carte. Carte ajoutée « de partout » : site (`construire.py`), Shopify (`productSet`
   sur le modèle des autres produits, publié sur le canal Whatnot) et ce lien pour le Pilotage.
   **Retirer `pilotage/ventes-<id>.bin` du dépôt** une fois les ventes enregistrées (à la session suivante au plus tard).
+- **Cartes exclues des taux** (26/11) : champ `hors_taux: true` sur une carte vendue (bouton « Exclure des taux » / « Remettre dans les taux » sur sa fiche, ou lien `hors_taux: ["<réf>"]`). Elle reste dans le bénéfice net et le CA, mais sort de la rentabilité et du taux de marque (moteur, tableau de bord, onglet Ventes, analyse). Pour les cartes payées 1 € (cadeaux) qui faussent les taux. Arthur ne veut suivre que la **rentabilité** (bénéfice ÷ coût d'achat) : ne plus lui parler du taux de marque.
 - Le lien gère aussi le **scellé** (`scelle: [{id, creer?, delta?: {quantite, paye_total, displays}, ventes?: [{n, prix,
   envois, date, canal, note}]}]`, aperçu calculé par le moteur sur une copie) : une display vendue entière sort de la
   ligne « boosters » (30 boosters et son prix payé) et entre dans la ligne « displays » (vendues d'un bloc), sinon les

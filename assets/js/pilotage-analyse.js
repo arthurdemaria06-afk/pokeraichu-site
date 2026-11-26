@@ -104,6 +104,7 @@
     var c = r.c, vendu = !!c.vendu, cout = z(r.cout), prix = nb(c.prix), da = dateAchat(r, R);
     var e = { n: 1, nv: vendu ? 1 : 0, cout: cout, estime: r.source === 'estimé' ? cout : 0, inconnu: r.cout == null,
       cout_vendu: vendu ? cout : 0, ca: vendu ? z(r.encaisse) : 0, benef: vendu && r.vente ? r.vente.net : 0,
+      cout_vendu_t: vendu && !c.hors_taux ? cout : 0, benef_t: vendu && r.vente && !c.hors_taux ? r.vente.net : 0,
       cout_stock: vendu ? 0 : cout, valeur_stock: !vendu && prix != null ? prix : 0, cout_stock_val: !vendu && prix != null ? cout : 0,
       n_stock_val: !vendu && prix != null ? 1 : 0, latent: !vendu ? z(r.latent) : 0,
       marche_vendu: vendu && prix != null ? prix : 0, enc_vendu_prix: vendu && prix != null ? z(r.encaisse) : 0, nv_prix: vendu && prix != null ? 1 : 0,
@@ -122,7 +123,7 @@
     var v = x.vente, estimeTout = x.connu ? 0 : x.nb * z(x.prix_u) * (1 - P.fv) / ((1 + P.tva) + P.rent);
     var coutTotal = x.connu ? z(x.paye) : estimeTout;
     return { n: x.nb, nv: v.vendus, cout: coutTotal, estime: x.connu ? 0 : coutTotal, inconnu: false,
-      cout_vendu: v.cout, ca: v.encaisse, benef: v.net, cout_stock: x.stock_reel + x.stock_estime, valeur_stock: x.stock_valeur,
+      cout_vendu: v.cout, ca: v.encaisse, benef: v.net, cout_vendu_t: v.cout, benef_t: v.net, cout_stock: x.stock_reel + x.stock_estime, valeur_stock: x.stock_valeur,
       cout_stock_val: x.stock_reel + x.stock_estime, n_stock_val: x.reste, latent: x.latent,
       marche_vendu: v.vendus * z(x.prix_u), enc_vendu_prix: v.encaisse, nv_prix: v.vendus, delais: [], ages: [], produit: true };
   }
@@ -130,11 +131,11 @@
 
   /* ---------------------------------------------------------------- segments */
   function vide() {
-    return { n: 0, nv: 0, cout: 0, estime: 0, inconnus: 0, cout_vendu: 0, ca: 0, benef: 0, cout_stock: 0, valeur_stock: 0, cout_stock_val: 0,
+    return { n: 0, nv: 0, cout: 0, estime: 0, inconnus: 0, cout_vendu: 0, cout_vendu_t: 0, benef_t: 0, ca: 0, benef: 0, cout_stock: 0, valeur_stock: 0, cout_stock_val: 0,
       n_stock_val: 0, latent: 0, marche_vendu: 0, enc_vendu_prix: 0, nv_prix: 0, delais: [], ages: [], n_delais_est: 0, produit: false };
   }
   function ajouter(s, e) {
-    ['n', 'nv', 'cout', 'estime', 'cout_vendu', 'ca', 'benef', 'cout_stock', 'valeur_stock', 'cout_stock_val', 'n_stock_val', 'latent', 'marche_vendu', 'enc_vendu_prix', 'nv_prix']
+    ['n', 'nv', 'cout', 'estime', 'cout_vendu', 'cout_vendu_t', 'benef_t', 'ca', 'benef', 'cout_stock', 'valeur_stock', 'cout_stock_val', 'n_stock_val', 'latent', 'marche_vendu', 'enc_vendu_prix', 'nv_prix']
       .forEach(function (k) { s[k] += e[k]; });
     if (e.inconnu) s.inconnus++;
     s.delais = s.delais.concat(e.delais); s.ages = s.ages.concat(e.ages); s.n_delais_est += e.n_delais_est || 0;
@@ -167,7 +168,7 @@
     function mesurer(s) {
       s.ecoul_n = s.n ? s.nv / s.n : null;
       s.ecoul = s.cout ? s.cout_vendu / s.cout : (s.n ? s.nv / s.n : null);
-      s.rentab_real = s.cout_vendu ? s.benef / s.cout_vendu : null;
+      s.rentab_real = s.cout_vendu_t ? s.benef_t / s.cout_vendu_t : null;
       s.realisation = s.marche_vendu ? s.enc_vendu_prix / s.marche_vendu : null;
       var d = s.nv_prix >= 3 && s.realisation != null ? s.realisation : realPf;
       s.realisation_retenue = d;

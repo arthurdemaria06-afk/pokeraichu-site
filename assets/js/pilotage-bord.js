@@ -40,7 +40,7 @@
       var base = { r: r, ref: c.ref, nom: c.nom || c.ref, groupe: c.groupe || 'Sans groupe', cat: c.cat || 'Sans catégorie',
         langue: c.langue || 'Non renseignée', gamme: gamme(c.prix), prix: nb(c.prix) };
       if (r.vente && compte) ventes.push(assign({ type: 'carte', date: dateOk(r.date_vente !== undefined ? r.date_vente : c.vente_date), date_estimee: !!r.vente_estimee, canal: c.canal || 'Non renseigné', n: 1,
-        ca: r.vente.encaisse, net: r.vente.net, cout: r.vente.cout, frais: r.vente.frais, envoi: r.vente.envoi, marche: nb(c.prix), estime: r.source === 'estimé' }, base));
+        ca: r.vente.encaisse, net: r.vente.net, cout: r.vente.cout, frais: r.vente.frais, envoi: r.vente.envoi, marche: nb(c.prix), estime: r.source === 'estimé', hors_taux: !!c.hors_taux }, base));
       if (r.stock) stock.push(assign({ type: 'carte', n: 1, valeur: nb(c.prix), cout: z(r.cout), latent: r.latent, sans_prix: nb(c.prix) == null, estime: r.source === 'estimé',
         date_achat: dateOk(c.date_achat) }, base));
       if (compte && r.compte) achats.push(assign({ type: 'carte', paye: z(r.paye) }, base));
@@ -113,13 +113,14 @@
 
   /* ---------------------------------------------------------------- sommes */
   function totaux(l) {
-    var t = { n: 0, ca: 0, net: 0, cout: 0, frais: 0, envoi: 0, marche: 0, ca_marche: 0, lignes: 0 };
+    var t = { n: 0, ca: 0, net: 0, cout: 0, frais: 0, envoi: 0, marche: 0, ca_marche: 0, lignes: 0, ca_t: 0, net_t: 0, cout_t: 0, hors_taux: 0 };
     (l || []).forEach(function (v) {
       t.n += z(v.n); t.ca += z(v.ca); t.net += z(v.net); t.cout += z(v.cout); t.frais += z(v.frais); t.envoi += z(v.envoi); t.lignes++;
+      if (v.hors_taux) t.hors_taux += z(v.n); else { t.ca_t += z(v.ca); t.net_t += z(v.net); t.cout_t += z(v.cout); }   /* hors taux : compté dans le CA et le bénéfice, pas dans les taux */
       if (nb(v.marche) != null && v.marche > 0) { t.marche += v.marche; t.ca_marche += z(v.ca); }
     });
-    t.marque = t.ca ? t.net / t.ca : null;
-    t.rentab = t.cout ? t.net / t.cout : null;
+    t.marque = t.ca_t ? t.net_t / t.ca_t : null;
+    t.rentab = t.cout_t ? t.net_t / t.cout_t : null;
     t.panier = t.n ? t.ca / t.n : null;
     t.realisation = t.marche ? t.ca_marche / t.marche : null;
     t.recupere = t.ca - t.frais - t.envoi;

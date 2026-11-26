@@ -124,8 +124,8 @@
       };
       if (c.vendu && !hors) {
         var frais = z(enc) * fvC, cout = (z(paye) + z(est)) * (1 + tva);
-        r.vente = { encaisse: z(enc), frais: frais, cout: cout, envoi: envoi, net: z(enc) - frais - cout - envoi };
-        r.vente.rentab = cout ? r.vente.net / cout : null;
+        r.vente = { encaisse: z(enc), frais: frais, cout: cout, envoi: envoi, net: z(enc) - frais - cout - envoi, hors_taux: !!c.hors_taux };
+        r.vente.rentab = cout && !c.hors_taux ? r.vente.net / cout : null;   /* « hors_taux » : reste dans le bénéfice et le CA, sort des taux */
       }
       r.latent = r.stock && prix != null ? prix * (1 - fv) - z(r.cout) * (1 + tva) : null;
       parRef[c.ref] = r;
@@ -212,24 +212,26 @@
     groupes.forEach(function (g) {
       if (g.hors_totaux) return;
       var rs = cartes.filter(function (r) { return r.c.groupe === g.id; });
-      var vd = rs.filter(function (r) { return r.c.vendu; });
+      var vd = rs.filter(function (r) { return r.c.vendu; }), vdT = vd.filter(function (r) { return !r.c.hors_taux; });
       var enc = somme(vd, function (r) { return r.encaisse; });
       var cout = (somme(vd, function (r) { return r.paye; }) + somme(vd, function (r) { return r.estime; })) * (1 + tva);
       var fr = somme(vd, function (r) { return z(r.encaisse) * r.fv; });
       var env = vd.length * envoi, b = enc - fr - cout - env;
+      var encT = somme(vdT, function (r) { return r.encaisse; }), frT = somme(vdT, function (r) { return z(r.encaisse) * r.fv; }),
+          coutT = (somme(vdT, function (r) { return r.paye; }) + somme(vdT, function (r) { return r.estime; })) * (1 + tva), bT = encT - frT - coutT - vdT.length * envoi;
       ventes.push({ cle: g.id, libelle: g.nom || g.id, ordre: nb(g.ordre) != null ? g.ordre : 50, vendus: vd.length, stock: rs.length - vd.length,
-        encaisse: enc, frais: fr, cout: cout, envoi: env, net: b, rentab: cout ? b / cout : null,
+        encaisse: enc, frais: fr, cout: cout, envoi: env, net: b, rentab: coutT ? bT / coutT : null, enc_t: encT, cout_t: coutT, net_t: bT, hors_taux: vd.length - vdT.length,
         estime: somme(vd, function (r) { return r.estime; }) * (1 + tva) });
     });
     produits.forEach(function (x) {
       var v = x.vente;
       ventes.push({ cle: x.id, libelle: x.p.libelle || x.p.nom, ordre: nb(x.p.ordre) != null ? x.p.ordre : 60, vendus: v.vendus, stock: v.stock,
-        encaisse: v.encaisse, frais: v.frais, cout: v.cout, envoi: v.envoi, net: v.net, rentab: v.cout ? v.net / v.cout : null, estime: 0, produit: true });
+        encaisse: v.encaisse, frais: v.frais, cout: v.cout, envoi: v.envoi, net: v.net, rentab: v.cout ? v.net / v.cout : null, enc_t: v.encaisse, cout_t: v.cout, net_t: v.net, hors_taux: 0, estime: 0, produit: true });
     });
     ventes.sort(function (a, b) { return a.ordre - b.ordre; });
     var vt = { cle: 'TOTAL', libelle: 'Total' };
-    ['vendus', 'stock', 'encaisse', 'frais', 'cout', 'envoi', 'net', 'estime'].forEach(function (k) { vt[k] = somme(ventes, function (l) { return l[k]; }); });
-    vt.rentab = vt.cout ? vt.net / vt.cout : null;
+    ['vendus', 'stock', 'encaisse', 'frais', 'cout', 'envoi', 'net', 'estime', 'enc_t', 'cout_t', 'net_t', 'hors_taux'].forEach(function (k) { vt[k] = somme(ventes, function (l) { return l[k]; }); });
+    vt.rentab = vt.cout_t ? vt.net_t / vt.cout_t : null;
 
     /* stock restant */
     var enStock = cartes.filter(function (r) { return r.stock; });
@@ -265,7 +267,7 @@
     var recupere = vt.encaisse - vt.frais - vt.envoi;
     var k = {
       benef: vt.net, encaisse: vt.encaisse, vendus: vt.vendus, cout_ventes: vt.cout, envois: vt.envoi, frais_vente: vt.frais,
-      rentab: vt.rentab, taux_marque: vt.encaisse ? vt.net / vt.encaisse : null, prix_moyen: vt.vendus ? vt.encaisse / vt.vendus : null,
+      rentab: vt.rentab, taux_marque: vt.enc_t ? vt.net_t / vt.enc_t : null, hors_taux: vt.hors_taux, prix_moyen: vt.vendus ? vt.encaisse / vt.vendus : null,
       cout_estime_ventes: vt.estime,
       investi: synthTotal.paye, valeur_collection: synthTotal.valeur,
       recupere: recupere, reste: synthTotal.paye - recupere, pct_recupere: synthTotal.paye ? recupere / synthTotal.paye : null,

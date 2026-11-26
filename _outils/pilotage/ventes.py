@@ -10,7 +10,8 @@ Le JSON vient d'un fichier HORS du dépôt (ex. /tmp/ventes.json) :
                "achat": {"mode": "eur", "eur": <payé>}, "date_achat": "AAAA-MM-JJ ou null"}]}
 scelle : [{"id": "<produit>", "creer": {…nouvelle ligne…}, "delta": {"quantite": …, "paye_total": …, "displays": …},
            "ventes": [{"n": <nombre>, "prix": <prix unitaire>, "envois": 1, "date": "AAAA-MM-JJ", "canal": null, "note": "…"}]}]
-ventes, cartes et scelle sont chacune facultatives (au moins une des trois).
+hors_taux : ["<réf.>"] = cartes vendues à exclure des taux de rentabilité et de marque (restent dans le bénéfice et le CA).
+ventes, cartes, scelle et hors_taux sont chacune facultatives (au moins une des quatre).
 (aucun chiffre réel dans ce fichier : le dépôt est public)
 ref = réf. du site (ou N° du Pilotage) ; prix = ce qui reste de la vente, frais d'envoi payés par Arthur déduits ;
 canal parmi CANAUX (null = à préciser) ; frais_canal (facultatif) = part du prix, entre 0 et 1.
@@ -26,8 +27,9 @@ racine = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 if os.path.abspath(src).startswith(racine + os.sep):
     sys.exit('Le JSON en clair ne doit pas être dans le dépôt (public) : mets-le dans /tmp.')
 doc = json.load(open(src, encoding='utf-8'))
-ventes, cartes, scelle = doc.get('ventes') or [], doc.get('cartes') or [], doc.get('scelle') or []
-assert isinstance(ventes, list) and isinstance(cartes, list) and isinstance(scelle, list) and (ventes or cartes or scelle), 'rien à enregistrer'
+ventes, cartes, scelle, hors = doc.get('ventes') or [], doc.get('cartes') or [], doc.get('scelle') or [], doc.get('hors_taux') or []
+assert isinstance(ventes, list) and isinstance(cartes, list) and isinstance(scelle, list) and isinstance(hors, list) and (ventes or cartes or scelle or hors), 'rien à enregistrer'
+assert all(str(r).strip() for r in hors), hors
 for o in scelle:
     assert isinstance(o.get('id'), str) and o['id'], o
     for v in o.get('ventes') or []:
