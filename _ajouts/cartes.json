@@ -1,0 +1,30 @@
+{
+ "cartes": [
+  {
+   "ref": "352",
+   "ajoute_le": "2026-11-27",
+   "nom_fr": "Lugia",
+   "nom_en": "Lugia",
+   "numero": "149/147",
+   "prix_eur": 200,
+   "quantite": 1,
+   "langue": "FR",
+   "extension": {
+    "code": "M6a",
+    "nom": "30th Celebration"
+   },
+   "etat": {
+    "type": "brute",
+    "libelle": "Near Mint"
+   },
+   "rarete": "Réédition 30 ans",
+   "pokemons": [
+    "Lugia"
+   ],
+   "pokemons_en": [
+    "Lugia"
+   ],
+   "photos": 1
+  }
+ ]
+}
